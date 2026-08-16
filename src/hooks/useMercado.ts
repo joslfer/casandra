@@ -149,7 +149,6 @@ function crearMock(
 }
 
 const MOCK: Pregunta[] = [
-  { ...crearMock("¿Entra la demostración del teorema de Bolzano?", "mat", 38, 10), misSi: 3 },
   crearMock("¿Cae un problema de circuitos RLC en régimen transitorio?", "fis", 22, 24),
   crearMock("¿Hay un ejercicio de integrales por partes?", "mat", 44, 6),
   crearMock("¿Entra la Guerra de Sucesión en el desarrollo largo?", "his", 14, 26),
