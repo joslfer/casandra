@@ -1,5 +1,4 @@
 import {
-  multiplicador,
   probabilidad,
   volumen,
   type Lado,
@@ -12,10 +11,6 @@ interface Props {
   onApostar: (lado: Lado) => void;
   onRetirar: () => void;
   bloqueado?: boolean;
-}
-
-function fmtMult(n: number): string {
-  return `× ${n.toFixed(2).replace(".", ",")}`;
 }
 
 export function FilaPregunta({ pregunta, onApostar, onRetirar, bloqueado }: Props) {
@@ -33,21 +28,16 @@ export function FilaPregunta({ pregunta, onApostar, onRetirar, bloqueado }: Prop
     <article className="border-b border-linea py-6">
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[15px] leading-snug text-ink">{pregunta.titulo}</h2>
-        <div className="flex items-baseline gap-2.5">
-          <span className="font-mono text-[26px] font-bold leading-none tabular-nums" style={{ color: "rgba(0,0,0,0.13)" }}>
-            {vol}
-          </span>
-          <span
-            className={`font-mono text-[30px] leading-none tabular-nums ${
-              positivo ? "text-verde" : "text-rojo"
-            }`}
-          >
-            {prob}
-          </span>
-        </div>
+        <span
+          className={`font-mono text-[30px] leading-none tabular-nums ${
+            positivo ? "text-verde" : "text-rojo"
+          }`}
+        >
+          {prob}
+        </span>
       </div>
 
-      <MiniGrafico historial={pregunta.historial} positivo={positivo} volumen={vol} />
+      <MiniGrafico historial={pregunta.historial} />
 
       {cerrada ? (
         <p className="mt-3 font-mono text-[12px] uppercase tracking-widest text-sutil">
@@ -67,16 +57,6 @@ export function FilaPregunta({ pregunta, onApostar, onRetirar, bloqueado }: Prop
               }`}
             >
               <span>NO</span>
-              {pregunta.misNo > 0 && (
-                <span className="font-mono text-[12px] tabular-nums">{pregunta.misNo}</span>
-              )}
-              <span
-                className={`font-mono text-[11px] tabular-nums ${
-                  pregunta.misNo > 0 ? "text-white/70" : "text-sutil"
-                }`}
-              >
-                {fmtMult(multiplicador("no", pregunta))}
-              </span>
             </button>
             <button
               onClick={() => onApostar("si")}
@@ -89,16 +69,6 @@ export function FilaPregunta({ pregunta, onApostar, onRetirar, bloqueado }: Prop
               }`}
             >
               <span>SÍ</span>
-              {pregunta.misSi > 0 && (
-                <span className="font-mono text-[12px] tabular-nums">{pregunta.misSi}</span>
-              )}
-              <span
-                className={`font-mono text-[11px] tabular-nums ${
-                  pregunta.misSi > 0 ? "text-white/70" : "text-sutil"
-                }`}
-              >
-                {fmtMult(multiplicador("si", pregunta))}
-              </span>
             </button>
           </div>
 
