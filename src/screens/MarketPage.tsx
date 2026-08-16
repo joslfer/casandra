@@ -5,7 +5,6 @@ import {
   haceTexto,
   probabilidad,
   useMercado,
-  volumen,
   type Lado,
   type Pregunta,
   type Mercado,
@@ -18,6 +17,7 @@ function Moneda({ className = "" }: { className?: string }) {
 type FiltroPreguntas = "feed" | "archivadas";
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
+const helvetica = { fontFamily: "Helvetica, Arial, sans-serif" };
 
 function Hero({ mercado }: { mercado: Mercado }) {
   const { nombres } = mercado.resumen();
@@ -31,22 +31,27 @@ function Hero({ mercado }: { mercado: Mercado }) {
   );
 }
 
-function MiniGrafico({ historial }: { historial: number[] }) {
-  const proporcionSi = Math.max(0, Math.min(100, historial[historial.length - 1] ?? 50));
-  const proporcionNo = 100 - proporcionSi;
+const MAX_PUNTOS = 60;
 
-  if (historial.length === 0) {
-    return <div className="mt-2.5 h-8" aria-hidden />;
+function EscalaPuntos({ si, no }: { si: number; no: number }) {
+  const total = si + no;
+
+  if (total === 0) {
+    return <p className="mt-2.5 font-mono text-[11px] text-sutil">sin apuestas todavía</p>;
   }
 
+  const escala = total > MAX_PUNTOS ? MAX_PUNTOS / total : 1;
+  const puntosSi = Math.max(si > 0 ? 1 : 0, Math.round(si * escala));
+  const puntosNo = Math.max(no > 0 ? 1 : 0, Math.round(no * escala));
+
   return (
-    <div className="mt-2.5 space-y-1.5" aria-hidden>
-      <div className="h-2.5 overflow-hidden rounded-full bg-linea">
-        <div className="flex h-full w-full">
-          <div className="h-full bg-verde" style={{ width: `${proporcionSi}%` }} />
-          <div className="h-full bg-rojo" style={{ width: `${proporcionNo}%` }} />
-        </div>
-      </div>
+    <div className="mt-2.5 flex flex-wrap items-center gap-1" aria-hidden>
+      {Array.from({ length: puntosSi }).map((_, i) => (
+        <span key={`si-${i}`} className="h-2 w-2 rounded-full bg-verde" />
+      ))}
+      {Array.from({ length: puntosNo }).map((_, i) => (
+        <span key={`no-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
+      ))}
     </div>
   );
 }
@@ -66,16 +71,14 @@ function FilaPregunta({
   const positivo = prob >= 50;
   const apostado = pregunta.misSi + pregunta.misNo;
   const cerrada = pregunta.resultado !== null;
-  const vol = volumen(pregunta);
 
   const btnBase =
     "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-normal transition-colors disabled:opacity-40";
-  const helvetica = { fontFamily: "Helvetica, Arial, sans-serif" };
 
   return (
     <article className="border-b border-linea py-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[15px] leading-snug text-ink">{pregunta.titulo}</h2>
+        <h2 className="text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
         <span
           className={`font-mono text-[30px] leading-none tabular-nums ${
             positivo ? "text-verde" : "text-rojo"
@@ -85,7 +88,7 @@ function FilaPregunta({
         </span>
       </div>
 
-      <MiniGrafico historial={pregunta.historial} />
+      <EscalaPuntos si={pregunta.poolSi} no={pregunta.poolNo} />
 
       {cerrada ? (
         <p className="mt-3 font-mono text-[12px] uppercase tracking-widest text-sutil">
@@ -123,9 +126,10 @@ function FilaPregunta({
           {apostado > 0 && (
             <button
               onClick={onRetirar}
-              className="mt-2 w-full rounded-lg border border-borde bg-transparent py-2 font-mono text-[12px] uppercase tracking-widest text-sutil transition-colors hover:text-ink"
+              style={helvetica}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-borde bg-transparent py-2 font-mono text-[12px] uppercase tracking-widest text-sutil transition-colors hover:text-ink"
             >
-              Retirar {apostado}
+              Retirar <Moneda /> {apostado}
             </button>
           )}
         </>
@@ -144,13 +148,16 @@ function Asignaturas({
   setAsigActiva: (id: string) => void;
 }) {
   return (
-    <div className="flex gap-4 overflow-x-auto border-b border-linea pb-2.5 pt-4">
+    <div className="flex flex-wrap gap-2 pt-4">
       {asignaturas.map((a) => (
         <button
           key={a.id}
           onClick={() => setAsigActiva(a.id)}
-          className={`whitespace-nowrap text-[13px] transition-colors ${
-            a.id === asigId ? "text-ink" : "text-sutil hover:text-ink"
+          style={helvetica}
+          className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-normal transition-colors ${
+            a.id === asigId
+              ? "border-ink bg-ink text-white"
+              : "border-borde bg-white text-ink hover:border-ink/30"
           }`}
         >
           {a.nombre}
@@ -160,11 +167,106 @@ function Asignaturas({
   );
 }
 
+function ModalNuevaPregunta({
+  asignaturas,
+  asigInicial,
+  onCerrar,
+  onCrear,
+}: {
+  asignaturas: Array<{ id: string; nombre: string }>;
+  asigInicial: string;
+  onCerrar: () => void;
+  onCrear: (titulo: string, asignaturaId: string) => boolean;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [asigId, setAsigId] = useState(asigInicial);
+  const [error, setError] = useState<string | null>(null);
+
+  const enviar = () => {
+    if (!titulo.trim()) {
+      setError("Escribe un enunciado para la pregunta");
+      return;
+    }
+    if (!asigId) {
+      setError("Elige una asignatura");
+      return;
+    }
+    const ok = onCrear(titulo, asigId);
+    if (!ok) {
+      setError("No se pudo publicar. Prueba de nuevo.");
+      return;
+    }
+    onCerrar();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center"
+      onClick={onCerrar}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full rounded-t-2xl bg-lienzo p-5 sm:max-w-sm sm:rounded-2xl"
+      >
+        <h2 className="text-[15px] font-semibold text-ink">Nueva pregunta</h2>
+
+        <input
+          autoFocus
+          value={titulo}
+          onChange={(e) => {
+            setTitulo(e.target.value);
+            if (error) setError(null);
+          }}
+          placeholder="¿Entra la demostración de X en el examen?"
+          className="mt-3 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-[14px] text-ink outline-none focus:border-ink/40"
+        />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {asignaturas.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => setAsigId(a.id)}
+              style={helvetica}
+              className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-normal transition-colors ${
+                a.id === asigId
+                  ? "border-ink bg-ink text-white"
+                  : "border-borde bg-white text-ink hover:border-ink/30"
+              }`}
+            >
+              {a.nombre}
+            </button>
+          ))}
+        </div>
+
+        {error && <p className="mt-2 text-[12px] text-rojo">{error}</p>}
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={onCerrar}
+            style={helvetica}
+            className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] text-ink transition-colors hover:border-ink/30"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={enviar}
+            style={helvetica}
+            className="flex-1 rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
+          >
+            Publicar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
   const [filtroPreguntas, setFiltroPreguntas] = useState<FiltroPreguntas>("feed");
   const [error, setError] = useState<string | null>(null);
+  const [modalAbierto, setModalAbierto] = useState(false);
 
   const asignaturas = mercado.leerAsignaturas();
   const [asigActiva, setAsigActiva] = useState<string>("");
@@ -183,6 +285,7 @@ export function MarketPage() {
         </p>
         <button
           onClick={async () => setError(await entrarConGoogle())}
+          style={helvetica}
           className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
         >
           Entrar con Google
@@ -227,6 +330,12 @@ export function MarketPage() {
           </p>
         )}
 
+        {!mercado.pausado && mercado.saldo < 1 && (
+          <p className="mt-4 rounded-lg border border-borde bg-white px-3 py-2 text-[12px] text-sutil">
+            Sin tokens. Retira alguna posición o espera a que se resuelva una pregunta.
+          </p>
+        )}
+
         <Hero mercado={mercado} />
 
         <ul className="mt-4 space-y-2 text-center text-[14px] font-normal leading-relaxed text-sutil">
@@ -235,19 +344,15 @@ export function MarketPage() {
               <span className="rounded-full px-1.5 py-0.5 text-ink [text-shadow:0_0_10px_rgba(245,193,59,0.55)]">
                 {a.usuario}
               </span>{" "}
-              apostó {a.tokens} {a.tokens === 1 ? "token" : "tokens"} {haceTexto(a.cuando)}
+              apostó{" "}
+              <span className="inline-flex items-center gap-1 font-mono tabular-nums text-ink">
+                <Moneda />
+                {a.tokens}
+              </span>{" "}
+              {a.tokens === 1 ? "token" : "tokens"} {haceTexto(a.cuando)}
             </li>
           ))}
         </ul>
-
-        <div className="mt-5 flex gap-4 border-b border-linea pb-2.5">
-          <button
-            onClick={() => setFiltroPreguntas("feed")}
-            className={`${mono} ${filtroPreguntas === "feed" ? "text-ink" : "text-sutil"}`}
-          >
-            Abiertas
-          </button>
-        </div>
 
         <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
 
@@ -255,7 +360,7 @@ export function MarketPage() {
           <FilaPregunta
             key={p.id}
             pregunta={p}
-            bloqueado={mercado.pausado}
+            bloqueado={mercado.pausado || mercado.saldo < 1}
             onApostar={(lado) => mercado.apostar(p.id, lado)}
             onRetirar={() => mercado.retirar(p.id)}
           />
@@ -274,11 +379,29 @@ export function MarketPage() {
 
         <button
           onClick={() => setFiltroPreguntas(filtroPreguntas === "feed" ? "archivadas" : "feed")}
+          style={helvetica}
           className={`mt-8 w-full rounded-full border border-linea py-3 text-[13px] font-normal tracking-normal text-ink transition-colors hover:bg-white`}
         >
           {filtroPreguntas === "feed" ? "Archivadas" : "Abiertas"}
         </button>
       </main>
+
+      <button
+        onClick={() => setModalAbierto(true)}
+        aria-label="Nueva pregunta"
+        className="fixed bottom-6 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-[28px] leading-none text-white shadow-lg transition-opacity hover:opacity-90"
+      >
+        +
+      </button>
+
+      {modalAbierto && (
+        <ModalNuevaPregunta
+          asignaturas={asignaturas}
+          asigInicial={asigId}
+          onCerrar={() => setModalAbierto(false)}
+          onCrear={(titulo, asignaturaId) => !!mercado.crearPregunta(titulo, asignaturaId)}
+        />
+      )}
     </div>
   );
 }
