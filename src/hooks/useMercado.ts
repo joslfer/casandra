@@ -183,7 +183,8 @@ export function useMercado(usuario: Usuario | null) {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>(ASIGNATURAS);
   const [alumnos, setAlumnos] = useState<Alumno[]>(ALUMNOS);
   const [apuestas, setApuestas] = useState<Apuesta[]>(APUESTAS);
-  const [saldo, setSaldo] = useState<number>(SALDO_INICIAL);
+  // El saldo se deriva de preguntas y ajustes, nunca se guarda por separado.
+  const [ajustesManuales, setAjustesManuales] = useState(0);
   const [perfil, setPerfil] = useState<{ nombre: string; usaHash: boolean; hash: string }>({
     nombre: "",
     usaHash: false,
@@ -196,6 +197,32 @@ export function useMercado(usuario: Usuario | null) {
     () => alumnos.some((a) => a.id === usuario?.id && a.pausado),
     [alumnos, usuario],
   );
+
+  const apostadoAbierto = useMemo(
+    () =>
+      preguntas.reduce(
+        (acc, p) => (p.resultado === null && !p.archivada ? acc + p.misSi + p.misNo : acc),
+        0,
+      ),
+    [preguntas],
+  );
+
+  // Los resultados se recalculan desde las preguntas: resolver/desresolver no
+  // puede dejar el saldo desincronizado.
+  const ajustes = useMemo(
+    () =>
+      preguntas.reduce((acc, p) => {
+        if (p.resultado === null) return acc;
+        const lado: Lado = p.resultado ? "si" : "no";
+        const stakeGanador = lado === "si" ? p.misSi : p.misNo;
+        const stakeTotal = p.misSi + p.misNo;
+        if (stakeTotal === 0) return acc;
+        return acc + Math.round(premio(stakeGanador, lado, p.poolSi, p.poolNo)) - stakeTotal;
+      }, ajustesManuales),
+    [preguntas, ajustesManuales],
+  );
+
+  const saldo = SALDO_INICIAL + ajustes - apostadoAbierto;
 
   /** leerAsignaturas() */
   const leerAsignaturas = useCallback((): Asignatura[] => asignaturas, [asignaturas]);
@@ -258,7 +285,7 @@ export function useMercado(usuario: Usuario | null) {
   /** apostar(id, lado, tokens = 1) */
   const apostar = useCallback(
     (id: string, lado: Lado, tokens = 1): boolean => {
-      if (pausado || saldo < tokens) return false;
+      if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
       let ok = false;
       setPreguntas((prev) =>
         prev.map((p) => {
@@ -275,7 +302,6 @@ export function useMercado(usuario: Usuario | null) {
         }),
       );
       if (ok) {
-        setSaldo((s) => s - tokens);
         setApuestas((prev) => [
           { id: crypto.randomUUID(), usuario: miNombre, tokens, cuando: Date.now() },
           ...prev,
@@ -306,7 +332,6 @@ export function useMercado(usuario: Usuario | null) {
           return { ...next, historial: [...p.historial, probabilidad(next)] };
         }),
       );
-      if (devueltos > 0) setSaldo((s) => s + devueltos);
       return devueltos;
     },
     [pausado],
@@ -374,16 +399,12 @@ export function useMercado(usuario: Usuario | null) {
   const resolver = useCallback(
     (id: string, entro: boolean): boolean => {
       if (!esAdmin) return false;
-      let pago = 0;
       setPreguntas((prev) =>
         prev.map((p) => {
           if (p.id !== id || p.resultado !== null) return p;
-          const stake = entro ? p.misSi : p.misNo;
-          pago = stake > 0 ? Math.round(premio(stake, entro ? "si" : "no", p.poolSi, p.poolNo)) : 0;
           return { ...p, resultado: entro };
         }),
       );
-      if (pago > 0) setSaldo((s) => s + pago);
       return true;
     },
     [esAdmin],
@@ -471,10 +492,12 @@ export function useMercado(usuario: Usuario | null) {
       setAlumnos((prev) =>
         prev.map((a) => (a.id === alumnoId ? { ...a, saldo: Math.max(0, a.saldo + delta) } : a)),
       );
-      if (alumnoId === usuario?.id) setSaldo((s) => Math.max(0, s + delta));
+      if (alumnoId === usuario?.id) {
+        setAjustesManuales((prev) => Math.max(prev - saldo, prev + delta));
+      }
       return true;
     },
-    [esAdmin, usuario],
+    [esAdmin, usuario, saldo],
   );
 
   const pausarAlumno = useCallback(
