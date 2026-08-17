@@ -1,4 +1,4 @@
-import { n as __toESM, t as __commonJSMin } from "../../_runtime.mjs";
+import { r as __toESM, t as __commonJSMin } from "../../_runtime.mjs";
 import { n as require_jsx_runtime, r as require_react } from "../react+tanstack__react-query.mjs";
 import { r as parseHref } from "../tanstack__history.mjs";
 import { PassThrough, Readable } from "node:stream";
@@ -3002,7 +3002,7 @@ var RouterCore = class {
 			const filter = (d) => {
 				const route = this.looseRoutesById[d.routeId];
 				if (!route.options.loader) return true;
-				const gcTime = (d.preload ? route.options.preloadGcTime ?? this.options.defaultPreloadGcTime : route.options.gcTime ?? this.options.defaultGcTime) ?? 300 * 1e3;
+				const gcTime = (d.preload ? route.options.preloadGcTime ?? this.options.defaultPreloadGcTime : route.options.gcTime ?? this.options.defaultGcTime) ?? 3e5;
 				if (d.status === "error") return true;
 				return now - d.updatedAt >= gcTime;
 			};
@@ -13660,9 +13660,9 @@ var MIN_CLOSING_TAG_LENGTH = 4;
 var DEFAULT_SERIALIZATION_TIMEOUT_MS = 6e4;
 var DEFAULT_LIFETIME_TIMEOUT_MS = DEFAULT_SERIALIZATION_TIMEOUT_MS * 2;
 var MAX_LEFTOVER_CHARS = 2048;
-var MAX_TAIL_CHARS = 64 * 1024;
-var MAX_ROUTER_HTML_CHARS = 16 * 1024 * 1024;
-var MAX_PENDING_WRITE_CHARS = 16 * 1024 * 1024;
+var MAX_TAIL_CHARS = 65536;
+var MAX_ROUTER_HTML_CHARS = 16777216;
+var MAX_PENDING_WRITE_CHARS = 16777216;
 var MergeState = {
 	ReadingBody: 0,
 	HoldingTail: 1,

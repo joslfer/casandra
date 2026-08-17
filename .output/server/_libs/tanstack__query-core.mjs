@@ -551,7 +551,7 @@ var Removable = class {
 		}, this.gcTime);
 	}
 	updateGcTime(newGcTime) {
-		this.gcTime = Math.max(this.gcTime || 0, newGcTime ?? (environmentManager.isServer() ? Infinity : 300 * 1e3));
+		this.gcTime = Math.max(this.gcTime || 0, newGcTime ?? (environmentManager.isServer() ? Infinity : 3e5));
 	}
 	clearGcTimeout() {
 		if (this.#gcTimeout !== void 0) {
@@ -770,8 +770,10 @@ var Query = class extends Removable {
 		if (this.observers.includes(observer)) {
 			this.observers = this.observers.filter((x) => x !== observer);
 			if (!this.observers.length) {
-				if (this.#retryer) if (this.#abortSignalConsumed || this.#isInitialPausedFetch()) this.#retryer.cancel({ revert: true });
-				else this.#retryer.cancelRetry();
+				if (this.#retryer) {
+					if (this.#abortSignalConsumed || this.#isInitialPausedFetch()) this.#retryer.cancel({ revert: true });
+					else this.#retryer.cancelRetry();
+				}
 				this.scheduleGc();
 			}
 			this.#cache.notify({
@@ -1056,8 +1058,10 @@ var Mutation = class extends Removable {
 		});
 	}
 	optionalRemove() {
-		if (!this.#observers.length) if (this.state.status === "pending") this.scheduleGc();
-		else this.#mutationCache.remove(this);
+		if (!this.#observers.length) {
+			if (this.state.status === "pending") this.scheduleGc();
+			else this.#mutationCache.remove(this);
+		}
 	}
 	continue() {
 		return this.#retryer?.continue() ?? this.execute(this.state.variables);

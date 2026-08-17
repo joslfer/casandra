@@ -1451,15 +1451,16 @@ var RealtimeChannel = class RealtimeChannel {
 				"broadcast",
 				"presence",
 				"postgres_changes"
-			].includes(typeLower)) if ("id" in bind) {
-				const bindId = bind.id;
-				const bindEvent = (_b = bind.filter) === null || _b === void 0 ? void 0 : _b.event;
-				return bindId && ((_c = payload.ids) === null || _c === void 0 ? void 0 : _c.includes(bindId)) && (bindEvent === "*" || (bindEvent === null || bindEvent === void 0 ? void 0 : bindEvent.toLocaleLowerCase()) === ((_d = payload.data) === null || _d === void 0 ? void 0 : _d.type.toLocaleLowerCase()));
-			} else {
-				const bindEvent = (_f = (_e = bind === null || bind === void 0 ? void 0 : bind.filter) === null || _e === void 0 ? void 0 : _e.event) === null || _f === void 0 ? void 0 : _f.toLocaleLowerCase();
-				return bindEvent === "*" || bindEvent === ((_g = payload === null || payload === void 0 ? void 0 : payload.event) === null || _g === void 0 ? void 0 : _g.toLocaleLowerCase());
-			}
-			else return bind.type.toLocaleLowerCase() === typeLower;
+			].includes(typeLower)) {
+				if ("id" in bind) {
+					const bindId = bind.id;
+					const bindEvent = (_b = bind.filter) === null || _b === void 0 ? void 0 : _b.event;
+					return bindId && ((_c = payload.ids) === null || _c === void 0 ? void 0 : _c.includes(bindId)) && (bindEvent === "*" || (bindEvent === null || bindEvent === void 0 ? void 0 : bindEvent.toLocaleLowerCase()) === ((_d = payload.data) === null || _d === void 0 ? void 0 : _d.type.toLocaleLowerCase()));
+				} else {
+					const bindEvent = (_f = (_e = bind === null || bind === void 0 ? void 0 : bind.filter) === null || _e === void 0 ? void 0 : _e.event) === null || _f === void 0 ? void 0 : _f.toLocaleLowerCase();
+					return bindEvent === "*" || bindEvent === ((_g = payload === null || payload === void 0 ? void 0 : payload.event) === null || _g === void 0 ? void 0 : _g.toLocaleLowerCase());
+				}
+			} else return bind.type.toLocaleLowerCase() === typeLower;
 		});
 	}
 	/** @internal */

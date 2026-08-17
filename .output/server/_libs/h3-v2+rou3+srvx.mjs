@@ -2,7 +2,7 @@
 var FastURL = URL;
 var FastResponse = Response;
 //#endregion
-//#region node_modules/h3-v2/node_modules/rou3/dist/index.mjs
+//#region node_modules/rou3/dist/index.mjs
 var NullProtoObj = /* @__PURE__ */ (() => {
 	const e = function() {};
 	return e.prototype = Object.create(null), Object.freeze(e.prototype), e;

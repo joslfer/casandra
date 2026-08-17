@@ -289,18 +289,19 @@ var FunctionsClient = class {
 				}
 				let body;
 				const hasContentTypeHeader = !!headers && Object.keys(headers).some((key) => key.toLowerCase() === "content-type");
-				if (functionArgs && !hasContentTypeHeader) if (typeof Blob !== "undefined" && functionArgs instanceof Blob || functionArgs instanceof ArrayBuffer) {
-					_headers["Content-Type"] = "application/octet-stream";
-					body = functionArgs;
-				} else if (typeof functionArgs === "string") {
-					_headers["Content-Type"] = "text/plain";
-					body = functionArgs;
-				} else if (typeof FormData !== "undefined" && functionArgs instanceof FormData) body = functionArgs;
-				else {
-					_headers["Content-Type"] = "application/json";
-					body = JSON.stringify(functionArgs);
-				}
-				else if (functionArgs && typeof functionArgs !== "string" && !(typeof Blob !== "undefined" && functionArgs instanceof Blob) && !(functionArgs instanceof ArrayBuffer) && !(typeof FormData !== "undefined" && functionArgs instanceof FormData)) body = JSON.stringify(functionArgs);
+				if (functionArgs && !hasContentTypeHeader) {
+					if (typeof Blob !== "undefined" && functionArgs instanceof Blob || functionArgs instanceof ArrayBuffer) {
+						_headers["Content-Type"] = "application/octet-stream";
+						body = functionArgs;
+					} else if (typeof functionArgs === "string") {
+						_headers["Content-Type"] = "text/plain";
+						body = functionArgs;
+					} else if (typeof FormData !== "undefined" && functionArgs instanceof FormData) body = functionArgs;
+					else {
+						_headers["Content-Type"] = "application/json";
+						body = JSON.stringify(functionArgs);
+					}
+				} else if (functionArgs && typeof functionArgs !== "string" && !(typeof Blob !== "undefined" && functionArgs instanceof Blob) && !(functionArgs instanceof ArrayBuffer) && !(typeof FormData !== "undefined" && functionArgs instanceof FormData)) body = JSON.stringify(functionArgs);
 				else body = functionArgs;
 				let effectiveSignal = signal;
 				if (timeout) {

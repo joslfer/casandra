@@ -40,7 +40,7 @@ var version = "2.112.3";
 //#endregion
 //#region node_modules/@supabase/auth-js/dist/module/lib/constants.js
 /** Current session will be checked for refresh at this interval. */
-var AUTO_REFRESH_TICK_DURATION_MS = 30 * 1e3;
+var AUTO_REFRESH_TICK_DURATION_MS = 3e4;
 var EXPIRY_MARGIN_MS = 3 * AUTO_REFRESH_TICK_DURATION_MS;
 /**
 * After a refresh fails, serial callers (including the next auto-refresh
@@ -823,8 +823,10 @@ async function removePKCEVerifier(storage, storageKey, flowId) {
 	await removeItemAsync(storage, slotKey);
 	const index = await getPKCEFlowIndex(storage, storageKey);
 	const remaining = index.filter((id) => id !== flowId);
-	if (remaining.length !== index.length) if (remaining.length > 0) await setItemAsync(storage, pkceFlowIndexKey(storageKey), remaining);
-	else await removeItemAsync(storage, pkceFlowIndexKey(storageKey));
+	if (remaining.length !== index.length) {
+		if (remaining.length > 0) await setItemAsync(storage, pkceFlowIndexKey(storageKey), remaining);
+		else await removeItemAsync(storage, pkceFlowIndexKey(storageKey));
+	}
 	if (slotValue != null && slotValue === await getItemAsync(storage, legacyKey)) await removeItemAsync(storage, legacyKey);
 }
 /**
@@ -5553,10 +5555,12 @@ var GoTrueClient = class GoTrueClient {
 			let currentSession = null;
 			const maybeSession = await getItemAsync(this.storage, this.storageKey);
 			this._debug("#getSession()", "session from storage", maybeSession);
-			if (maybeSession !== null) if (this._isValidSession(maybeSession)) currentSession = maybeSession;
-			else {
-				this._debug("#getSession()", "session from storage is not valid");
-				await this._removeSession();
+			if (maybeSession !== null) {
+				if (this._isValidSession(maybeSession)) currentSession = maybeSession;
+				else {
+					this._debug("#getSession()", "session from storage is not valid");
+					await this._removeSession();
+				}
 			}
 			if (!currentSession) return {
 				data: { session: null },
@@ -6270,10 +6274,7 @@ var GoTrueClient = class GoTrueClient {
 				case "implicit":
 					if (this.flowType === "pkce") throw new AuthPKCEGrantCodeExchangeError("Not a valid PKCE flow url.");
 					break;
-				case "pkce":
-					if (this.flowType === "implicit") throw new AuthImplicitGrantRedirectError("Not a valid implicit grant flow url.");
-					break;
-				default:
+				case "pkce": if (this.flowType === "implicit") throw new AuthImplicitGrantRedirectError("Not a valid implicit grant flow url.");
 			}
 			if (callbackUrlType === "pkce") {
 				this._debug("#_initialize()", "begin", "is PKCE flow", true);
@@ -7054,8 +7055,10 @@ var GoTrueClient = class GoTrueClient {
 			if (expiresWithMargin) {
 				if (this.autoRefreshToken && currentSession.refresh_token) {
 					const { error } = await this._callRefreshToken(currentSession.refresh_token);
-					if (error) if (isAuthRefreshDiscardedError(error)) this._debug(debugName, "refresh discarded by commit guard", error);
-					else this._debug(debugName, "refresh failed", error);
+					if (error) {
+						if (isAuthRefreshDiscardedError(error)) this._debug(debugName, "refresh discarded by commit guard", error);
+						else this._debug(debugName, "refresh failed", error);
+					}
 				}
 			} else if (currentSession.user && currentSession.user.__isUserNotAvailableProxy === true) try {
 				const { data, error: userError } = await this._getUser(currentSession.access_token);
