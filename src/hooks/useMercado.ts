@@ -1,13 +1,12 @@
 /**
- * CAPA DE DATOS AISLADA
- * ---------------------
- * Toda la lógica del mercado vive aquí. Ningún componente toca el estado
- * directamente: sólo llama a las funciones expuestas por useMercado().
- *
- * Las firmas están pensadas para sustituirse por llamadas a una API real
- * (fetch / server functions) sin tocar la UI. Hoy: mock en estado local.
+ * CAPA DE DATOS CONECTADA A SUPABASE
+ * ----------------------------------
+ * Toda la lógica del mercado se conecta ahora a la base de datos real.
+ * Se utilizan las funciones RPC de PostgreSQL para garantizar seguridad
+ * atómica en las transacciones (apuestas y repartos).
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export type Lado = "si" | "no";
 
@@ -22,12 +21,9 @@ export interface Pregunta {
   asignaturaId: string;
   poolSi: number;
   poolNo: number;
-  /** historial de probabilidad SÍ (0-100) */
   historial: number[];
-  /** tokens que ha apostado el usuario actual en cada lado */
   misSi: number;
   misNo: number;
-  /** null = abierta, true = entró, false = no entró */
   resultado: boolean | null;
   archivada: boolean;
   creadaEn: number;
@@ -55,27 +51,22 @@ export interface Alumno {
   hash: string;
 }
 
-const SALDO_INICIAL = 10;
-
 export function probabilidad(p: Pick<Pregunta, "poolSi" | "poolNo">): number {
   const total = p.poolSi + p.poolNo;
   if (total === 0) return 50;
   return Math.round((p.poolSi / total) * 100);
 }
 
-/** volumen(p): tokens totales apostados en la pregunta */
 export function volumen(p: Pick<Pregunta, "poolSi" | "poolNo">): number {
   return p.poolSi + p.poolNo;
 }
 
-/** premio(stake, lado, poolSi, poolNo): pago bruto de una posición ganadora */
 export function premio(stake: number, lado: Lado, poolSi: number, poolNo: number): number {
   const total = poolSi + poolNo;
   if (lado === "si") return poolSi === 0 ? 0 : total * (stake / poolSi);
   return poolNo === 0 ? 0 : total * (stake / poolNo);
 }
 
-/** multiplicador(lado, p): por cuánto multiplicarías 1 token nuevo si ganas */
 export function multiplicador(lado: Lado, p: Pick<Pregunta, "poolSi" | "poolNo">): number {
   const poolSi = p.poolSi + (lado === "si" ? 1 : 0);
   const poolNo = p.poolNo + (lado === "no" ? 1 : 0);
@@ -98,148 +89,157 @@ export function haceTexto(cuando: number, ahora = Date.now()): string {
   return `hace ${d} ${d === 1 ? "día" : "días"}`;
 }
 
-/** nombreCorto(titulo): para el pie del hero */
 export function nombreCorto(titulo: string): string {
   const limpio = titulo.replace(/^¿/, "").replace(/\?$/, "");
   const palabras = limpio.split(" ").slice(0, 3).join(" ");
   return palabras.charAt(0).toUpperCase() + palabras.slice(1);
 }
 
-/** Genera un historial verosímil terminando en la probabilidad actual. */
-function historialInicial(final: number, n = 14): number[] {
-  const out: number[] = [];
-  let v = final + (Math.random() * 24 - 12);
-  for (let i = 0; i < n - 1; i++) {
-    v = Math.min(96, Math.max(4, v + (Math.random() * 14 - 7)));
-    out.push(Math.round(v));
-  }
-  out.push(final);
-  return out;
-}
-
-const ASIGNATURAS: Asignatura[] = [
-  { id: "mat", nombre: "Matemáticas" },
-  { id: "fis", nombre: "Física" },
-  { id: "bio", nombre: "Biología" },
-  { id: "his", nombre: "Historia" },
-];
-
-function crearMock(
-  titulo: string,
-  asignaturaId: string,
-  poolSi: number,
-  poolNo: number,
-  resultado: boolean | null = null,
-  archivada = false,
-): Pregunta {
-  const base: Pregunta = {
-    id: crypto.randomUUID(),
-    titulo,
-    asignaturaId,
-    poolSi,
-    poolNo,
-    historial: [],
-    misSi: 0,
-    misNo: 0,
-    resultado,
-    archivada,
-    creadaEn: Date.now(),
-  };
-  return { ...base, historial: historialInicial(probabilidad(base)) };
-}
-
-const MOCK: Pregunta[] = [
-  crearMock("¿Cae un problema de circuitos RLC en régimen transitorio?", "fis", 22, 24),
-  crearMock("¿Hay un ejercicio de integrales por partes?", "mat", 44, 6),
-  crearMock("¿Entra la Guerra de Sucesión en el desarrollo largo?", "his", 14, 26),
-  crearMock("¿Piden demostrar la regla de la cadena?", "mat", 19, 21),
-  crearMock("¿Sale el efecto fotoeléctrico como teoría?", "fis", 30, 12, true),
-  crearMock("¿Entra la mitosis con dibujo?", "bio", 8, 40, false, true),
-];
-
-const ALUMNOS: Alumno[] = [
-  { id: "jose.luefer", nombre: "José L.", saldo: 10, pausado: false, usaHash: false, hash: hashAleatorio() },
-  { id: "marta.gil", nombre: "Marta G.", saldo: 14, pausado: false, usaHash: false, hash: hashAleatorio() },
-  { id: "anon1", nombre: "", saldo: 7, pausado: false, usaHash: true, hash: "k7q2ma" },
-  { id: "pablo.ruiz", nombre: "Pablo R.", saldo: 3, pausado: true, usaHash: false, hash: hashAleatorio() },
-  { id: "lucia.ny", nombre: "Lucía N.", saldo: 21, pausado: false, usaHash: false, hash: hashAleatorio() },
-  { id: "anon2", nombre: "", saldo: 9, pausado: false, usaHash: true, hash: "z3m9tp" },
-];
-
 export function nombreVisible(a: Alumno): string {
   return a.usaHash ? `#${a.hash}` : a.nombre || a.id;
 }
 
-const AHORA = Date.now();
-const APUESTAS: Apuesta[] = [
-  { id: "a1", usuario: "Marta G.", tokens: 4, cuando: AHORA - 55 * 60000 },
-  { id: "a2", usuario: "#k7q2ma", tokens: 2, cuando: AHORA - 2 * 3600_000 },
-  { id: "a3", usuario: "Lucía N.", tokens: 6, cuando: AHORA - 5 * 3600_000 },
-  { id: "a4", usuario: "#z3m9tp", tokens: 1, cuando: AHORA - 9 * 3600_000 },
-];
 
 export function useMercado(usuario: Usuario | null) {
-  const [preguntas, setPreguntas] = useState<Pregunta[]>(MOCK);
-  const [asignaturas, setAsignaturas] = useState<Asignatura[]>(ASIGNATURAS);
-  const [alumnos, setAlumnos] = useState<Alumno[]>(ALUMNOS);
-  const [apuestas, setApuestas] = useState<Apuesta[]>(APUESTAS);
-  // El saldo se deriva de preguntas y ajustes, nunca se guarda por separado.
-  const [ajustesManuales, setAjustesManuales] = useState(0);
-  const [perfil, setPerfil] = useState<{ nombre: string; usaHash: boolean; hash: string }>({
-    nombre: "",
-    usaHash: false,
-    hash: hashAleatorio(),
-  });
+  const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
+  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [apuestas, setApuestas] = useState<Apuesta[]>([]);
+  const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
 
+  // --------------------------------------------------------
+  // CARGA DE DATOS DESDE SUPABASE
+  // --------------------------------------------------------
+  const cargarDatos = useCallback(async () => {
+    // 1. Descargamos tablas públicas
+    const [resAsig, resPerf, resPreg, resApu] = await Promise.all([
+      supabase.from("asignaturas").select("*"),
+      supabase.from("perfiles").select("*"),
+      supabase.from("preguntas").select("*").order("creada_en", { ascending: false }),
+      supabase.from("apuestas").select("*, perfiles(nombre, usa_hash, hash)").order("cuando", { ascending: false }).limit(30)
+    ]);
+
+    // CHIVATOS DE ERRORES:
+    if (resAsig.error) console.error("Error Asignaturas:", resAsig.error);
+    if (resPerf.error) console.error("Error Perfiles:", resPerf.error);
+    if (resPreg.error) console.error("Error Preguntas:", resPreg.error);
+    if (resApu.error) console.error("Error Apuestas:", resApu.error);
+
+    // 2. Extraemos MIS apuestas para calcular misSi y misNo
+    let misApuestas: any[] = [];
+    if (usuario) {
+      const { data, error } = await supabase.from("apuestas").select("*").eq("usuario_id", usuario.id);
+      if (error) console.error("Error Mis Apuestas:", error);
+      if (data) misApuestas = data;
+    }
+
+    if (resAsig.data) setAsignaturas(resAsig.data.map((a: any) => ({ id: a.id, nombre: a.nombre })));
+
+    if (resPerf.data) {
+      const alums = resPerf.data.map((p: any) => ({
+        id: p.id,
+        nombre: p.nombre || "",
+        saldo: Number(p.saldo),
+        pausado: p.pausado,
+        usaHash: p.usa_hash,
+        hash: p.hash || ""
+      }));
+      setAlumnos(alums);
+      if (usuario) {
+        const mio = alums.find((a) => a.id === usuario.id);
+        if (mio) setMiPerfil(mio);
+      }
+    }
+
+    if (resApu.data) {
+      const apFormateadas: Apuesta[] = resApu.data.map((a: any) => {
+        const p = a.perfiles;
+        let nombre = "Anónimo";
+        if (p) nombre = p.usa_hash ? `#${p.hash}` : p.nombre || "Anónimo";
+        return {
+          id: a.id,
+          usuario: nombre,
+          tokens: Number(a.tokens),
+          cuando: new Date(a.cuando).getTime()
+        };
+      });
+      setApuestas(apFormateadas);
+    }
+
+    if (resPreg.data) {
+      const pregs: Pregunta[] = resPreg.data.map((p: any) => {
+        let misSi = 0;
+        let misNo = 0;
+        for (const ap of misApuestas) {
+          if (ap.pregunta_id === p.id) {
+            if (ap.lado === "si") misSi += Number(ap.tokens);
+            else misNo += Number(ap.tokens);
+          }
+        }
+        return {
+          id: p.id,
+          titulo: p.titulo,
+          asignaturaId: p.asignatura_id,
+          poolSi: Number(p.pool_si),
+          poolNo: Number(p.pool_no),
+          historial: typeof p.historial === "string" ? JSON.parse(p.historial) : p.historial || [],
+          misSi,
+          misNo,
+          resultado: p.resultado,
+          archivada: p.archivada,
+          creadaEn: new Date(p.creada_en).getTime()
+        };
+      });
+      setPreguntas(pregs);
+    }
+  }, [usuario]);
+
+  // Suscripción básica y carga inicial
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
+
+
+  // --------------------------------------------------------
+  // ESTADOS COMPUTADOS
+  // --------------------------------------------------------
+  const saldo = miPerfil ? miPerfil.saldo : 0;
+  const pausado = miPerfil ? miPerfil.pausado : false;
+  
+  const perfil = miPerfil 
+    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash } 
+    : { nombre: "", usaHash: false, hash: "" };
+    
   const miNombre = perfil.usaHash ? `#${perfil.hash}` : perfil.nombre || usuario?.nombre || "Tú";
 
-  const pausado = useMemo(
-    () => alumnos.some((a) => a.id === usuario?.id && a.pausado),
-    [alumnos, usuario],
-  );
-
-  const apostadoAbierto = useMemo(
-    () =>
-      preguntas.reduce(
-        (acc, p) => (p.resultado === null && !p.archivada ? acc + p.misSi + p.misNo : acc),
-        0,
-      ),
-    [preguntas],
-  );
-
-  // Los resultados se recalculan desde las preguntas: resolver/desresolver no
-  // puede dejar el saldo desincronizado.
-  const ajustes = useMemo(
-    () =>
-      preguntas.reduce((acc, p) => {
-        if (p.resultado === null) return acc;
-        const lado: Lado = p.resultado ? "si" : "no";
-        const stakeGanador = lado === "si" ? p.misSi : p.misNo;
-        const stakeTotal = p.misSi + p.misNo;
-        if (stakeTotal === 0) return acc;
-        return acc + Math.round(premio(stakeGanador, lado, p.poolSi, p.poolNo)) - stakeTotal;
-      }, ajustesManuales),
-    [preguntas, ajustesManuales],
-  );
-
-  const saldo = SALDO_INICIAL + ajustes - apostadoAbierto;
-
-  /** leerAsignaturas() */
   const leerAsignaturas = useCallback((): Asignatura[] => asignaturas, [asignaturas]);
-
-  /** leerApuestas(): actividad reciente */
-  const leerApuestas = useCallback(
-    (): Apuesta[] => [...apuestas].sort((a, b) => b.cuando - a.cuando).slice(0, 5),
-    [apuestas],
-  );
-
-  /** leerAlumnos() */
   const leerAlumnos = useCallback((): Alumno[] => alumnos, [alumnos]);
 
-  /**
-   * leerPreguntas(filtro): ordenadas por probabilidad SÍ desc.
-   * estado: "abiertas" | "resueltas" | "archivadas" | "todas"
-   */
+  // Actividad agrupada para evitar spam visual de clics consecutivos
+  const leerApuestas = useCallback((): Apuesta[] => {
+    const agrupadas: Apuesta[] = [];
+    for (const a of apuestas) {
+      const ultima = agrupadas[agrupadas.length - 1];
+      if (ultima && ultima.usuario === a.usuario) {
+        ultima.tokens += a.tokens;
+      } else {
+        agrupadas.push({ ...a });
+      }
+    }
+    return agrupadas.slice(0, 15);
+  }, [apuestas]);
+
+  // Ranking ordenado por saldo de mayor a menor
+  const leerRanking = useCallback(() => {
+    return [...alumnos]
+      .sort((a, b) => b.saldo - a.saldo)
+      .map((a) => ({
+        usuario: a.usaHash ? `#${a.hash}` : (a.nombre || "Anónimo"),
+        tokens: Math.round(a.saldo)
+      }))
+      .slice(0, 10);
+  }, [alumnos]);
+
   const leerPreguntas = useCallback(
     (opts?: { asignaturaId?: string; estado?: "abiertas" | "resueltas" | "archivadas" | "todas" }) => {
       const estado = opts?.estado ?? "todas";
@@ -253,18 +253,15 @@ export function useMercado(usuario: Usuario | null) {
         })
         .sort((a, b) => probabilidad(b) - probabilidad(a));
     },
-    [preguntas],
+    [preguntas]
   );
 
-  /** resumen(): posible ganancia/pérdida sobre todas mis posiciones abiertas */
   const resumen = useCallback(() => {
     let ganar = 0;
     let perder = 0;
     const nombres: string[] = [];
     for (const p of preguntas) {
-      if (p.resultado !== null) continue;
-      const abierta = p.misSi > 0 || p.misNo > 0;
-      if (!abierta) continue;
+      if (p.resultado !== null || (!p.misSi && !p.misNo)) continue;
       if (p.misSi > 0) {
         ganar += premio(p.misSi, "si", p.poolSi, p.poolNo) - p.misSi;
         perder += p.misSi;
@@ -278,245 +275,189 @@ export function useMercado(usuario: Usuario | null) {
     return { ganar: Math.round(ganar), perder: Math.round(perder), nombres };
   }, [preguntas]);
 
+
+  // --------------------------------------------------------
+  // ACCIONES DEL USUARIO (CONECTADAS A LA DB)
+  // --------------------------------------------------------
+  
+  const apostar = useCallback(async (id: string, lado: Lado, tokens = 1) => {
+    if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
+
+    // Actualización optimista de la UI para que se sienta instantánea
+    setPreguntas((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      return {
+        ...p,
+        poolSi: p.poolSi + (lado === "si" ? tokens : 0),
+        poolNo: p.poolNo + (lado === "no" ? tokens : 0),
+        misSi: p.misSi + (lado === "si" ? tokens : 0),
+        misNo: p.misNo + (lado === "no" ? tokens : 0)
+      };
+    }));
+    setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo - tokens } : prev));
+
+    // Llamada segura a la DB
+    const { error } = await supabase.rpc("apostar", { p_pregunta_id: id, p_lado: lado, p_tokens: tokens });
+    if (error) console.error("Error al apostar:", error);
+    
+    await cargarDatos();
+    return !error;
+  }, [saldo, pausado, cargarDatos]);
+
+  const retirar = useCallback(async (id: string) => {
+    if (pausado) return 0;
+    const p = preguntas.find((p) => p.id === id);
+    const devolucion = p ? p.misSi + p.misNo : 0;
+
+    // Actualización optimista
+    setPreguntas((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      return {
+        ...p,
+        poolSi: Math.max(0, p.poolSi - p.misSi),
+        poolNo: Math.max(0, p.poolNo - p.misNo),
+        misSi: 0,
+        misNo: 0
+      };
+    }));
+    setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + devolucion } : prev));
+
+    // Llamada segura a la DB
+    const { error } = await supabase.rpc("retirar_todo", { p_pregunta_id: id });
+    if (error) console.error("Error al retirar:", error);
+
+    await cargarDatos();
+    return devolucion;
+  }, [pausado, preguntas, cargarDatos]);
+
+  const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
+    const t = titulo.trim();
+    if (!t || pausado || !asignaturaId) return null;
+    
+    const { data, error } = await supabase.from("preguntas").insert({
+      titulo: t,
+      asignatura_id: asignaturaId,
+      historial: [50]
+    }).select().single();
+    
+    if (error || !data) return null;
+    await cargarDatos();
+    return data as unknown as Pregunta; 
+  }, [pausado, cargarDatos]);
+
+  const simular = useCallback(() => {
+    console.log("Simular deshabilitado. La app ya está conectada al backend real.");
+  }, []);
+
   const mutar = useCallback((id: string, fn: (p: Pregunta) => Pregunta) => {
     setPreguntas((prev) => prev.map((p) => (p.id === id ? fn(p) : p)));
   }, []);
 
-  /** apostar(id, lado, tokens = 1) */
-  const apostar = useCallback(
-    (id: string, lado: Lado, tokens = 1): boolean => {
-      if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
-      let ok = false;
-      setPreguntas((prev) =>
-        prev.map((p) => {
-          if (p.id !== id || p.resultado !== null || p.archivada) return p;
-          ok = true;
-          const next: Pregunta = {
-            ...p,
-            poolSi: p.poolSi + (lado === "si" ? tokens : 0),
-            poolNo: p.poolNo + (lado === "no" ? tokens : 0),
-            misSi: p.misSi + (lado === "si" ? tokens : 0),
-            misNo: p.misNo + (lado === "no" ? tokens : 0),
-          };
-          return { ...next, historial: [...p.historial, probabilidad(next)] };
-        }),
-      );
-      if (ok) {
-        setApuestas((prev) => [
-          { id: crypto.randomUUID(), usuario: miNombre, tokens, cuando: Date.now() },
-          ...prev,
-        ]);
-      }
-      return ok;
-    },
-    [saldo, pausado, miNombre],
-  );
+  // --------------------------------------------------------
+  // PERFIL
+  // --------------------------------------------------------
+  
+  const guardarNombre = useCallback(async (nombre: string) => {
+    if (!usuario) return;
+    setMiPerfil((prev) => (prev ? { ...prev, nombre } : prev));
+    await supabase.from("perfiles").update({ nombre }).eq("id", usuario.id);
+    await cargarDatos();
+  }, [usuario, cargarDatos]);
 
-  /** retirar(id): devuelve todos mis tokens y revierte el pool */
-  const retirar = useCallback(
-    (id: string): number => {
-      if (pausado) return 0;
-      let devueltos = 0;
-      setPreguntas((prev) =>
-        prev.map((p) => {
-          if (p.id !== id) return p;
-          devueltos = p.misSi + p.misNo;
-          if (devueltos === 0) return p;
-          const next: Pregunta = {
-            ...p,
-            poolSi: Math.max(0, p.poolSi - p.misSi),
-            poolNo: Math.max(0, p.poolNo - p.misNo),
-            misSi: 0,
-            misNo: 0,
-          };
-          return { ...next, historial: [...p.historial, probabilidad(next)] };
-        }),
-      );
-      return devueltos;
-    },
-    [pausado],
-  );
+  const usarHash = useCallback(async (valor: boolean) => {
+    if (!usuario) return;
+    const nuevoHash = valor ? hashAleatorio() : miPerfil?.hash;
+    setMiPerfil((prev) => (prev ? { ...prev, usaHash: valor, hash: nuevoHash || "" } : prev));
+    await supabase.from("perfiles").update({ usa_hash: valor, hash: nuevoHash }).eq("id", usuario.id);
+    await cargarDatos();
+  }, [usuario, miPerfil, cargarDatos]);
 
-  /** crearPregunta(titulo, asignaturaId): arranca en 50, sin historial */
-  const crearPregunta = useCallback(
-    (titulo: string, asignaturaId: string): Pregunta | null => {
-      const t = titulo.trim();
-      if (!t || pausado || !asignaturaId) return null;
-      const nueva: Pregunta = {
-        id: crypto.randomUUID(),
-        titulo: t,
-        asignaturaId,
-        poolSi: 0,
-        poolNo: 0,
-        historial: [],
-        misSi: 0,
-        misNo: 0,
-        resultado: null,
-        archivada: false,
-        creadaEn: Date.now(),
-      };
-      setPreguntas((prev) => [nueva, ...prev]);
-      return nueva;
-    },
-    [pausado],
-  );
 
-  /** simular(): otro alumno apuesta 1-3 tokens a un lado random */
-  const simular = useCallback((): void => {
-    let registro: Apuesta | null = null;
-    setPreguntas((prev) => {
-      const abiertas = prev.filter((p) => p.resultado === null && !p.archivada);
-      if (abiertas.length === 0) return prev;
-      const objetivo = abiertas[Math.floor(Math.random() * abiertas.length)];
-      if (!objetivo) return prev;
-      const lado: Lado = Math.random() < 0.5 ? "si" : "no";
-      const tokens = 1 + Math.floor(Math.random() * 3);
-      const activos = ALUMNOS.filter((a) => !a.pausado);
-      const quien = activos[Math.floor(Math.random() * activos.length)]!;
-      registro = {
-        id: crypto.randomUUID(),
-        usuario: nombreVisible(quien),
-        tokens,
-        cuando: Date.now(),
-      };
-      return prev.map((p) => {
-        if (p.id !== objetivo.id) return p;
-        const next: Pregunta = {
-          ...p,
-          poolSi: p.poolSi + (lado === "si" ? tokens : 0),
-          poolNo: p.poolNo + (lado === "no" ? tokens : 0),
-        };
-        return { ...next, historial: [...p.historial, probabilidad(next)] };
-      });
-    });
-    if (registro) setApuestas((prev) => [registro!, ...prev]);
-  }, []);
-
-  // ---------- ADMIN ----------
+  // --------------------------------------------------------
+  // ADMIN
+  // --------------------------------------------------------
   const esAdmin = !!usuario?.esAdmin;
 
-  /** resolver(id, entro): paga el premio proporcional al pool. */
-  const resolver = useCallback(
-    (id: string, entro: boolean): boolean => {
-      if (!esAdmin) return false;
-      setPreguntas((prev) =>
-        prev.map((p) => {
-          if (p.id !== id || p.resultado !== null) return p;
-          return { ...p, resultado: entro };
-        }),
-      );
-      return true;
-    },
-    [esAdmin],
-  );
+  const resolver = useCallback(async (id: string, entro: boolean) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase.rpc("resolver_pregunta", { p_pregunta_id: id, p_entro: entro });
+    if (error) console.error("Error al resolver:", error);
+    await cargarDatos();
+    return !error;
+  }, [esAdmin, cargarDatos]);
 
-  /** desresolver(id): vuelve a abrir la pregunta */
-  const desresolver = useCallback(
-    (id: string): boolean => {
-      if (!esAdmin) return false;
-      setPreguntas((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, resultado: null, archivada: false } : p)),
-      );
-      return true;
-    },
-    [esAdmin],
-  );
+  const desresolver = useCallback(async (id: string) => {
+    if (!esAdmin) return false;
+    await supabase.from("preguntas").update({ resultado: null, archivada: false }).eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const archivar = useCallback(
-    (id: string, valor = true): boolean => {
-      if (!esAdmin) return false;
-      setPreguntas((prev) => prev.map((p) => (p.id === id ? { ...p, archivada: valor } : p)));
-      return true;
-    },
-    [esAdmin],
-  );
+  const archivar = useCallback(async (id: string, valor = true) => {
+    if (!esAdmin) return false;
+    await supabase.from("preguntas").update({ archivada: valor }).eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const eliminarPregunta = useCallback(
-    (id: string): boolean => {
-      if (!esAdmin) return false;
-      setPreguntas((prev) => prev.filter((p) => p.id !== id));
-      return true;
-    },
-    [esAdmin],
-  );
+  const eliminarPregunta = useCallback(async (id: string) => {
+    if (!esAdmin) return false;
+    await supabase.from("preguntas").delete().eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const moverPregunta = useCallback(
-    (id: string, asignaturaId: string): boolean => {
-      if (!esAdmin) return false;
-      setPreguntas((prev) => prev.map((p) => (p.id === id ? { ...p, asignaturaId } : p)));
-      return true;
-    },
-    [esAdmin],
-  );
+  const moverPregunta = useCallback(async (id: string, asignaturaId: string) => {
+    if (!esAdmin) return false;
+    await supabase.from("preguntas").update({ asignatura_id: asignaturaId }).eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const editarTitulo = useCallback(
-    (id: string, titulo: string): boolean => {
-      if (!esAdmin || !titulo.trim()) return false;
-      setPreguntas((prev) => prev.map((p) => (p.id === id ? { ...p, titulo: titulo.trim() } : p)));
-      return true;
-    },
-    [esAdmin],
-  );
+  const editarTitulo = useCallback(async (id: string, titulo: string) => {
+    if (!esAdmin || !titulo.trim()) return false;
+    await supabase.from("preguntas").update({ titulo: titulo.trim() }).eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const crearAsignatura = useCallback(
-    (nombre: string): boolean => {
-      if (!esAdmin || !nombre.trim()) return false;
-      setAsignaturas((prev) => [...prev, { id: crypto.randomUUID(), nombre: nombre.trim() }]);
-      return true;
-    },
-    [esAdmin],
-  );
+  const crearAsignatura = useCallback(async (nombre: string) => {
+    if (!esAdmin || !nombre.trim()) return false;
+    await supabase.from("asignaturas").insert({ nombre: nombre.trim() });
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const eliminarAsignatura = useCallback(
-    (id: string): boolean => {
-      if (!esAdmin) return false;
-      setAsignaturas((prev) => prev.filter((a) => a.id !== id));
-      setPreguntas((prev) => prev.filter((p) => p.asignaturaId !== id));
-      return true;
-    },
-    [esAdmin],
-  );
+  const eliminarAsignatura = useCallback(async (id: string) => {
+    if (!esAdmin) return false;
+    await supabase.from("asignaturas").delete().eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const renombrarAsignatura = useCallback(
-    (id: string, nombre: string): boolean => {
-      if (!esAdmin || !nombre.trim()) return false;
-      setAsignaturas((prev) => prev.map((a) => (a.id === id ? { ...a, nombre: nombre.trim() } : a)));
-      return true;
-    },
-    [esAdmin],
-  );
+  const renombrarAsignatura = useCallback(async (id: string, nombre: string) => {
+    if (!esAdmin || !nombre.trim()) return false;
+    await supabase.from("asignaturas").update({ nombre: nombre.trim() }).eq("id", id);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
-  const darTokens = useCallback(
-    (alumnoId: string, delta: number): boolean => {
-      if (!esAdmin) return false;
-      setAlumnos((prev) =>
-        prev.map((a) => (a.id === alumnoId ? { ...a, saldo: Math.max(0, a.saldo + delta) } : a)),
-      );
-      if (alumnoId === usuario?.id) {
-        setAjustesManuales((prev) => Math.max(prev - saldo, prev + delta));
-      }
-      return true;
-    },
-    [esAdmin, usuario, saldo],
-  );
+  const darTokens = useCallback(async (alumnoId: string, delta: number) => {
+    if (!esAdmin) return false;
+    const alum = alumnos.find((a) => a.id === alumnoId);
+    if (alum) {
+      await supabase.from("perfiles").update({ saldo: Math.max(0, alum.saldo + delta) }).eq("id", alumnoId);
+      await cargarDatos();
+    }
+    return true;
+  }, [esAdmin, alumnos, cargarDatos]);
 
-  const pausarAlumno = useCallback(
-    (alumnoId: string, valor: boolean): boolean => {
-      if (!esAdmin) return false;
-      setAlumnos((prev) => prev.map((a) => (a.id === alumnoId ? { ...a, pausado: valor } : a)));
-      return true;
-    },
-    [esAdmin],
-  );
-
-  // ---------- PERFIL ----------
-  const guardarNombre = useCallback((nombre: string) => {
-    setPerfil((p) => ({ ...p, nombre }));
-  }, []);
-
-  const usarHash = useCallback((valor: boolean) => {
-    setPerfil((p) => ({ ...p, usaHash: valor, hash: valor ? hashAleatorio() : p.hash }));
-  }, []);
+  const pausarAlumno = useCallback(async (alumnoId: string, valor: boolean) => {
+    if (!esAdmin) return false;
+    await supabase.from("perfiles").update({ pausado: valor }).eq("id", alumnoId);
+    await cargarDatos();
+    return true;
+  }, [esAdmin, alumnos, cargarDatos]);
 
   return useMemo(
     () => ({
@@ -528,6 +469,7 @@ export function useMercado(usuario: Usuario | null) {
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
+      leerRanking,
       resumen,
       apostar,
       retirar,
@@ -557,6 +499,7 @@ export function useMercado(usuario: Usuario | null) {
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
+      leerRanking,
       resumen,
       apostar,
       retirar,
@@ -576,7 +519,7 @@ export function useMercado(usuario: Usuario | null) {
       guardarNombre,
       usarHash,
       mutar,
-    ],
+    ]
   );
 }
 

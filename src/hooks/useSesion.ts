@@ -4,11 +4,11 @@ import type { Usuario } from "./useMercado";
 
 const ADMIN_HANDLE = "jose.luefer";
 
-function aUsuario(email: string | null | undefined, nombre?: string | null): Usuario {
+function aUsuario(id: string, email: string | null | undefined, nombre?: string | null): Usuario {
   const correo = email ?? "";
   const handle = correo.split("@")[0]?.toLowerCase() ?? "";
   return {
-    id: correo,
+    id: id,
     nombre: nombre || correo,
     esAdmin: handle === ADMIN_HANDLE,
   };
@@ -22,15 +22,17 @@ export function useSesion() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUsuario(
         session?.user
-          ? aUsuario(session.user.email, session.user.user_metadata?.["full_name"] as string)
+          ? aUsuario(session.user.id, session.user.email, session.user.user_metadata?.["full_name"] as string)
           : null,
       );
       setCargando(false);
     });
+    
     supabase.auth.getSession().then(({ data }) => {
       setUsuario(
         data.session?.user
           ? aUsuario(
+              data.session.user.id,
               data.session.user.email,
               data.session.user.user_metadata?.["full_name"] as string,
             )

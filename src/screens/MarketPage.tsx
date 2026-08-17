@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
 import {
@@ -34,14 +34,11 @@ function EscalaPuntos({
     return <p className="mt-2.5 font-mono text-[11px] text-sutil">sin apuestas todavía</p>;
   }
 
-  // Cada punto es un token real apostado. Nada de escalas ni redondeos:
-  // si hay 43 tokens en NO, hay exactamente 43 puntos en NO.
   const otrosNo = Math.max(0, no - misNo);
   const otrosSi = Math.max(0, si - misSi);
 
   return (
     <div className="mt-2.5 grid grid-cols-2 gap-2" aria-hidden>
-      {/* NO: justificado a la izquierda, los rojos van primero y los nuestros (amarillos) se añaden a la derecha del último */}
       <div className="flex flex-wrap justify-start gap-1">
         {Array.from({ length: otrosNo }).map((_, i) => (
           <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
@@ -50,7 +47,6 @@ function EscalaPuntos({
           <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
         ))}
       </div>
-      {/* SÍ: justificado a la derecha mediante flex-row-reverse. Los verdes van al extremo derecho y los amarillos crecen hacia la izquierda */}
       <div className="flex flex-row-reverse flex-wrap gap-1">
         {Array.from({ length: otrosSi }).map((_, i) => (
           <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde" />
@@ -77,6 +73,8 @@ function FilaPregunta({
   ocultarBorde?: boolean;
 }) {
   const prob = probabilidad(pregunta);
+  const totalApuestas = pregunta.poolSi + pregunta.poolNo;
+  const tieneApuestas = totalApuestas > 0;
   const positivo = prob >= 50;
   const cerrada = pregunta.resultado !== null;
 
@@ -84,15 +82,18 @@ function FilaPregunta({
     "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors disabled:opacity-40";
 
   return (
-    <article className={`py-6 ${ocultarBorde ? "" : "border-b border-linea"}`}>
+    <article 
+      className={`py-6 ${ocultarBorde ? "" : "border-b border-linea"} transition-all duration-500 ease-in-out`}
+      style={{ willChange: "transform" }}
+    >
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
         <span
           className={`font-mono text-[30px] leading-none tabular-nums ${
-            positivo ? "text-verde" : "text-rojo"
+            !tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"
           }`}
         >
-          {prob}%
+          {tieneApuestas ? `${prob}%` : "--%"}
         </span>
       </div>
 
@@ -184,27 +185,30 @@ function ModalNuevaPregunta({
   asignaturas: Array<{ id: string; nombre: string }>;
   asigInicial: string;
   onCerrar: () => void;
-  onCrear: (titulo: string, asignaturaId: string) => boolean;
+  onCrear: (titulo: string, asignaturaId: string) => Promise<any>;
 }) {
   const [titulo, setTitulo] = useState("");
   const [asigId, setAsigId] = useState(asigInicial);
   const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
 
-  const enviar = () => {
+  const enviar = async () => {
     if (!titulo.trim()) {
-      setError("Escribe un enunciado para la pregunta");
+      setError("Escribe un enunciado");
       return;
     }
-    if (!asigId) {
-      setError("Elige una asignatura");
-      return;
+    
+    try {
+      setCargando(true);
+      setError(null);
+      await onCrear(titulo, asigId);
+      onCerrar();
+    } catch (err) {
+      console.error("Error al crear pregunta:", err);
+      setError("No se pudo publicar. Revisa tu conexión o permisos.");
+    } finally {
+      setCargando(false);
     }
-    const ok = onCrear(titulo, asigId);
-    if (!ok) {
-      setError("No se pudo publicar. Prueba de nuevo.");
-      return;
-    }
-    onCerrar();
   };
 
   return (
@@ -225,8 +229,8 @@ function ModalNuevaPregunta({
             setTitulo(e.target.value);
             if (error) setError(null);
           }}
-          placeholder="¿Entra la demostración de X en el examen?"
-          className="mt-3 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-[14px] text-ink outline-none focus:border-ink/40"
+          disabled={cargando}
+          className="mt-3 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-[14px] text-ink outline-none focus:border-ink/40 disabled:opacity-50"
         />
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -235,6 +239,7 @@ function ModalNuevaPregunta({
               key={a.id}
               onClick={() => setAsigId(a.id)}
               style={fuenteApple}
+              disabled={cargando}
               className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                 a.id === asigId
                   ? "border-ink bg-ink text-white"
@@ -251,17 +256,19 @@ function ModalNuevaPregunta({
         <div className="mt-4 flex gap-2">
           <button
             onClick={onCerrar}
+            disabled={cargando}
             style={fuenteApple}
-            className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30"
+            className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30 disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={enviar}
+            disabled={cargando}
             style={fuenteApple}
-            className="flex-1 rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
+            className="flex-1 rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 disabled:opacity-50"
           >
-            Publicar
+            {cargando ? "Publicando..." : "Publicar"}
           </button>
         </div>
       </div>
@@ -276,6 +283,39 @@ export function MarketPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const haptic = useHaptic();
+
+  // Estados de búfer
+  const [rankingDisplay, setRankingDisplay] = useState<any[]>([]);
+  const [actividadDisplay, setActividadDisplay] = useState<any[]>([]);
+  const [preguntasDisplay, setPreguntasDisplay] = useState<Pregunta[]>([]);
+
+  useEffect(() => {
+    // 1. Ranking (Rápido, 3s)
+    const intervalRanking = setInterval(() => {
+      setRankingDisplay((mercado as any).leerRanking?.() || []);
+    }, 3000);
+
+    // 2. Actividad (Lento, 60s)
+    const intervalActividad = setInterval(() => {
+      setActividadDisplay(mercado.leerApuestas() || []);
+    }, 60000);
+
+    // 3. Preguntas (Moderado, 5s - para evitar saltos bruscos mientras interactúas)
+    const intervalPreguntas = setInterval(() => {
+        setPreguntasDisplay(mercado.leerPreguntas({ estado: "todas" }));
+    }, 5000);
+
+    // Carga inicial
+    setRankingDisplay((mercado as any).leerRanking?.() || []);
+    setActividadDisplay(mercado.leerApuestas() || []);
+    setPreguntasDisplay(mercado.leerPreguntas({ estado: "todas" }));
+
+    return () => {
+      clearInterval(intervalRanking);
+      clearInterval(intervalActividad);
+      clearInterval(intervalPreguntas);
+    };
+  }, [mercado]);
 
   const asignaturas = mercado.leerAsignaturas();
   const [asigActiva, setAsigActiva] = useState<string>("");
@@ -307,11 +347,11 @@ export function MarketPage() {
     );
   }
 
-  const abiertas = mercado.leerPreguntas({ asignaturaId: asigId, estado: "abiertas" });
-  const archivadas = mercado.leerPreguntas({ asignaturaId: asigId, estado: "archivadas" });
-
-  const todasPreguntas = mercado.leerPreguntas({ estado: "todas" });
-  const preguntasConApuesta = todasPreguntas.filter(
+  // Usamos el búfer de preguntasDisplay en lugar de leer directamente
+  const abiertas = preguntasDisplay.filter(p => p.asignaturaId === asigId && p.resultado === null && !p.archivada);
+  const archivadas = preguntasDisplay.filter(p => p.asignaturaId === asigId && p.resultado !== null || p.archivada);
+  
+  const preguntasConApuesta = preguntasDisplay.filter(
     (p) => p.resultado === null && !p.archivada && p.misSi + p.misNo > 0,
   );
   const tieneApuestas = preguntasConApuesta.length > 0;
@@ -372,15 +412,6 @@ export function MarketPage() {
       </header>
 
       <main className="mx-auto max-w-[520px] px-5 pt-14">
-        {mercado.pausado && (
-          <p
-            style={fuenteApple}
-            className="mt-4 rounded-lg border border-borde bg-white px-3 py-2 text-[13px] font-medium text-sutil"
-          >
-            Tu cuenta está pausada por el administrador.
-          </p>
-        )}
-
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
             <div className="relative flex items-center justify-center">
@@ -403,37 +434,47 @@ export function MarketPage() {
               )}
             </div>
             
-            <span style={fuenteApple} className="mt-3 text-[13px] font-medium uppercase tracking-widest text-sutil">
+            <span style={fuenteApple} className="mt-4 text-[13px] font-medium uppercase tracking-widest text-sutil">
               Tokens disponibles
             </span>
           </div>
         )}
 
-        <ul className="space-y-2 text-center text-[14px] font-normal leading-relaxed text-sutil">
-          {mercado.leerApuestas().map((a) => (
-            <li key={a.id} className="mx-auto max-w-[32rem]">
-              <span className="rounded-full px-1.5 py-0.5 text-ink [text-shadow:0_0_10px_rgba(245,193,59,0.55)]">
-                {a.usuario}
-              </span>{" "}
-              apostó{" "}
-              <span className="inline-flex items-center gap-1 font-mono tabular-nums text-ink">
-                <Moneda />
-                {a.tokens}
-              </span>{" "}
-              {a.tokens === 1 ? "token" : "tokens"} {haceTexto(a.cuando)}
-            </li>
-          ))}
-        </ul>
+        <div className="mt-8 grid grid-cols-2 gap-6 px-1">
+          <div className="flex flex-col h-[160px] overflow-hidden">
+            <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
+              Ranking
+            </h3>
+            <ul className="space-y-2.5 text-[13px] text-ink" style={fuenteApple}>
+              {rankingDisplay.slice(0, 4).map((r: any, i: number) => (
+                <li key={i} className="flex items-center justify-between">
+                  <span className="truncate pr-2 font-medium">{r.usuario}</span>
+                  <span className="flex shrink-0 items-center gap-1 font-mono tabular-nums">
+                    {r.tokens} <Moneda className="h-2.5 w-2.5" />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        {/* NOTA DEL EDITOR */}
-        <div className="mt-8 text-left text-[15px] leading-relaxed text-ink" style={fuenteApple}>
-          <p>
-            <svg className="inline-block mr-1.5 h-4 w-4 shrink-0 text-ink align-[-2px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m3 11 18-5v12L3 14v-3z"></path>
-              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path>
-            </svg>
-            <span className="font-semibold">Nota del editor:</span> Bienvenido! Aquí puedes hacer apuestas sobre lo que va a caer en el próximo examen. Quien acierte se lleva los tokens de los perdedores. Los mercados de predicción funcionan mejor cuantos más participantes, y pueden llegar a ser muy muy precisos. De momento los tokens no tienen valor real pero... quién sabe?
-          </p>
+          <div className="flex flex-col h-[160px] overflow-hidden">
+            <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
+              Actividad
+            </h3>
+            <ul className="space-y-3 text-[12px] leading-snug text-sutil" style={fuenteApple}>
+              {actividadDisplay.slice(0, 4).map((a: any) => (
+                <li key={a.id} className="flex flex-col gap-0.5">
+                  <div className="truncate">
+                    <span className="font-medium text-ink">{a.usuario}</span> apostó{" "}
+                    <span className="inline-flex items-center gap-0.5 font-mono text-ink">
+                      {a.tokens} <Moneda className="h-2 w-2" />
+                    </span>
+                  </div>
+                  <span className="text-[11px] opacity-80">{haceTexto(a.cuando)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
@@ -476,7 +517,7 @@ export function MarketPage() {
                 pregunta={p}
                 bloqueado={mercado.pausado}
                 sinTokens={mercado.saldo < 1}
-                ocultarBorde={index === archivadas.length - 1}
+                ocultarBorde={index === abiertas.length - 1}
                 onApostar={(lado) => intentarApostar(p.id, lado)}
               />
             ))}
@@ -497,7 +538,7 @@ export function MarketPage() {
           asignaturas={asignaturas}
           asigInicial={asigId}
           onCerrar={() => setModalAbierto(false)}
-          onCrear={(titulo, asignaturaId) => !!mercado.crearPregunta(titulo, asignaturaId)}
+          onCrear={async (t, id) => { await mercado.crearPregunta(t, id); }}
         />
       )}
     </div>
