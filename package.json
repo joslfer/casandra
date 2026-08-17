@@ -1,6 +1,6 @@
 {
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "name": "tanstack_start_ts",
   "private": true,
