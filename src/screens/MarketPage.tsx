@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
 import {
   haceTexto,
@@ -7,7 +8,6 @@ import {
   useMercado,
   type Lado,
   type Pregunta,
-  type Mercado,
 } from "@/hooks/useMercado";
 
 function Moneda({ className = "" }: { className?: string }) {
@@ -17,41 +17,48 @@ function Moneda({ className = "" }: { className?: string }) {
 type FiltroPreguntas = "feed" | "archivadas";
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
-const helvetica = { fontFamily: "Helvetica, Arial, sans-serif" };
+const helvetica = { fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' };
 
-function Hero({ mercado }: { mercado: Mercado }) {
-  const { nombres } = mercado.resumen();
-
-  return (
-    <section className="relative mt-5 border-b border-linea pb-4">
-      {nombres.length > 0 && (
-        <p className="mt-3 truncate text-[11.5px] text-sutil">{nombres.join(" · ")}</p>
-      )}
-    </section>
-  );
-}
-
-const MAX_PUNTOS = 60;
-
-function EscalaPuntos({ si, no }: { si: number; no: number }) {
+function EscalaPuntos({
+  si,
+  no,
+  misSi,
+  misNo,
+}: {
+  si: number;
+  no: number;
+  misSi: number;
+  misNo: number;
+}) {
   const total = si + no;
 
   if (total === 0) {
     return <p className="mt-2.5 font-mono text-[11px] text-sutil">sin apuestas todavía</p>;
   }
 
-  const escala = total > MAX_PUNTOS ? MAX_PUNTOS / total : 1;
-  const puntosSi = Math.max(si > 0 ? 1 : 0, Math.round(si * escala));
-  const puntosNo = Math.max(no > 0 ? 1 : 0, Math.round(no * escala));
+  // Cada punto es un token real apostado. Nada de escalas ni redondeos:
+  // si hay 43 tokens en NO, hay exactamente 43 puntos en NO.
+  const otrosNo = Math.max(0, no - misNo);
+  const otrosSi = Math.max(0, si - misSi);
 
   return (
-    <div className="mt-2.5 flex flex-wrap items-center gap-1" aria-hidden>
-      {Array.from({ length: puntosSi }).map((_, i) => (
-        <span key={`si-${i}`} className="h-2 w-2 rounded-full bg-verde" />
-      ))}
-      {Array.from({ length: puntosNo }).map((_, i) => (
-        <span key={`no-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
-      ))}
+    <div className="mt-2.5 grid grid-cols-2 gap-2" aria-hidden>
+      <div className="flex flex-wrap justify-start gap-1">
+        {Array.from({ length: otrosNo }).map((_, i) => (
+          <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
+        ))}
+        {Array.from({ length: misNo }).map((_, i) => (
+          <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
+        ))}
+      </div>
+      <div className="flex flex-wrap justify-end gap-1">
+        {Array.from({ length: misSi }).map((_, i) => (
+          <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
+        ))}
+        {Array.from({ length: otrosSi }).map((_, i) => (
+          <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -59,21 +66,18 @@ function EscalaPuntos({ si, no }: { si: number; no: number }) {
 function FilaPregunta({
   pregunta,
   onApostar,
-  onRetirar,
   bloqueado,
 }: {
   pregunta: Pregunta;
   onApostar: (lado: Lado) => void;
-  onRetirar: () => void;
   bloqueado?: boolean;
 }) {
   const prob = probabilidad(pregunta);
   const positivo = prob >= 50;
-  const apostado = pregunta.misSi + pregunta.misNo;
   const cerrada = pregunta.resultado !== null;
 
   const btnBase =
-    "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-normal transition-colors disabled:opacity-40";
+    "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors disabled:opacity-40";
 
   return (
     <article className="border-b border-linea py-6">
@@ -88,51 +92,45 @@ function FilaPregunta({
         </span>
       </div>
 
-      <EscalaPuntos si={pregunta.poolSi} no={pregunta.poolNo} />
+      <EscalaPuntos si={pregunta.poolSi} no={pregunta.poolNo} misSi={pregunta.misSi} misNo={pregunta.misNo} />
 
       {cerrada ? (
         <p className="mt-3 font-mono text-[12px] uppercase tracking-widest text-sutil">
           Resuelta · {pregunta.resultado ? "entró" : "no entró"}
         </p>
       ) : (
-        <>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => onApostar("no")}
-              disabled={bloqueado}
-              style={helvetica}
-              className={`${btnBase} ${
-                pregunta.misNo > 0
-                  ? "border-rojo bg-rojo text-white"
-                  : "border-borde bg-white text-ink hover:border-ink/30"
-              }`}
-            >
-              <span>NO</span>
-            </button>
-            <button
-              onClick={() => onApostar("si")}
-              disabled={bloqueado}
-              style={helvetica}
-              className={`${btnBase} ${
-                pregunta.misSi > 0
-                  ? "border-verde bg-verde text-white"
-                  : "border-borde bg-white text-ink hover:border-ink/30"
-              }`}
-            >
-              <span>SÍ</span>
-            </button>
-          </div>
-
-          {apostado > 0 && (
-            <button
-              onClick={onRetirar}
-              style={helvetica}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-borde bg-transparent py-2 font-mono text-[12px] uppercase tracking-widest text-sutil transition-colors hover:text-ink"
-            >
-              Retirar <Moneda /> {apostado}
-            </button>
-          )}
-        </>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => onApostar("no")}
+            disabled={bloqueado}
+            style={helvetica}
+            className={`${btnBase} ${
+              pregunta.misNo > 0
+                ? "border-rojo bg-rojo text-white"
+                : "border-borde bg-white text-ink hover:border-ink/30"
+            }`}
+          >
+            <span>NO</span>
+            {pregunta.misNo > 0 && (
+              <span className="font-mono text-[12px] tabular-nums">· {pregunta.misNo}</span>
+            )}
+          </button>
+          <button
+            onClick={() => onApostar("si")}
+            disabled={bloqueado}
+            style={helvetica}
+            className={`${btnBase} ${
+              pregunta.misSi > 0
+                ? "border-verde bg-verde text-white"
+                : "border-borde bg-white text-ink hover:border-ink/30"
+            }`}
+          >
+            <span>SÍ</span>
+            {pregunta.misSi > 0 && (
+              <span className="font-mono text-[12px] tabular-nums">· {pregunta.misSi}</span>
+            )}
+          </button>
+        </div>
       )}
     </article>
   );
@@ -154,7 +152,7 @@ function Asignaturas({
           key={a.id}
           onClick={() => setAsigActiva(a.id)}
           style={helvetica}
-          className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-normal transition-colors ${
+          className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
             a.id === asigId
               ? "border-ink bg-ink text-white"
               : "border-borde bg-white text-ink hover:border-ink/30"
@@ -227,7 +225,7 @@ function ModalNuevaPregunta({
               key={a.id}
               onClick={() => setAsigId(a.id)}
               style={helvetica}
-              className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-normal transition-colors ${
+              className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                 a.id === asigId
                   ? "border-ink bg-ink text-white"
                   : "border-borde bg-white text-ink hover:border-ink/30"
@@ -244,7 +242,7 @@ function ModalNuevaPregunta({
           <button
             onClick={onCerrar}
             style={helvetica}
-            className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] text-ink transition-colors hover:border-ink/30"
+            className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30"
           >
             Cancelar
           </button>
@@ -267,6 +265,7 @@ export function MarketPage() {
   const [filtroPreguntas, setFiltroPreguntas] = useState<FiltroPreguntas>("feed");
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const haptic = useHaptic();
 
   const asignaturas = mercado.leerAsignaturas();
   const [asigActiva, setAsigActiva] = useState<string>("");
@@ -284,7 +283,10 @@ export function MarketPage() {
           Mercado de predicción académico. Apuesta tokens a si una pregunta entra en el examen.
         </p>
         <button
-          onClick={async () => setError(await entrarConGoogle())}
+          onClick={async () => {
+            haptic();
+            setError(await entrarConGoogle());
+          }}
           style={helvetica}
           className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
         >
@@ -299,12 +301,49 @@ export function MarketPage() {
   const archivadas = mercado.leerPreguntas({ asignaturaId: asigId, estado: "archivadas" });
   const preguntasVisibles = filtroPreguntas === "feed" ? abiertas : archivadas;
 
+  const todasPreguntas = mercado.leerPreguntas({ estado: "todas" });
+  const preguntasConApuesta = todasPreguntas.filter(
+    (p) => p.resultado === null && !p.archivada && p.misSi + p.misNo > 0,
+  );
+  const tieneApuestas = preguntasConApuesta.length > 0;
+
+  const retirarTodo = () => {
+    preguntasConApuesta.forEach((p) => mercado.retirar(p.id));
+  };
+  const intentarApostar = (id: string, lado: Lado) => {
+  if (mercado.saldo < 1) {
+    document.body.animate(
+      [
+        { transform: "translateX(0)" },
+        { transform: "translateX(-7px)" },
+        { transform: "translateX(6px)" },
+        { transform: "translateX(-4px)" },
+        { transform: "translateX(0)" },
+      ],
+      { duration: 280, easing: "ease-in-out" },
+    );
+    return;
+  }
+
+  mercado.apostar(id, lado);
+  };
   return (
-    <div className="min-h-screen bg-lienzo pb-28">
+    <div
+      className="min-h-screen bg-lienzo pb-28"
+      style={helvetica}
+      onClickCapture={(event) => {
+        const target = event.target as Element;
+        if (target.closest("button, a, input, select, textarea")) haptic();
+      }}
+    >
       <header className="fixed inset-x-0 top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
-          <button onClick={() => setFiltroPreguntas("feed")} className="text-[15px] font-semibold tracking-tight">
-            Casandra
+          <button
+            onClick={() => setFiltroPreguntas("feed")}
+            style={helvetica}
+            className="text-[15px] font-semibold tracking-tight"
+          >
+            Adivina preguntas para ganar
           </button>
           <div className="flex items-center gap-3">
             <Link to="/profile" className={mono}>
@@ -332,13 +371,13 @@ export function MarketPage() {
 
         {!mercado.pausado && mercado.saldo < 1 && (
           <p className="mt-4 rounded-lg border border-borde bg-white px-3 py-2 text-[12px] text-sutil">
-            Sin tokens. Retira alguna posición o espera a que se resuelva una pregunta.
-          </p>
+      {mercado.saldo < 1
+        ? "Sin tokens. Retira alguna posición o espera a que se resuelva una pregunta."
+        : "Nota del mercado: nada por el momento."}
+</p>
         )}
 
-        <Hero mercado={mercado} />
-
-        <ul className="mt-4 space-y-2 text-center text-[14px] font-normal leading-relaxed text-sutil">
+        <ul className="mt-5 space-y-2 text-center text-[14px] font-normal leading-relaxed text-sutil">
           {mercado.leerApuestas().map((a) => (
             <li key={a.id} className="mx-auto max-w-[32rem]">
               <span className="rounded-full px-1.5 py-0.5 text-ink [text-shadow:0_0_10px_rgba(245,193,59,0.55)]">
@@ -356,13 +395,32 @@ export function MarketPage() {
 
         <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
 
+        <div className="mt-3 flex min-h-[42px] items-center">
+          {tieneApuestas ? (
+            <button
+              onClick={retirarTodo}
+              disabled={mercado.pausado}
+              style={helvetica}
+              className={`w-full rounded-full border border-borde bg-white py-2.5 ${mono} font-semibold text-ink transition-colors hover:border-ink/30 disabled:opacity-40`}
+            >
+              Retirar todo · {preguntasConApuesta.reduce((acc, p) => acc + p.misSi + p.misNo, 0)}
+            </button>
+          ) : (
+            <div
+              aria-live="polite"
+              className={`w-full rounded-full border border-borde bg-white py-2.5 text-center ${mono} font-semibold text-sutil`}
+            >
+              Tienes todos tus tokens para apostar
+            </div>
+          )}
+        </div>
+
         {preguntasVisibles.map((p) => (
           <FilaPregunta
             key={p.id}
             pregunta={p}
             bloqueado={mercado.pausado || mercado.saldo < 1}
             onApostar={(lado) => mercado.apostar(p.id, lado)}
-            onRetirar={() => mercado.retirar(p.id)}
           />
         ))}
 
@@ -380,7 +438,7 @@ export function MarketPage() {
         <button
           onClick={() => setFiltroPreguntas(filtroPreguntas === "feed" ? "archivadas" : "feed")}
           style={helvetica}
-          className={`mt-8 w-full rounded-full border border-linea py-3 text-[13px] font-normal tracking-normal text-ink transition-colors hover:bg-white`}
+          className={`mt-8 w-full rounded-full border border-linea py-3 text-[13px] font-medium tracking-normal text-ink transition-colors hover:bg-white`}
         >
           {filtroPreguntas === "feed" ? "Archivadas" : "Abiertas"}
         </button>
