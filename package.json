@@ -1,6 +1,6 @@
 {
   "engines": {
-    "node": "24.x"
+    "node": ">=20.0.0"
   },
   "name": "tanstack_start_ts",
   "private": true,
@@ -68,7 +68,7 @@
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
-    "vite": "^5.4.14",
+    "vite": "^7.2.0",
     "vite-tsconfig-paths": "^6.0.2",
     "zod": "^3.24.2"
   },
