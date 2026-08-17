@@ -14,10 +14,8 @@ function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
 }
 
-type FiltroPreguntas = "feed" | "archivadas";
-
 const mono = "font-mono text-[11px] uppercase tracking-widest";
-const helvetica = { fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' };
+const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
 function EscalaPuntos({
   si,
@@ -43,6 +41,7 @@ function EscalaPuntos({
 
   return (
     <div className="mt-2.5 grid grid-cols-2 gap-2" aria-hidden>
+      {/* NO: justificado a la izquierda, los rojos van primero y los nuestros (amarillos) se añaden a la derecha del último */}
       <div className="flex flex-wrap justify-start gap-1">
         {Array.from({ length: otrosNo }).map((_, i) => (
           <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
@@ -51,12 +50,13 @@ function EscalaPuntos({
           <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
         ))}
       </div>
-      <div className="flex flex-wrap justify-end gap-1">
-        {Array.from({ length: misSi }).map((_, i) => (
-          <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
-        ))}
+      {/* SÍ: justificado a la derecha mediante flex-row-reverse. Los verdes van al extremo derecho y los amarillos crecen hacia la izquierda */}
+      <div className="flex flex-row-reverse flex-wrap gap-1">
         {Array.from({ length: otrosSi }).map((_, i) => (
           <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde" />
+        ))}
+        {Array.from({ length: misSi }).map((_, i) => (
+          <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
         ))}
       </div>
     </div>
@@ -67,10 +67,14 @@ function FilaPregunta({
   pregunta,
   onApostar,
   bloqueado,
+  sinTokens,
+  ocultarBorde,
 }: {
   pregunta: Pregunta;
   onApostar: (lado: Lado) => void;
   bloqueado?: boolean;
+  sinTokens?: boolean;
+  ocultarBorde?: boolean;
 }) {
   const prob = probabilidad(pregunta);
   const positivo = prob >= 50;
@@ -80,7 +84,7 @@ function FilaPregunta({
     "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors disabled:opacity-40";
 
   return (
-    <article className="border-b border-linea py-6">
+    <article className={`py-6 ${ocultarBorde ? "" : "border-b border-linea"}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
         <span
@@ -88,7 +92,7 @@ function FilaPregunta({
             positivo ? "text-verde" : "text-rojo"
           }`}
         >
-          {prob}
+          {prob}%
         </span>
       </div>
 
@@ -101,13 +105,16 @@ function FilaPregunta({
       ) : (
         <div className="mt-3 flex gap-2">
           <button
+            data-apuesta
             onClick={() => onApostar("no")}
             disabled={bloqueado}
-            style={helvetica}
+            style={fuenteApple}
             className={`${btnBase} ${
               pregunta.misNo > 0
                 ? "border-rojo bg-rojo text-white"
-                : "border-borde bg-white text-ink hover:border-ink/30"
+                : sinTokens
+                  ? "border-linea bg-black/5 text-sutil"
+                  : "border-borde bg-white text-ink hover:border-ink/30"
             }`}
           >
             <span>NO</span>
@@ -116,13 +123,16 @@ function FilaPregunta({
             )}
           </button>
           <button
+            data-apuesta
             onClick={() => onApostar("si")}
             disabled={bloqueado}
-            style={helvetica}
+            style={fuenteApple}
             className={`${btnBase} ${
               pregunta.misSi > 0
                 ? "border-verde bg-verde text-white"
-                : "border-borde bg-white text-ink hover:border-ink/30"
+                : sinTokens
+                  ? "border-linea bg-black/5 text-sutil"
+                  : "border-borde bg-white text-ink hover:border-ink/30"
             }`}
           >
             <span>SÍ</span>
@@ -146,12 +156,12 @@ function Asignaturas({
   setAsigActiva: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2 pt-4">
+    <div className="flex flex-wrap justify-center gap-2 py-6">
       {asignaturas.map((a) => (
         <button
           key={a.id}
           onClick={() => setAsigActiva(a.id)}
-          style={helvetica}
+          style={fuenteApple}
           className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
             a.id === asigId
               ? "border-ink bg-ink text-white"
@@ -224,7 +234,7 @@ function ModalNuevaPregunta({
             <button
               key={a.id}
               onClick={() => setAsigId(a.id)}
-              style={helvetica}
+              style={fuenteApple}
               className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                 a.id === asigId
                   ? "border-ink bg-ink text-white"
@@ -241,14 +251,14 @@ function ModalNuevaPregunta({
         <div className="mt-4 flex gap-2">
           <button
             onClick={onCerrar}
-            style={helvetica}
+            style={fuenteApple}
             className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30"
           >
             Cancelar
           </button>
           <button
             onClick={enviar}
-            style={helvetica}
+            style={fuenteApple}
             className="flex-1 rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
           >
             Publicar
@@ -262,7 +272,7 @@ function ModalNuevaPregunta({
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
-  const [filtroPreguntas, setFiltroPreguntas] = useState<FiltroPreguntas>("feed");
+  const [mostrarArchivadas, setMostrarArchivadas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const haptic = useHaptic();
@@ -287,7 +297,7 @@ export function MarketPage() {
             haptic();
             setError(await entrarConGoogle());
           }}
-          style={helvetica}
+          style={fuenteApple}
           className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
         >
           Entrar con Google
@@ -299,7 +309,6 @@ export function MarketPage() {
 
   const abiertas = mercado.leerPreguntas({ asignaturaId: asigId, estado: "abiertas" });
   const archivadas = mercado.leerPreguntas({ asignaturaId: asigId, estado: "archivadas" });
-  const preguntasVisibles = filtroPreguntas === "feed" ? abiertas : archivadas;
 
   const todasPreguntas = mercado.leerPreguntas({ estado: "todas" });
   const preguntasConApuesta = todasPreguntas.filter(
@@ -310,27 +319,29 @@ export function MarketPage() {
   const retirarTodo = () => {
     preguntasConApuesta.forEach((p) => mercado.retirar(p.id));
   };
-  const intentarApostar = (id: string, lado: Lado) => {
-  if (mercado.saldo < 1) {
-    document.body.animate(
-      [
-        { transform: "translateX(0)" },
-        { transform: "translateX(-7px)" },
-        { transform: "translateX(6px)" },
-        { transform: "translateX(-4px)" },
-        { transform: "translateX(0)" },
-      ],
-      { duration: 280, easing: "ease-in-out" },
-    );
-    return;
-  }
 
-  mercado.apostar(id, lado);
+  const intentarApostar = (id: string, lado: Lado) => {
+    if (mercado.saldo < 1) {
+      document.body.animate(
+        [
+          { transform: "translateX(0)" },
+          { transform: "translateX(-7px)" },
+          { transform: "translateX(6px)" },
+          { transform: "translateX(-4px)" },
+          { transform: "translateX(0)" },
+        ],
+        { duration: 280, easing: "ease-in-out" },
+      );
+      return;
+    }
+
+    mercado.apostar(id, lado);
   };
+
   return (
     <div
       className="min-h-screen bg-lienzo pb-28"
-      style={helvetica}
+      style={fuenteApple}
       onClickCapture={(event) => {
         const target = event.target as Element;
         if (target.closest("button, a, input, select, textarea")) haptic();
@@ -338,46 +349,67 @@ export function MarketPage() {
     >
       <header className="fixed inset-x-0 top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
-          <button
-            onClick={() => setFiltroPreguntas("feed")}
-            style={helvetica}
+          <span
+            style={fuenteApple}
             className="text-[15px] font-semibold tracking-tight"
           >
             Adivina preguntas para ganar
-          </button>
-          <div className="flex items-center gap-3">
-            <Link to="/profile" className={mono}>
-              Perfil
-            </Link>
+          </span>
+          <div className="flex items-center gap-4">
             {usuario.esAdmin && (
               <Link to={"/admin" as never} className={mono}>
                 Admin
               </Link>
             )}
-            <span className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-white">
-              <Moneda />
-              <span className="font-mono text-[13px] tabular-nums">{mercado.saldo}</span>
-            </span>
+            <Link to="/profile" className="text-ink transition-opacity hover:opacity-70" aria-label="Perfil">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </Link>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-[520px] px-5 pt-14">
         {mercado.pausado && (
-          <p className="mt-4 rounded-lg border border-borde bg-white px-3 py-2 text-[12px] text-sutil">
+          <p
+            style={fuenteApple}
+            className="mt-4 rounded-lg border border-borde bg-white px-3 py-2 text-[13px] font-medium text-sutil"
+          >
             Tu cuenta está pausada por el administrador.
           </p>
         )}
 
-        {!mercado.pausado && mercado.saldo < 1 && (
-          <p className="mt-4 rounded-lg border border-borde bg-white px-3 py-2 text-[12px] text-sutil">
-      {mercado.saldo < 1
-        ? "Sin tokens. Retira alguna posición o espera a que se resuelva una pregunta."
-        : "Nota del mercado: nada por el momento."}
-</p>
+        {!mercado.pausado && (
+          <div className="my-10 flex flex-col items-center justify-center">
+            <div className="relative flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <Moneda className="h-8 w-8" />
+                <span className="font-mono text-[64px] leading-none tabular-nums tracking-tight text-ink">
+                  {mercado.saldo}
+                </span>
+              </div>
+              
+              {tieneApuestas && (
+                <button
+                  onClick={retirarTodo}
+                  disabled={mercado.pausado}
+                  style={fuenteApple}
+                  className="absolute left-[calc(100%+20px)] w-32 rounded-lg border border-borde bg-white px-3 py-2.5 text-left text-[12px] font-medium leading-tight text-ink shadow-sm transition-colors hover:bg-black/5 disabled:opacity-40"
+                >
+                  Retirar todo y recuperar tokens.
+                </button>
+              )}
+            </div>
+            
+            <span style={fuenteApple} className="mt-3 text-[13px] font-medium uppercase tracking-widest text-sutil">
+              Tokens disponibles
+            </span>
+          </div>
         )}
 
-        <ul className="mt-5 space-y-2 text-center text-[14px] font-normal leading-relaxed text-sutil">
+        <ul className="space-y-2 text-center text-[14px] font-normal leading-relaxed text-sutil">
           {mercado.leerApuestas().map((a) => (
             <li key={a.id} className="mx-auto max-w-[32rem]">
               <span className="rounded-full px-1.5 py-0.5 text-ink [text-shadow:0_0_10px_rgba(245,193,59,0.55)]">
@@ -395,53 +427,50 @@ export function MarketPage() {
 
         <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
 
-        <div className="mt-3 flex min-h-[42px] items-center">
-          {tieneApuestas ? (
-            <button
-              onClick={retirarTodo}
-              disabled={mercado.pausado}
-              style={helvetica}
-              className={`w-full rounded-full border border-borde bg-white py-2.5 ${mono} font-semibold text-ink transition-colors hover:border-ink/30 disabled:opacity-40`}
-            >
-              Retirar todo · {preguntasConApuesta.reduce((acc, p) => acc + p.misSi + p.misNo, 0)}
-            </button>
-          ) : (
-            <div
-              aria-live="polite"
-              className={`w-full rounded-full border border-borde bg-white py-2.5 text-center ${mono} font-semibold text-sutil`}
-            >
-              Tienes todos tus tokens para apostar
-            </div>
-          )}
-        </div>
-
-        {preguntasVisibles.map((p) => (
+        {abiertas.map((p, index) => (
           <FilaPregunta
             key={p.id}
             pregunta={p}
-            bloqueado={mercado.pausado || mercado.saldo < 1}
-            onApostar={(lado) => mercado.apostar(p.id, lado)}
+            bloqueado={mercado.pausado}
+            sinTokens={mercado.saldo < 1}
+            ocultarBorde={index === abiertas.length - 1}
+            onApostar={(lado) => intentarApostar(p.id, lado)}
           />
         ))}
 
-        {preguntasVisibles.length === 0 && <p className={`mt-6 ${mono} text-sutil`}>sin preguntas aquí</p>}
-
-        {filtroPreguntas === "feed" && (
+        <div className="mt-10 flex justify-center">
           <button
-            onClick={() => mercado.simular()}
-            className={`mt-6 ${mono} text-sutil transition-colors hover:text-ink`}
+            onClick={() => setMostrarArchivadas(!mostrarArchivadas)}
+            style={fuenteApple}
+            className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-sutil transition-colors hover:text-ink"
           >
-            simular apuesta de otro alumno →
+            <span>Archivadas</span>
+            <svg
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${mostrarArchivadas ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
-        )}
+        </div>
 
-        <button
-          onClick={() => setFiltroPreguntas(filtroPreguntas === "feed" ? "archivadas" : "feed")}
-          style={helvetica}
-          className={`mt-8 w-full rounded-full border border-linea py-3 text-[13px] font-medium tracking-normal text-ink transition-colors hover:bg-white`}
-        >
-          {filtroPreguntas === "feed" ? "Archivadas" : "Abiertas"}
-        </button>
+        {mostrarArchivadas && (
+          <div className="mt-4 flex flex-col">
+            {archivadas.map((p, index) => (
+              <FilaPregunta
+                key={p.id}
+                pregunta={p}
+                bloqueado={mercado.pausado}
+                sinTokens={mercado.saldo < 1}
+                ocultarBorde={index === archivadas.length - 1}
+                onApostar={(lado) => intentarApostar(p.id, lado)}
+              />
+            ))}
+          </div>
+        )}
       </main>
 
       <button
