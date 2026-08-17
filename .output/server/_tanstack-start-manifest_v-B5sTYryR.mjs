@@ -1,0 +1,4 @@
+const tsrStartManifest = () => ({ routes: { __root__: { filePath: "/Users/joseluengofernandez/wizzard/casandra/src/routes/__root.tsx", children: ["/", "/admin", "/profile"], preloads: ["/assets/index-DlP8I7yM.js"], scripts: [{ attrs: { type: "module", async: true, src: "/assets/index-DlP8I7yM.js" } }] }, "/": { filePath: "/Users/joseluengofernandez/wizzard/casandra/src/routes/index.tsx", children: void 0, preloads: ["/assets/index-RcFFuywJ.js", "/assets/useMercado-DdFN8Fba.js"] }, "/admin": { filePath: "/Users/joseluengofernandez/wizzard/casandra/src/routes/admin.tsx", children: void 0, preloads: ["/assets/admin-B0vxsT0o.js", "/assets/useMercado-DdFN8Fba.js"] }, "/profile": { filePath: "/Users/joseluengofernandez/wizzard/casandra/src/routes/profile.tsx", children: void 0, preloads: ["/assets/profile-DoEYdAmA.js", "/assets/useMercado-DdFN8Fba.js"] } } });
+export {
+  tsrStartManifest
+};
