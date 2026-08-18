@@ -87,7 +87,6 @@ function FilaPregunta({
   const cerrada = pregunta.resultado !== null;
   const tengoApuesta = pregunta.misSi + pregunta.misNo > 0;
 
-  // Quitada la transición de opacidad/blanco al hacer clic para evitar el efecto "barato"
   const btnBase =
     "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium disabled:opacity-40";
 
@@ -447,7 +446,7 @@ export function MarketPage() {
             style={fuenteApple}
             className="text-[15px] font-semibold tracking-tight"
           >
-            Adivina preguntas para ganar
+            Adivina preguntas
           </span>
           <div className="flex items-center gap-4">
             {usuario.esAdmin && (
@@ -455,9 +454,16 @@ export function MarketPage() {
                 Admin
               </Link>
             )}
-            <Link to="/resueltas" className={mono}>
-              Resueltas
+            
+            <Link to="/resueltas" className="text-ink transition-opacity hover:opacity-70" aria-label="Apuestas resueltas">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"></path>
+                <path d="M14 8H8"></path>
+                <path d="M16 12H8"></path>
+                <path d="M13 16H8"></path>
+              </svg>
             </Link>
+
             <Link to="/profile" className="text-ink transition-opacity hover:opacity-70" aria-label="Perfil">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
@@ -468,7 +474,7 @@ export function MarketPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-top))]">
+      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-bottom))]">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
             <div className="flex items-center gap-3">
