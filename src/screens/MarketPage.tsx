@@ -43,21 +43,23 @@ function EscalaPuntos({
 
   return (
     <div className="mt-2.5 flex min-h-[16px] w-full items-center">
-      <div className="grid w-full grid-cols-2 gap-2" aria-hidden>
-        <div className="flex flex-wrap justify-start gap-1">
+      <div className="grid w-full grid-cols-2 gap-4 items-start" aria-hidden>
+        {/* Lado NO (Izquierda) */}
+        <div className="grid grid-cols-10 content-start gap-1 justify-items-start">
           {Array.from({ length: otrosNo }).map((_, i) => (
-            <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
+            <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo block" />
           ))}
           {Array.from({ length: misNo }).map((_, i) => (
-            <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
+            <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda block" />
           ))}
         </div>
-        <div className="flex flex-row-reverse flex-wrap gap-1">
-          {Array.from({ length: otrosSi }).map((_, i) => (
-            <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde" />
-          ))}
+        {/* Lado SÍ (Derecha) - dir="rtl" para alinear y rellenar desde la derecha */}
+        <div className="grid grid-cols-10 content-start gap-1 justify-items-start" dir="rtl">
           {Array.from({ length: misSi }).map((_, i) => (
-            <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
+            <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda block" />
+          ))}
+          {Array.from({ length: otrosSi }).map((_, i) => (
+            <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde block" />
           ))}
         </div>
       </div>
@@ -318,7 +320,22 @@ export function MarketPage() {
     }
   }, [actividadActual, actividadFija.length]);
 
+  // Seleccionar por defecto la única asignatura que tiene preguntas abiertas
+  const asignaturasConPreguntas = asignaturas.filter((a) =>
+    preguntas.some((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
+  );
+
+  const asigUnicaDefault =
+    asignaturasConPreguntas.length === 1 ? asignaturasConPreguntas[0].id : "";
+
   const [asigActiva, setAsigActiva] = useState<string>("");
+
+  useEffect(() => {
+    if (!asigActiva && asigUnicaDefault) {
+      setAsigActiva(asigUnicaDefault);
+    }
+  }, [asigActiva, asigUnicaDefault]);
+
   const asigId = asigActiva || asignaturas[0]?.id || "";
 
   const asigAnteriorRef = useRef<string>("");
