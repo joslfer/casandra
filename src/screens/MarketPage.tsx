@@ -84,7 +84,6 @@ function FilaPregunta({
   const totalApuestas = pregunta.poolSi + pregunta.poolNo;
   const tieneApuestas = totalApuestas > 0;
   const positivo = prob >= 50;
-  const cerrada = pregunta.resultado !== null;
   const tengoApuesta = pregunta.misSi + pregunta.misNo > 0;
 
   const btnBase =
@@ -107,62 +106,54 @@ function FilaPregunta({
 
       <EscalaPuntos si={pregunta.poolSi} no={pregunta.poolNo} misSi={pregunta.misSi} misNo={pregunta.misNo} />
 
-      {cerrada ? (
-        <p className="mt-3 font-mono text-[12px] uppercase tracking-widest text-sutil">
-          Resuelta · {pregunta.resultado ? "entró" : "no entró"}
-        </p>
-      ) : (
-        <>
-          <div className="mt-3 flex gap-2">
-            <button
-              data-apuesta
-              onClick={() => onApostar("no")}
-              disabled={bloqueado}
-              style={fuenteApple}
-              className={`${btnBase} ${
-                pregunta.misNo > 0
-                  ? "border-rojo bg-rojo text-white"
-                  : sinTokens
-                    ? "border-linea bg-black/5 text-sutil"
-                    : "border-borde bg-white text-ink hover:border-ink/30"
-              }`}
-            >
-              <span>NO</span>
-              {pregunta.misNo > 0 && (
-                <span className="font-mono text-[12px] tabular-nums">· {pregunta.misNo}</span>
-              )}
-            </button>
-            <button
-              data-apuesta
-              onClick={() => onApostar("si")}
-              disabled={bloqueado}
-              style={fuenteApple}
-              className={`${btnBase} ${
-                pregunta.misSi > 0
-                  ? "border-verde bg-verde text-white"
-                  : sinTokens
-                    ? "border-linea bg-black/5 text-sutil"
-                    : "border-borde bg-white text-ink hover:border-ink/30"
-              }`}
-            >
-              <span>SÍ</span>
-              {pregunta.misSi > 0 && (
-                <span className="font-mono text-[12px] tabular-nums">· {pregunta.misSi}</span>
-              )}
-            </button>
-          </div>
-
-          {tengoApuesta && (
-            <button
-              onClick={onRetirar}
-              disabled={bloqueado}
-              style={fuenteApple}
-              className="mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[12px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink active:bg-black/5 disabled:opacity-40"
-            >
-              Retirar apuesta
-            </button>
+      <div className="mt-3 flex gap-2">
+        <button
+          data-apuesta
+          onClick={() => onApostar("no")}
+          disabled={bloqueado}
+          style={fuenteApple}
+          className={`${btnBase} ${
+            pregunta.misNo > 0
+              ? "border-rojo bg-rojo text-white"
+              : sinTokens
+                ? "border-linea bg-black/5 text-sutil"
+                : "border-borde bg-white text-ink hover:border-ink/30"
+          }`}
+        >
+          <span>NO</span>
+          {pregunta.misNo > 0 && (
+            <span className="font-mono text-[14px] font-semibold tabular-nums">· {pregunta.misNo}</span>
           )}
-        </>
+        </button>
+        <button
+          data-apuesta
+          onClick={() => onApostar("si")}
+          disabled={bloqueado}
+          style={fuenteApple}
+          className={`${btnBase} ${
+            pregunta.misSi > 0
+              ? "border-verde bg-verde text-white"
+              : sinTokens
+                ? "border-linea bg-black/5 text-sutil"
+                : "border-borde bg-white text-ink hover:border-ink/30"
+          }`}
+        >
+          <span>SÍ</span>
+          {pregunta.misSi > 0 && (
+            <span className="font-mono text-[14px] font-semibold tabular-nums">· {pregunta.misSi}</span>
+          )}
+        </button>
+      </div>
+
+      {tengoApuesta && (
+        <button
+          onClick={onRetirar}
+          disabled={bloqueado}
+          style={fuenteApple}
+          className="mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[12px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink active:bg-black/5 disabled:opacity-40"
+        >
+          Retirar apuesta
+        </button>
       )}
     </article>
   );
@@ -303,7 +294,6 @@ export function MarketPage() {
   const mercado = useMercado(usuario);
   const haptic = useHaptic();
 
-  const [mostrarArchivadas, setMostrarArchivadas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
 
@@ -333,7 +323,6 @@ export function MarketPage() {
 
   const asigAnteriorRef = useRef<string>("");
   const [ordenAbiertasIds, setOrdenAbiertasIds] = useState<string[]>([]);
-  const [ordenArchivadasIds, setOrdenArchivadasIds] = useState<string[]>([]);
 
   useEffect(() => {
     const cambioAsignatura = asigAnteriorRef.current !== asigId;
@@ -341,9 +330,6 @@ export function MarketPage() {
 
     const abiertasAsig = preguntas.filter(
       (p) => p.asignaturaId === asigId && p.resultado === null && !p.archivada,
-    );
-    const archivadasAsig = preguntas.filter(
-      (p) => (p.asignaturaId === asigId && p.resultado !== null) || p.archivada,
     );
 
     setOrdenAbiertasIds((prev) => {
@@ -353,19 +339,6 @@ export function MarketPage() {
       const idsActuales = new Set(abiertasAsig.map((p) => p.id));
       const conservados = prev.filter((id) => idsActuales.has(id));
       const nuevos = abiertasAsig.map((p) => p.id).filter((id) => !prev.includes(id));
-      if (conservados.length === prev.length && nuevos.length === 0) {
-        return prev;
-      }
-      return [...conservados, ...nuevos];
-    });
-
-    setOrdenArchivadasIds((prev) => {
-      if (cambioAsignatura || prev.length === 0) {
-        return archivadasAsig.map((p) => p.id);
-      }
-      const idsActuales = new Set(archivadasAsig.map((p) => p.id));
-      const conservados = prev.filter((id) => idsActuales.has(id));
-      const nuevos = archivadasAsig.map((p) => p.id).filter((id) => !prev.includes(id));
       if (conservados.length === prev.length && nuevos.length === 0) {
         return prev;
       }
@@ -401,9 +374,6 @@ export function MarketPage() {
 
   const mapaPreguntas = new Map(preguntas.map((p) => [p.id, p]));
   const abiertas = ordenAbiertasIds
-    .map((id) => mapaPreguntas.get(id))
-    .filter((p): p is Pregunta => Boolean(p));
-  const archivadas = ordenArchivadasIds
     .map((id) => mapaPreguntas.get(id))
     .filter((p): p is Pregunta => Boolean(p));
 
@@ -474,7 +444,7 @@ export function MarketPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-bottom))]">
+      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-top))]">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
             <div className="flex items-center gap-3">
@@ -552,41 +522,6 @@ export function MarketPage() {
             onRetirar={() => retirarPregunta(p.id)}
           />
         ))}
-
-        <div className="mt-10 flex justify-center">
-          <button
-            onClick={() => setMostrarArchivadas(!mostrarArchivadas)}
-            style={fuenteApple}
-            className="flex touch-manipulation items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-sutil transition-colors hover:text-ink active:opacity-70"
-          >
-            <span>Archivadas</span>
-            <svg
-              className={`h-3.5 w-3.5 transition-transform duration-200 ${mostrarArchivadas ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-
-        {mostrarArchivadas && (
-          <div className="mt-4 flex flex-col">
-            {archivadas.map((p, index) => (
-              <FilaPregunta
-                key={p.id}
-                pregunta={p}
-                bloqueado={mercado.pausado}
-                sinTokens={mercado.saldo < 1}
-                ocultarBorde={index === abiertas.length - 1}
-                onApostar={(lado) => intentarApostar(p.id, lado)}
-                onRetirar={() => retirarPregunta(p.id)}
-              />
-            ))}
-          </div>
-        )}
       </main>
 
       <button

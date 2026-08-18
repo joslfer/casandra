@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useSesion } from "@/hooks/useSesion";
-import { useMercado } from "@/hooks/useMercado";
+import { probabilidad, useMercado } from "@/hooks/useMercado";
 import { createFileRoute } from "@tanstack/react-router";
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -25,7 +25,14 @@ function ResueltasComponent() {
   );
 
   const gruposPorAsignatura = asignaturas.map((asig) => {
-    const preguntasAsig = resueltasUsuario.filter((p) => p.asignaturaId === asig.id);
+    const preguntasAsig = resueltasUsuario
+      .filter((p) => p.asignaturaId === asig.id)
+      .sort((a, b) => {
+        const fechaA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const fechaB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return fechaB - fechaA;
+      });
+
     return {
       asignatura: asig,
       preguntas: preguntasAsig,
@@ -58,6 +65,7 @@ function ResueltasComponent() {
 
                 <div className="space-y-4">
                   {preguntasAsig.map((p) => {
+                    const prob = probabilidad(p);
                     const esSi = p.misSi > 0;
                     const apuestaUsuario = esSi ? p.misSi : p.misNo;
                     const ladoApostado = esSi ? "sí" : "no";
@@ -96,7 +104,7 @@ function ResueltasComponent() {
                             </span>.
                           </p>
                           <p className="text-[13px] font-mono text-ink/75">
-                            Pool en juego: {poolTotal} tokens (SÍ: {p.poolSi} · NO: {p.poolNo})
+                            Pool en juego: {poolTotal} tokens (SÍ: {p.poolSi} · NO: {p.poolNo} · {prob}%)
                           </p>
                         </div>
                       </article>
