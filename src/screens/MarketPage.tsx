@@ -31,29 +31,35 @@ function EscalaPuntos({
   const total = si + no;
 
   if (total === 0) {
-    return <p className="mt-2.5 font-mono text-[11px] text-sutil">sin apuestas todavía</p>;
+    return (
+      <div className="mt-2.5 flex min-h-[16px] items-center">
+        <p className="font-mono text-[11px] leading-none text-sutil">sin apuestas todavía</p>
+      </div>
+    );
   }
 
   const otrosNo = Math.max(0, no - misNo);
   const otrosSi = Math.max(0, si - misSi);
 
   return (
-    <div className="mt-2.5 grid grid-cols-2 gap-2" aria-hidden>
-      <div className="flex flex-wrap justify-start gap-1">
-        {Array.from({ length: otrosNo }).map((_, i) => (
-          <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
-        ))}
-        {Array.from({ length: misNo }).map((_, i) => (
-          <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
-        ))}
-      </div>
-      <div className="flex flex-row-reverse flex-wrap gap-1">
-        {Array.from({ length: otrosSi }).map((_, i) => (
-          <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde" />
-        ))}
-        {Array.from({ length: misSi }).map((_, i) => (
-          <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
-        ))}
+    <div className="mt-2.5 flex min-h-[16px] w-full items-center">
+      <div className="grid w-full grid-cols-2 gap-2" aria-hidden>
+        <div className="flex flex-wrap justify-start gap-1">
+          {Array.from({ length: otrosNo }).map((_, i) => (
+            <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo" />
+          ))}
+          {Array.from({ length: misNo }).map((_, i) => (
+            <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
+          ))}
+        </div>
+        <div className="flex flex-row-reverse flex-wrap gap-1">
+          {Array.from({ length: otrosSi }).map((_, i) => (
+            <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde" />
+          ))}
+          {Array.from({ length: misSi }).map((_, i) => (
+            <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda" />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -81,8 +87,9 @@ function FilaPregunta({
   const cerrada = pregunta.resultado !== null;
   const tengoApuesta = pregunta.misSi + pregunta.misNo > 0;
 
+  // Quitada la transición de opacidad/blanco al hacer clic para evitar el efecto "barato"
   const btnBase =
-    "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors disabled:opacity-40";
+    "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium disabled:opacity-40";
 
   return (
     <article 
@@ -151,7 +158,7 @@ function FilaPregunta({
               onClick={onRetirar}
               disabled={bloqueado}
               style={fuenteApple}
-              className="mt-2 w-full rounded-lg border border-borde bg-white py-2 text-[12px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink disabled:opacity-40"
+              className="mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[12px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink active:bg-black/5 disabled:opacity-40"
             >
               Retirar apuesta
             </button>
@@ -178,7 +185,7 @@ function Asignaturas({
           key={a.id}
           onClick={() => setAsigActiva(a.id)}
           style={fuenteApple}
-          className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+          className={`touch-manipulation whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
             a.id === asigId
               ? "border-ink bg-ink text-white"
               : "border-borde bg-white text-ink hover:border-ink/30"
@@ -234,18 +241,19 @@ function ModalNuevaPregunta({
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full rounded-t-2xl bg-lienzo p-5 sm:max-w-sm sm:rounded-2xl"
+        style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
       >
         <h2 className="text-[15px] font-semibold text-ink">Nueva pregunta</h2>
 
         <input
-          autoFocus
           value={titulo}
           onChange={(e) => {
             setTitulo(e.target.value);
             if (error) setError(null);
           }}
           disabled={cargando}
-          className="mt-3 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-[14px] text-ink outline-none focus:border-ink/40 disabled:opacity-50"
+          style={{ fontSize: "16px" }}
+          className="mt-3 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50"
         />
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -255,7 +263,7 @@ function ModalNuevaPregunta({
               onClick={() => setAsigId(a.id)}
               style={fuenteApple}
               disabled={cargando}
-              className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`touch-manipulation whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
                 a.id === asigId
                   ? "border-ink bg-ink text-white"
                   : "border-borde bg-white text-ink hover:border-ink/30"
@@ -273,7 +281,7 @@ function ModalNuevaPregunta({
             onClick={onCerrar}
             disabled={cargando}
             style={fuenteApple}
-            className="flex-1 rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30 disabled:opacity-50"
+            className="flex-1 touch-manipulation rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30 active:bg-black/5 disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -281,7 +289,7 @@ function ModalNuevaPregunta({
             onClick={enviar}
             disabled={cargando}
             style={fuenteApple}
-            className="flex-1 rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 disabled:opacity-50"
+            className="flex-1 touch-manipulation rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 active:opacity-70 disabled:opacity-50"
           >
             {cargando ? "Publicando..." : "Publicar"}
           </button>
@@ -300,25 +308,30 @@ export function MarketPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
 
-  // 1. LEEMOS DIRECTAMENTE DEL HOOK (Cero retardos, actualizaciones optimistas instantáneas)
-  const ranking = (mercado as any).leerRanking?.() || [];
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas();
   
-  const [asigActiva, setAsigActiva] = useState<string>("");
-  const asigId = asigActiva || asignaturas[0]?.id || "";
-
-  // 2. ACTIVIDAD: Se carga solo la primera vez que hay datos y se congela
-  const [actividadFija, setActividadFija] = useState<any[]>([]);
+  const rankingActual = (mercado as any).leerRanking?.() || [];
   const actividadActual = mercado.leerApuestas() || [];
+
+  const [rankingFijo, setRankingFijo] = useState<any[]>([]);
+  const [actividadFija, setActividadFija] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (rankingFijo.length === 0 && rankingActual.length > 0) {
+      setRankingFijo(rankingActual);
+    }
+  }, [rankingActual, rankingFijo.length]);
 
   useEffect(() => {
     if (actividadFija.length === 0 && actividadActual.length > 0) {
       setActividadFija(actividadActual);
     }
-  }, [actividadActual.length, actividadFija.length]);
+  }, [actividadActual, actividadFija.length]);
 
-  // 3. ORDEN CONGELADO: Solo se recalcula al cambiar de asignatura
+  const [asigActiva, setAsigActiva] = useState<string>("");
+  const asigId = asigActiva || asignaturas[0]?.id || "";
+
   const asigAnteriorRef = useRef<string>("");
   const [ordenAbiertasIds, setOrdenAbiertasIds] = useState<string[]>([]);
   const [ordenArchivadasIds, setOrdenArchivadasIds] = useState<string[]>([]);
@@ -409,7 +422,6 @@ export function MarketPage() {
       );
       return;
     }
-    // Llama al hook y la UI se actualizará sola e instantáneamente
     mercado.apostar(id, lado); 
   };
 
@@ -426,7 +438,10 @@ export function MarketPage() {
         if (target.closest("button, a, input, select, textarea")) haptic();
       }}
     >
-      <header className="fixed inset-x-0 top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur">
+      <header 
+        className="fixed inset-x-0 top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
           <span
             style={fuenteApple}
@@ -450,7 +465,7 @@ export function MarketPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5 pt-14">
+      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-top))]">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
             <div className="flex items-center gap-3">
@@ -466,16 +481,17 @@ export function MarketPage() {
           </div>
         )}
 
-        <div className="mt-8 grid grid-cols-2 gap-6 px-1">
-          <div className="flex flex-col h-[160px] overflow-hidden">
+        {/* DOS COLUMNAS COMPACTAS: RANKING Y ACTIVIDAD (Limitadas a 4 y misma altura) */}
+        <div className="mt-8 grid grid-cols-2 gap-6 px-1 items-start">
+          <div className="flex flex-col">
             <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
               Ranking
             </h3>
-            <ul className="space-y-2.5 text-[13px] text-ink" style={fuenteApple}>
-              {ranking.slice(0, 4).map((r: any, i: number) => (
-                <li key={i} className="flex items-center justify-between">
-                  <span className="truncate pr-2 font-medium">{r.usuario}</span>
-                  <span className="flex shrink-0 items-center gap-1 font-mono tabular-nums">
+            <ul className="space-y-3 text-[13px] text-ink" style={fuenteApple}>
+              {rankingFijo.slice(0, 4).map((r: any, i: number) => (
+                <li key={i} className="flex items-center justify-between gap-2 h-[22px]">
+                  <span className="truncate font-medium">{r.usuario}</span>
+                  <span className="flex shrink-0 items-center gap-1 font-mono tabular-nums text-[13px]">
                     {r.tokens} <Moneda className="h-2.5 w-2.5" />
                   </span>
                 </li>
@@ -483,20 +499,20 @@ export function MarketPage() {
             </ul>
           </div>
 
-          <div className="flex flex-col h-[160px] overflow-hidden">
+          <div className="flex flex-col">
             <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
               Actividad
             </h3>
-            <ul className="space-y-3 text-[12px] leading-snug text-sutil" style={fuenteApple}>
-              {actividadFija.slice(0, 4).map((a: any) => (
-                <li key={a.id} className="flex flex-col gap-0.5">
-                  <div className="truncate">
-                    <span className="font-medium text-ink">{a.usuario}</span> apostó{" "}
-                    <span className="inline-flex items-center gap-0.5 font-mono text-ink">
-                      {a.tokens} <Moneda className="h-2 w-2" />
-                    </span>
-                  </div>
-                  <span className="text-[11px] opacity-80">{haceTexto(a.cuando)}</span>
+            <ul className="space-y-3 text-[13px] text-ink" style={fuenteApple}>
+              {actividadFija.slice(0, 4).map((a: any, i: number) => (
+                <li 
+                  key={a.id || i} 
+                  className="flex items-center justify-between gap-2 h-[22px] px-2 rounded-md bg-amber-50/50 border border-amber-200/40 shadow-[0_0_8px_rgba(251,191,36,0.15)]"
+                >
+                  <span className="truncate font-medium">{a.usuario}</span>
+                  <span className="shrink-0 text-[11px] text-sutil">
+                    {haceTexto(a.cuando)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -521,7 +537,7 @@ export function MarketPage() {
           <button
             onClick={() => setMostrarArchivadas(!mostrarArchivadas)}
             style={fuenteApple}
-            className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-sutil transition-colors hover:text-ink"
+            className="flex touch-manipulation items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-sutil transition-colors hover:text-ink active:opacity-70"
           >
             <span>Archivadas</span>
             <svg
@@ -554,9 +570,13 @@ export function MarketPage() {
       </main>
 
       <button
-        onClick={() => setModalAbierto(true)}
+        onClick={() => {
+          haptic();
+          setModalAbierto(true);
+        }}
         aria-label="Nueva pregunta"
-        className="fixed bottom-6 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-[28px] leading-none text-white shadow-lg transition-opacity hover:opacity-90"
+        className="fixed right-5 z-30 flex h-14 w-14 touch-manipulation items-center justify-center rounded-full bg-ink text-[28px] leading-none text-white shadow-lg transition-transform active:scale-95 hover:opacity-90"
+        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >
         +
       </button>
