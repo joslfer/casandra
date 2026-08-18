@@ -100,6 +100,7 @@ export function nombreVisible(a: Alumno): string {
 }
 
 
+
 export function useMercado(usuario: Usuario | null) {
   const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
@@ -522,5 +523,7 @@ export function useMercado(usuario: Usuario | null) {
     ]
   );
 }
+
+
 
 export type Mercado = ReturnType<typeof useMercado>;
