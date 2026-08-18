@@ -1,17 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { useHaptic } from "@/hooks/useHaptic";
-import { nombreVisible, probabilidad, useMercado, volumen, type Pregunta } from "@/hooks/useMercado";
+import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
 type VistaAdmin = "preguntas" | "archivado" | "usuarios" | "asignaturas";
-
-function Moneda({ className = "" }: { className?: string }) {
-  return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
-}
 
 export function AdminPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
@@ -21,6 +17,25 @@ export function AdminPage() {
   const [vistaAdmin, setVistaAdmin] = useState<VistaAdmin>("preguntas");
   const [nuevaAsig, setNuevaAsig] = useState("");
   const [modalResolucion, setModalResolucion] = useState<{ pregunta: Pregunta; resultado: boolean } | null>(null);
+
+  const [detalleApuestas, setDetalleApuestas] = useState<ApuestaDetalle[]>([]);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+
+  useEffect(() => {
+    if (!modalResolucion) {
+      setDetalleApuestas([]);
+      return;
+    }
+    let cancelado = false;
+    setCargandoDetalle(true);
+    mercado.leerApuestasDePregunta(modalResolucion.pregunta.id).then((detalle) => {
+      if (!cancelado) {
+        setDetalleApuestas(detalle);
+        setCargandoDetalle(false);
+      }
+    });
+    return () => { cancelado = true; };
+  }, [modalResolucion, mercado]);
 
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
@@ -80,10 +95,6 @@ export function AdminPage() {
           <Link to="/" className="text-[15px] font-semibold tracking-tight text-ink touch-manipulation">
             ← Mercado
           </Link>
-          <span className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-white">
-            <Moneda />
-            <span className="font-mono text-[13px] tabular-nums">{mercado.saldo}</span>
-          </span>
         </div>
       </header>
 
@@ -327,12 +338,16 @@ export function AdminPage() {
       {modalResolucion && (() => {
         const p = modalResolucion.pregunta;
         const resultadoSi = modalResolucion.resultado;
-        const poolGanador = resultadoSi ? p.poolSi : p.poolNo;
-        const poolPerdedor = resultadoSi ? p.poolNo : p.poolSi;
         const poolTotal = p.poolSi + p.poolNo;
+        const poolPerdedor = resultadoSi ? p.poolNo : p.poolSi;
 
-        const todasApuestas = (mercado as any).leerApuestas?.() || [];
-        const apuestasPregunta = todasApuestas.filter((a: any) => a.preguntaId === p.id);
+        const conPago = detalleApuestas
+          .map((d) => {
+            const gana = d.lado === (resultadoSi ? "si" : "no");
+            const pago = gana ? Math.round(premio(d.tokens, d.lado, p.poolSi, p.poolNo)) : 0;
+            return { ...d, gana, pago };
+          })
+          .sort((a, b) => b.pago - a.pago);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModalResolucion(null)}>
@@ -345,34 +360,24 @@ export function AdminPage() {
               </div>
 
               <div className="space-y-2">
-                <span className="text-[12px] font-mono uppercase text-sutil">Desglose de ganadores y tokens</span>
-                
+                <span className="text-[12px] font-mono uppercase text-sutil">A quién van los tokens</span>
                 <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-xl border border-borde bg-lienzo p-3 text-[13px]">
-                  {apuestasPregunta.length === 0 ? (
-                    <p className="text-sutil text-center py-2">Pool general a repartir proporcionalmente entre acertantes.</p>
+                  {cargandoDetalle ? (
+                    <p className="text-sutil text-center py-2">Cargando apuestas…</p>
+                  ) : conPago.length === 0 ? (
+                    <p className="text-sutil text-center py-2">Nadie ha apostado en esta pregunta.</p>
                   ) : (
-                    apuestasPregunta.map((ap: any, idx: number) => {
-                      const apostoSi = ap.lado === "si" || ap.apuestaSi > 0;
-                      const esGanador = apostoSi === resultadoSi;
-                      const cantidadApostada = ap.cantidad || ap.apuestaSi || ap.apuestaNo || 0;
-                      let tokensRecuperados = 0;
-                      if (esGanador && poolGanador > 0) {
-                        tokensRecuperados = Math.round(cantidadApostada + (cantidadApostada / poolGanador) * poolPerdedor);
-                      }
-
-                      return (
-                        <div key={idx} className="flex justify-between items-center py-1 border-b border-linea/50 last:border-0">
-                          <span className="font-medium text-ink">{ap.usuario || ap.email || "Participante"}</span>
-                          <span className="font-mono text-[12px]">
-                            {esGanador ? (
-                              <strong className="text-ink">+{tokensRecuperados} tokens</strong>
-                            ) : (
-                              <span className="text-sutil">0 tokens</span>
-                            )}
-                          </span>
+                    conPago.map((d) => (
+                      <div key={`${d.usuarioId}-${d.lado}`} className="flex justify-between items-center py-1 border-b border-linea/50 last:border-0">
+                        <div className="min-w-0">
+                          <span className="font-medium text-ink truncate block">{d.nombre}</span>
+                          <span className="font-mono text-[10px] text-sutil uppercase">{d.lado} · apostó {d.tokens}</span>
                         </div>
-                      );
-                    })
+                        <span className="font-mono text-[12px] shrink-0">
+                          {d.gana ? <strong className="text-verde">+{d.pago} tokens</strong> : <span className="text-sutil">0 tokens</span>}
+                        </span>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -389,16 +394,10 @@ export function AdminPage() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setModalResolucion(null)}
-                  className="flex-1 rounded-xl border border-borde bg-white py-3 text-[13px] font-medium text-ink hover:border-ink/30 active:bg-black/5"
-                >
+                <button onClick={() => setModalResolucion(null)} className="flex-1 rounded-xl border border-borde bg-white py-3 text-[13px] font-medium text-ink hover:border-ink/30 active:bg-black/5">
                   Cancelar
                 </button>
-                <button
-                  onClick={confirmarResolucion}
-                  className="flex-1 rounded-xl bg-ink py-3 text-[13px] font-medium text-white hover:opacity-90 active:opacity-70"
-                >
+                <button onClick={confirmarResolucion} className="flex-1 rounded-xl bg-ink py-3 text-[13px] font-medium text-white hover:opacity-90 active:opacity-70">
                   Confirmar resolución
                 </button>
               </div>
