@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { useHaptic } from "@/hooks/useHaptic";
-import { nombreVisible, probabilidad, useMercado, volumen } from "@/hooks/useMercado";
+import { nombreVisible, probabilidad, useMercado, volumen, type Pregunta } from "@/hooks/useMercado";
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -20,6 +20,7 @@ export function AdminPage() {
   
   const [vistaAdmin, setVistaAdmin] = useState<VistaAdmin>("preguntas");
   const [nuevaAsig, setNuevaAsig] = useState("");
+  const [modalResolucion, setModalResolucion] = useState<{ pregunta: Pregunta; resultado: boolean } | null>(null);
 
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
@@ -61,6 +62,13 @@ export function AdminPage() {
 
   // Orden alfabético de asignaturas en el admin
   const asignaturas = [...mercado.leerAsignaturas()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+  const confirmarResolucion = async () => {
+    if (!modalResolucion) return;
+    haptic();
+    await mercado.resolver(modalResolucion.pregunta.id, modalResolucion.resultado);
+    setModalResolucion(null);
+  };
 
   return (
     <div className="min-h-screen bg-lienzo pb-28" style={fuenteApple}>
@@ -125,13 +133,13 @@ export function AdminPage() {
                     {p.resultado === null ? (
                       <>
                         <button
-                          onClick={() => { haptic(); mercado.resolver(p.id, true); }}
+                          onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: true }); }}
                           className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-verde hover:text-verde active:bg-black/5"
                         >
                           Entró
                         </button>
                         <button
-                          onClick={() => { haptic(); mercado.resolver(p.id, false); }}
+                          onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: false }); }}
                           className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-rojo hover:text-rojo active:bg-black/5"
                         >
                           No entró
@@ -314,6 +322,90 @@ export function AdminPage() {
           )}
         </section>
       </main>
+
+      {/* POPUP BREAKDOWN DE RESOLUCIÓN */}
+      {modalResolucion && (() => {
+        const p = modalResolucion.pregunta;
+        const resultadoSi = modalResolucion.resultado;
+        const poolGanador = resultadoSi ? p.poolSi : p.poolNo;
+        const poolPerdedor = resultadoSi ? p.poolNo : p.poolSi;
+        const poolTotal = p.poolSi + p.poolNo;
+
+        const todasApuestas = (mercado as any).leerApuestas?.() || [];
+        const apuestasPregunta = todasApuestas.filter((a: any) => a.preguntaId === p.id);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModalResolucion(null)}>
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4 border border-borde" onClick={(e) => e.stopPropagation()} style={fuenteApple}>
+              <div>
+                <span className="font-mono text-[11px] text-sutil uppercase tracking-wider">
+                  Resolución: {resultadoSi ? "ENTRÓ (SÍ)" : "NO ENTRÓ (NO)"}
+                </span>
+                <h3 className="text-[16px] font-semibold text-ink mt-1">{p.titulo}</h3>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[12px] font-mono uppercase text-sutil">Desglose de ganadores y tokens</span>
+                
+                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-xl border border-borde bg-lienzo p-3 text-[13px]">
+                  {apuestasPregunta.length === 0 ? (
+                    <p className="text-sutil text-center py-2">Pool general a repartir proporcionalmente entre acertantes.</p>
+                  ) : (
+                    apuestasPregunta.map((ap: any, idx: number) => {
+                      const apostoSi = ap.lado === "si" || ap.apuestaSi > 0;
+                      const esGanador = apostoSi === resultadoSi;
+                      const cantidadApostada = ap.cantidad || ap.apuestaSi || ap.apuestaNo || 0;
+                      let tokensRecuperados = 0;
+                      if (esGanador && poolGanador > 0) {
+                        tokensRecuperados = Math.round(cantidadApostada + (cantidadApostada / poolGanador) * poolPerdedor);
+                      }
+
+                      return (
+                        <div key={idx} className="flex justify-between items-center py-1 border-b border-linea/50 last:border-0">
+                          <span className="font-medium text-ink">{ap.usuario || ap.email || "Participante"}</span>
+                          <span className="font-mono text-[12px]">
+                            {esGanador ? (
+                              <strong className="text-ink">+{tokensRecuperados} tokens</strong>
+                            ) : (
+                              <span className="text-sutil">0 tokens</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-borde bg-lienzo p-3 space-y-1 text-[12px] font-mono text-sutil">
+                <div className="flex justify-between">
+                  <span>Pool total:</span>
+                  <strong className="text-ink">{poolTotal} tokens</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>A repartir del bando perdedor:</span>
+                  <strong className="text-ink">+{poolPerdedor} tokens</strong>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setModalResolucion(null)}
+                  className="flex-1 rounded-xl border border-borde bg-white py-3 text-[13px] font-medium text-ink hover:border-ink/30 active:bg-black/5"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarResolucion}
+                  className="flex-1 rounded-xl bg-ink py-3 text-[13px] font-medium text-white hover:opacity-90 active:opacity-70"
+                >
+                  Confirmar resolución
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

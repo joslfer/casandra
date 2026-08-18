@@ -4,12 +4,17 @@ import type { Usuario } from "./useMercado";
 
 const ADMIN_HANDLE = "jose.luefer";
 
-function aUsuario(id: string, email: string | null | undefined, nombre?: string | null): Usuario {
+function generarHashUsuario(id: string): string {
+  // Genera un identificador hash corto y único basado en el ID del usuario
+  return `user_${id.replace(/-/g, "").slice(0, 8)}`;
+}
+
+function aUsuario(id: string, email: string | null | undefined): Usuario {
   const correo = email ?? "";
   const handle = correo.split("@")[0]?.toLowerCase() ?? "";
   return {
     id: id,
-    nombre: nombre || correo,
+    nombre: generarHashUsuario(id),
     esAdmin: handle === ADMIN_HANDLE,
   };
 }
@@ -22,7 +27,7 @@ export function useSesion() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUsuario(
         session?.user
-          ? aUsuario(session.user.id, session.user.email, session.user.user_metadata?.["full_name"] as string)
+          ? aUsuario(session.user.id, session.user.email)
           : null,
       );
       setCargando(false);
@@ -34,7 +39,6 @@ export function useSesion() {
           ? aUsuario(
               data.session.user.id,
               data.session.user.email,
-              data.session.user.user_metadata?.["full_name"] as string,
             )
           : null,
       );
