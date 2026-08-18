@@ -1,37 +1,46 @@
 import { useCallback, useEffect, useRef } from "react";
 
 /**
- * Reproduce el haptic nativo de Safari cuando el navegador admite controles
- * `switch`. Fuera de Safari no tiene efecto.
+ * Hook de feedback háptico.
+ * - Android / navegadores con Vibration API: usa navigator.vibrate directamente.
+ * - iOS Safari (17.4+): no soporta Vibration API, así que simula un click
+ *   sobre un <label> asociado a un checkbox oculto, lo cual dispara el
+ *   haptic feedback nativo del sistema en ciertos controles de formulario.
  */
 export function useHaptic() {
-  const switchRef = useRef<HTMLInputElement | null>(null);
+  const labelRef = useRef<HTMLLabelElement | null>(null);
 
   useEffect(() => {
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.setAttribute("switch", "");
-    input.setAttribute("aria-hidden", "true");
-    input.tabIndex = -1;
-    input.style.cssText =
-      "position:fixed;inline-size:1px;block-size:1px;opacity:0;pointer-events:none;" +
-      "clip-path:inset(50%);overflow:hidden;inset:0;";
+    if (navigator.vibrate) return; // no hace falta el truco de iOS
 
-    document.body.appendChild(input);
-    switchRef.current = input;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = "haptic-checkbox";
+    checkbox.style.display = "none";
+
+    const label = document.createElement("label");
+    label.htmlFor = "haptic-checkbox";
+    label.style.display = "none";
+
+    document.body.appendChild(checkbox);
+    document.body.appendChild(label);
+    labelRef.current = label;
 
     return () => {
-      switchRef.current = null;
-      input.remove();
+      checkbox.remove();
+      label.remove();
+      labelRef.current = null;
     };
   }, []);
 
-  return useCallback(() => {
-    const input = switchRef.current;
-    if (!input) return;
-
-    // Se llama solamente desde un handler de interacción real.
-    input.click();
+  const haptic = useCallback((pattern: number | number[] = 10) => {
+    if (navigator.vibrate) {
+      navigator.vibrate(pattern);
+      return;
+    }
+    labelRef.current?.click();
   }, []);
+
+  return haptic;
 }
 
