@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
 import {
@@ -62,12 +62,14 @@ function EscalaPuntos({
 function FilaPregunta({
   pregunta,
   onApostar,
+  onRetirar,
   bloqueado,
   sinTokens,
   ocultarBorde,
 }: {
   pregunta: Pregunta;
   onApostar: (lado: Lado) => void;
+  onRetirar: () => void;
   bloqueado?: boolean;
   sinTokens?: boolean;
   ocultarBorde?: boolean;
@@ -77,14 +79,14 @@ function FilaPregunta({
   const tieneApuestas = totalApuestas > 0;
   const positivo = prob >= 50;
   const cerrada = pregunta.resultado !== null;
+  const tengoApuesta = pregunta.misSi + pregunta.misNo > 0;
 
   const btnBase =
     "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors disabled:opacity-40";
 
   return (
     <article 
-      className={`py-6 ${ocultarBorde ? "" : "border-b border-linea"} transition-all duration-500 ease-in-out`}
-      style={{ willChange: "transform" }}
+      className={`py-6 ${ocultarBorde ? "" : "border-b border-linea"}`}
     >
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
@@ -104,44 +106,57 @@ function FilaPregunta({
           Resuelta · {pregunta.resultado ? "entró" : "no entró"}
         </p>
       ) : (
-        <div className="mt-3 flex gap-2">
-          <button
-            data-apuesta
-            onClick={() => onApostar("no")}
-            disabled={bloqueado}
-            style={fuenteApple}
-            className={`${btnBase} ${
-              pregunta.misNo > 0
-                ? "border-rojo bg-rojo text-white"
-                : sinTokens
-                  ? "border-linea bg-black/5 text-sutil"
-                  : "border-borde bg-white text-ink hover:border-ink/30"
-            }`}
-          >
-            <span>NO</span>
-            {pregunta.misNo > 0 && (
-              <span className="font-mono text-[12px] tabular-nums">· {pregunta.misNo}</span>
-            )}
-          </button>
-          <button
-            data-apuesta
-            onClick={() => onApostar("si")}
-            disabled={bloqueado}
-            style={fuenteApple}
-            className={`${btnBase} ${
-              pregunta.misSi > 0
-                ? "border-verde bg-verde text-white"
-                : sinTokens
-                  ? "border-linea bg-black/5 text-sutil"
-                  : "border-borde bg-white text-ink hover:border-ink/30"
-            }`}
-          >
-            <span>SÍ</span>
-            {pregunta.misSi > 0 && (
-              <span className="font-mono text-[12px] tabular-nums">· {pregunta.misSi}</span>
-            )}
-          </button>
-        </div>
+        <>
+          <div className="mt-3 flex gap-2">
+            <button
+              data-apuesta
+              onClick={() => onApostar("no")}
+              disabled={bloqueado}
+              style={fuenteApple}
+              className={`${btnBase} ${
+                pregunta.misNo > 0
+                  ? "border-rojo bg-rojo text-white"
+                  : sinTokens
+                    ? "border-linea bg-black/5 text-sutil"
+                    : "border-borde bg-white text-ink hover:border-ink/30"
+              }`}
+            >
+              <span>NO</span>
+              {pregunta.misNo > 0 && (
+                <span className="font-mono text-[12px] tabular-nums">· {pregunta.misNo}</span>
+              )}
+            </button>
+            <button
+              data-apuesta
+              onClick={() => onApostar("si")}
+              disabled={bloqueado}
+              style={fuenteApple}
+              className={`${btnBase} ${
+                pregunta.misSi > 0
+                  ? "border-verde bg-verde text-white"
+                  : sinTokens
+                    ? "border-linea bg-black/5 text-sutil"
+                    : "border-borde bg-white text-ink hover:border-ink/30"
+              }`}
+            >
+              <span>SÍ</span>
+              {pregunta.misSi > 0 && (
+                <span className="font-mono text-[12px] tabular-nums">· {pregunta.misSi}</span>
+              )}
+            </button>
+          </div>
+
+          {tengoApuesta && (
+            <button
+              onClick={onRetirar}
+              disabled={bloqueado}
+              style={fuenteApple}
+              className="mt-2 w-full rounded-lg border border-borde bg-white py-2 text-[12px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink disabled:opacity-40"
+            >
+              Retirar apuesta
+            </button>
+          )}
+        </>
       )}
     </article>
   );
@@ -279,47 +294,72 @@ function ModalNuevaPregunta({
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
+  const haptic = useHaptic();
+
   const [mostrarArchivadas, setMostrarArchivadas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const haptic = useHaptic();
 
-  // Estados de búfer
-  const [rankingDisplay, setRankingDisplay] = useState<any[]>([]);
-  const [actividadDisplay, setActividadDisplay] = useState<any[]>([]);
-  const [preguntasDisplay, setPreguntasDisplay] = useState<Pregunta[]>([]);
-
-  useEffect(() => {
-    // 1. Ranking (Rápido, 3s)
-    const intervalRanking = setInterval(() => {
-      setRankingDisplay((mercado as any).leerRanking?.() || []);
-    }, 3000);
-
-    // 2. Actividad (Lento, 60s)
-    const intervalActividad = setInterval(() => {
-      setActividadDisplay(mercado.leerApuestas() || []);
-    }, 60000);
-
-    // 3. Preguntas (Moderado, 5s - para evitar saltos bruscos mientras interactúas)
-    const intervalPreguntas = setInterval(() => {
-        setPreguntasDisplay(mercado.leerPreguntas({ estado: "todas" }));
-    }, 5000);
-
-    // Carga inicial
-    setRankingDisplay((mercado as any).leerRanking?.() || []);
-    setActividadDisplay(mercado.leerApuestas() || []);
-    setPreguntasDisplay(mercado.leerPreguntas({ estado: "todas" }));
-
-    return () => {
-      clearInterval(intervalRanking);
-      clearInterval(intervalActividad);
-      clearInterval(intervalPreguntas);
-    };
-  }, [mercado]);
-
+  // 1. LEEMOS DIRECTAMENTE DEL HOOK (Cero retardos, actualizaciones optimistas instantáneas)
+  const ranking = (mercado as any).leerRanking?.() || [];
+  const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas();
+  
   const [asigActiva, setAsigActiva] = useState<string>("");
   const asigId = asigActiva || asignaturas[0]?.id || "";
+
+  // 2. ACTIVIDAD: Se carga solo la primera vez que hay datos y se congela
+  const [actividadFija, setActividadFija] = useState<any[]>([]);
+  const actividadActual = mercado.leerApuestas() || [];
+
+  useEffect(() => {
+    if (actividadFija.length === 0 && actividadActual.length > 0) {
+      setActividadFija(actividadActual);
+    }
+  }, [actividadActual.length, actividadFija.length]);
+
+  // 3. ORDEN CONGELADO: Solo se recalcula al cambiar de asignatura
+  const asigAnteriorRef = useRef<string>("");
+  const [ordenAbiertasIds, setOrdenAbiertasIds] = useState<string[]>([]);
+  const [ordenArchivadasIds, setOrdenArchivadasIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const cambioAsignatura = asigAnteriorRef.current !== asigId;
+    asigAnteriorRef.current = asigId;
+
+    const abiertasAsig = preguntas.filter(
+      (p) => p.asignaturaId === asigId && p.resultado === null && !p.archivada,
+    );
+    const archivadasAsig = preguntas.filter(
+      (p) => (p.asignaturaId === asigId && p.resultado !== null) || p.archivada,
+    );
+
+    setOrdenAbiertasIds((prev) => {
+      if (cambioAsignatura || prev.length === 0) {
+        return abiertasAsig.map((p) => p.id);
+      }
+      const idsActuales = new Set(abiertasAsig.map((p) => p.id));
+      const conservados = prev.filter((id) => idsActuales.has(id));
+      const nuevos = abiertasAsig.map((p) => p.id).filter((id) => !prev.includes(id));
+      if (conservados.length === prev.length && nuevos.length === 0) {
+        return prev;
+      }
+      return [...conservados, ...nuevos];
+    });
+
+    setOrdenArchivadasIds((prev) => {
+      if (cambioAsignatura || prev.length === 0) {
+        return archivadasAsig.map((p) => p.id);
+      }
+      const idsActuales = new Set(archivadasAsig.map((p) => p.id));
+      const conservados = prev.filter((id) => idsActuales.has(id));
+      const nuevos = archivadasAsig.map((p) => p.id).filter((id) => !prev.includes(id));
+      if (conservados.length === prev.length && nuevos.length === 0) {
+        return prev;
+      }
+      return [...conservados, ...nuevos];
+    });
+  }, [asigId, preguntas]);
 
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
@@ -347,18 +387,13 @@ export function MarketPage() {
     );
   }
 
-  // Usamos el búfer de preguntasDisplay en lugar de leer directamente
-  const abiertas = preguntasDisplay.filter(p => p.asignaturaId === asigId && p.resultado === null && !p.archivada);
-  const archivadas = preguntasDisplay.filter(p => p.asignaturaId === asigId && p.resultado !== null || p.archivada);
-  
-  const preguntasConApuesta = preguntasDisplay.filter(
-    (p) => p.resultado === null && !p.archivada && p.misSi + p.misNo > 0,
-  );
-  const tieneApuestas = preguntasConApuesta.length > 0;
-
-  const retirarTodo = () => {
-    preguntasConApuesta.forEach((p) => mercado.retirar(p.id));
-  };
+  const mapaPreguntas = new Map(preguntas.map((p) => [p.id, p]));
+  const abiertas = ordenAbiertasIds
+    .map((id) => mapaPreguntas.get(id))
+    .filter((p): p is Pregunta => Boolean(p));
+  const archivadas = ordenArchivadasIds
+    .map((id) => mapaPreguntas.get(id))
+    .filter((p): p is Pregunta => Boolean(p));
 
   const intentarApostar = (id: string, lado: Lado) => {
     if (mercado.saldo < 1) {
@@ -374,8 +409,12 @@ export function MarketPage() {
       );
       return;
     }
+    // Llama al hook y la UI se actualizará sola e instantáneamente
+    mercado.apostar(id, lado); 
+  };
 
-    mercado.apostar(id, lado);
+  const retirarPregunta = (id: string) => {
+    mercado.retirar(id);
   };
 
   return (
@@ -414,26 +453,13 @@ export function MarketPage() {
       <main className="mx-auto max-w-[520px] px-5 pt-14">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
-            <div className="relative flex items-center justify-center">
-              <div className="flex items-center gap-3">
-                <Moneda className="h-8 w-8" />
-                <span className="font-mono text-[64px] leading-none tabular-nums tracking-tight text-ink">
-                  {mercado.saldo}
-                </span>
-              </div>
-              
-              {tieneApuestas && (
-                <button
-                  onClick={retirarTodo}
-                  disabled={mercado.pausado}
-                  style={fuenteApple}
-                  className="absolute left-[calc(100%+20px)] w-32 rounded-lg border border-borde bg-white px-3 py-2.5 text-left text-[12px] font-medium leading-tight text-ink shadow-sm transition-colors hover:bg-black/5 disabled:opacity-40"
-                >
-                  Retirar todo y recuperar tokens.
-                </button>
-              )}
+            <div className="flex items-center gap-3">
+              <Moneda className="h-8 w-8" />
+              <span className="font-mono text-[64px] leading-none tabular-nums tracking-tight text-ink">
+                {mercado.saldo}
+              </span>
             </div>
-            
+
             <span style={fuenteApple} className="mt-4 text-[13px] font-medium uppercase tracking-widest text-sutil">
               Tokens disponibles
             </span>
@@ -446,7 +472,7 @@ export function MarketPage() {
               Ranking
             </h3>
             <ul className="space-y-2.5 text-[13px] text-ink" style={fuenteApple}>
-              {rankingDisplay.slice(0, 4).map((r: any, i: number) => (
+              {ranking.slice(0, 4).map((r: any, i: number) => (
                 <li key={i} className="flex items-center justify-between">
                   <span className="truncate pr-2 font-medium">{r.usuario}</span>
                   <span className="flex shrink-0 items-center gap-1 font-mono tabular-nums">
@@ -462,7 +488,7 @@ export function MarketPage() {
               Actividad
             </h3>
             <ul className="space-y-3 text-[12px] leading-snug text-sutil" style={fuenteApple}>
-              {actividadDisplay.slice(0, 4).map((a: any) => (
+              {actividadFija.slice(0, 4).map((a: any) => (
                 <li key={a.id} className="flex flex-col gap-0.5">
                   <div className="truncate">
                     <span className="font-medium text-ink">{a.usuario}</span> apostó{" "}
@@ -487,6 +513,7 @@ export function MarketPage() {
             sinTokens={mercado.saldo < 1}
             ocultarBorde={index === abiertas.length - 1}
             onApostar={(lado) => intentarApostar(p.id, lado)}
+            onRetirar={() => retirarPregunta(p.id)}
           />
         ))}
 
@@ -519,6 +546,7 @@ export function MarketPage() {
                 sinTokens={mercado.saldo < 1}
                 ocultarBorde={index === abiertas.length - 1}
                 onApostar={(lado) => intentarApostar(p.id, lado)}
+                onRetirar={() => retirarPregunta(p.id)}
               />
             ))}
           </div>
