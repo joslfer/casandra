@@ -99,8 +99,6 @@ export function nombreVisible(a: Alumno): string {
   return a.usaHash ? `#${a.hash}` : a.nombre || a.id;
 }
 
-
-
 export function useMercado(usuario: Usuario | null) {
   const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
@@ -200,7 +198,6 @@ export function useMercado(usuario: Usuario | null) {
     cargarDatos();
   }, [cargarDatos]);
 
-
   // --------------------------------------------------------
   // ESTADOS COMPUTADOS
   // --------------------------------------------------------
@@ -275,7 +272,6 @@ export function useMercado(usuario: Usuario | null) {
     }
     return { ganar: Math.round(ganar), perder: Math.round(perder), nombres };
   }, [preguntas]);
-
 
   // --------------------------------------------------------
   // ACCIONES DEL USUARIO (CONECTADAS A LA DB)
@@ -373,7 +369,6 @@ export function useMercado(usuario: Usuario | null) {
     await cargarDatos();
   }, [usuario, miPerfil, cargarDatos]);
 
-
   // --------------------------------------------------------
   // ADMIN
   // --------------------------------------------------------
@@ -445,20 +440,19 @@ export function useMercado(usuario: Usuario | null) {
 
   const darTokens = useCallback(async (alumnoId: string, delta: number) => {
     if (!esAdmin) return false;
-    const alum = alumnos.find((a) => a.id === alumnoId);
-    if (alum) {
-      await supabase.from("perfiles").update({ saldo: Math.max(0, alum.saldo + delta) }).eq("id", alumnoId);
-      await cargarDatos();
-    }
-    return true;
-  }, [esAdmin, alumnos, cargarDatos]);
+    const { error } = await supabase.rpc("admin_dar_tokens", { p_alumno_id: alumnoId, p_delta: delta });
+    if (error) console.error("Error al dar tokens:", error);
+    await cargarDatos();
+    return !error;
+  }, [esAdmin, cargarDatos]);
 
   const pausarAlumno = useCallback(async (alumnoId: string, valor: boolean) => {
     if (!esAdmin) return false;
-    await supabase.from("perfiles").update({ pausado: valor }).eq("id", alumnoId);
+    const { error } = await supabase.rpc("admin_pausar_alumno", { p_alumno_id: alumnoId, p_valor: valor });
+    if (error) console.error("Error al pausar alumno:", error);
     await cargarDatos();
-    return true;
-  }, [esAdmin, alumnos, cargarDatos]);
+    return !error;
+  }, [esAdmin, cargarDatos]);
 
   return useMemo(
     () => ({
@@ -523,7 +517,5 @@ export function useMercado(usuario: Usuario | null) {
     ]
   );
 }
-
-
 
 export type Mercado = ReturnType<typeof useMercado>;

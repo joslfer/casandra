@@ -43,25 +43,31 @@ function EscalaPuntos({
 
   return (
     <div className="mt-2.5 flex min-h-[16px] w-full items-center">
-      <div className="grid w-full grid-cols-2 gap-4 items-start" aria-hidden>
-        {/* Lado NO (Izquierda) */}
-        <div className="grid grid-cols-10 content-start gap-1 justify-items-start">
+      <div className="flex w-full gap-4 items-start" aria-hidden>
+        
+        {/* Lado NO (Izquierda) - Crece de izquierda a derecha (hacia el centro) */}
+        <div className="flex flex-1 flex-wrap content-start items-start justify-start gap-1">
           {Array.from({ length: otrosNo }).map((_, i) => (
-            <span key={`no-o-${i}`} className="h-2 w-2 rounded-full bg-rojo block" />
+            <span key={`no-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-rojo" />
           ))}
+          {/* Tus tokens se añaden al final del array, así que aparecen a la derecha (hacia el centro) */}
           {Array.from({ length: misNo }).map((_, i) => (
-            <span key={`no-m-${i}`} className="h-2 w-2 rounded-full bg-moneda block" />
+            <span key={`no-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
           ))}
         </div>
-        {/* Lado SÍ (Derecha) - dir="rtl" para alinear y rellenar desde la derecha */}
-        <div className="grid grid-cols-10 content-start gap-1 justify-items-start" dir="rtl">
-          {Array.from({ length: misSi }).map((_, i) => (
-            <span key={`si-m-${i}`} className="h-2 w-2 rounded-full bg-moneda block" />
-          ))}
+
+        {/* Lado SÍ (Derecha) - Crece de derecha a izquierda (hacia el centro) */}
+        {/* flex-row-reverse hace que el primer elemento del array se pinte pegado a la derecha */}
+        <div className="flex flex-1 flex-wrap flex-row-reverse content-start items-start gap-1">
           {Array.from({ length: otrosSi }).map((_, i) => (
-            <span key={`si-o-${i}`} className="h-2 w-2 rounded-full bg-verde block" />
+            <span key={`si-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-verde" />
+          ))}
+          {/* Al usar row-reverse, los tokens añadidos al final aparecen a la izquierda (hacia el centro) */}
+          {Array.from({ length: misSi }).map((_, i) => (
+            <span key={`si-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
           ))}
         </div>
+
       </div>
     </div>
   );
@@ -232,10 +238,10 @@ function ModalNuevaPregunta({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full rounded-t-2xl bg-lienzo p-5 sm:max-w-sm sm:rounded-2xl"
+        className="w-full rounded-t-md bg-lienzo p-5 sm:max-w-sm sm:rounded-md"
         style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
       >
-        <h2 className="text-[15px] font-semibold text-ink">Nueva pregunta</h2>
+        <h2 className="text-[15px] font-semibold text-ink">Cuanto más específica mejor</h2>
 
         <input
           value={titulo}
@@ -245,7 +251,7 @@ function ModalNuevaPregunta({
           }}
           disabled={cargando}
           style={{ fontSize: "16px" }}
-          className="mt-3 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50"
+          className="mt-3 w-full rounded-md border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50"
         />
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -273,7 +279,7 @@ function ModalNuevaPregunta({
             onClick={onCerrar}
             disabled={cargando}
             style={fuenteApple}
-            className="flex-1 touch-manipulation rounded-full border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30 active:bg-black/5 disabled:opacity-50"
+            className="flex-1 touch-manipulation rounded-md border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30 active:bg-black/5 disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -281,7 +287,7 @@ function ModalNuevaPregunta({
             onClick={enviar}
             disabled={cargando}
             style={fuenteApple}
-            className="flex-1 touch-manipulation rounded-full bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 active:opacity-70 disabled:opacity-50"
+            className="flex-1 touch-manipulation rounded-md bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 active:opacity-70 disabled:opacity-50"
           >
             {cargando ? "Publicando..." : "Publicar"}
           </button>
@@ -424,10 +430,7 @@ export function MarketPage() {
         if (target.closest("button, a, input, select, textarea")) haptic();
       }}
     >
-      <header 
-        className="fixed inset-x-0 top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
-      >
+<header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
           <span
             style={fuenteApple}
@@ -461,7 +464,7 @@ export function MarketPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-top))]">
+      <main className="mx-auto max-w-[520px] px-5">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
             <div className="flex items-center gap-3">
@@ -528,7 +531,7 @@ export function MarketPage() {
 
         <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
 
-        {abiertas.map((p, index) => (
+{abiertas.map((p, index) => (
           <FilaPregunta
             key={p.id}
             pregunta={p}
@@ -539,20 +542,36 @@ export function MarketPage() {
             onRetirar={() => retirarPregunta(p.id)}
           />
         ))}
+
+        {/* NUEVO BOTÓN AQUÍ */}
+        <div className="mt-8 mb-12 flex justify-center">
+          <button
+            onClick={() => {
+              haptic();
+              setModalAbierto(true);
+            }}
+            style={fuenteApple}
+            className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform active:scale-95 hover:opacity-90"
+          >
+            <svg 
+              width="18" 
+              height="18" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+            Proponer pregunta
+          </button>
+        </div>
       </main>
 
-      <button
-        onClick={() => {
-          haptic();
-          setModalAbierto(true);
-        }}
-        aria-label="Nueva pregunta"
-        className="fixed right-5 z-30 flex h-14 w-14 touch-manipulation items-center justify-center rounded-full bg-ink text-[28px] leading-none text-white shadow-lg transition-transform active:scale-95 hover:opacity-90"
-        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-      >
-        +
-      </button>
-
+      {/* EL MODAL SE QUEDA DONDE ESTABA */}
       {modalAbierto && (
         <ModalNuevaPregunta
           asignaturas={asignaturas}
