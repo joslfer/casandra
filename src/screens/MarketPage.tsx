@@ -28,42 +28,54 @@ function EscalaPuntos({
   misSi: number;
   misNo: number;
 }) {
-  const total = si + no;
+  const safeSi = si || 0;
+  const safeNo = no || 0;
+  const safeMisSi = misSi || 0;
+  const safeMisNo = misNo || 0;
+  
+  const total = safeSi + safeNo;
 
   if (total === 0) {
     return (
       <div className="mt-2.5 flex min-h-[16px] items-center">
-        <p className="font-mono text-[11px] leading-none text-sutil">sin apuestas todavía</p>
+        <p className="font-mono text-[11px] leading-none text-sutil">nadie ha apostado todavía</p>
       </div>
     );
   }
 
-  const otrosNo = Math.max(0, no - misNo);
-  const otrosSi = Math.max(0, si - misSi);
+  const otrosNo = Math.max(0, safeNo - safeMisNo);
+  const otrosSi = Math.max(0, safeSi - safeMisSi);
+
+  // Escalar proporcionalmente para no reventar el DOM si hay cientos de tokens
+  const MAX_PUNTOS = 45;
+  const factorNo = safeNo > MAX_PUNTOS ? MAX_PUNTOS / safeNo : 1;
+  const factorSi = safeSi > MAX_PUNTOS ? MAX_PUNTOS / safeSi : 1;
+
+  const renderOtrosNo = Math.round(otrosNo * factorNo);
+  const renderMisNo = Math.round(safeMisNo * factorNo);
+  const renderOtrosSi = Math.round(otrosSi * factorSi);
+  const renderMisSi = Math.round(safeMisSi * factorSi);
 
   return (
     <div className="mt-2.5 flex min-h-[16px] w-full items-center">
-      <div className="flex w-full gap-4 items-start" aria-hidden>
+      <div className="flex w-full gap-4 items-start" aria-hidden="true">
         
-        {/* Lado NO (Izquierda) - Crece de izquierda a derecha (hacia el centro) */}
+        {/* Lado NO (Izquierda) */}
         <div className="flex flex-1 flex-wrap content-start items-start justify-start gap-1">
-          {Array.from({ length: otrosNo }).map((_, i) => (
+          {Array.from({ length: renderOtrosNo }).map((_, i) => (
             <span key={`no-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-rojo" />
           ))}
-          {/* Tus tokens se añaden al final del array, así que aparecen a la derecha (hacia el centro) */}
-          {Array.from({ length: misNo }).map((_, i) => (
+          {Array.from({ length: renderMisNo }).map((_, i) => (
             <span key={`no-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
           ))}
         </div>
 
-        {/* Lado SÍ (Derecha) - Crece de derecha a izquierda (hacia el centro) */}
-        {/* flex-row-reverse hace que el primer elemento del array se pinte pegado a la derecha */}
+        {/* Lado SÍ (Derecha) */}
         <div className="flex flex-1 flex-wrap flex-row-reverse content-start items-start gap-1">
-          {Array.from({ length: otrosSi }).map((_, i) => (
+          {Array.from({ length: renderOtrosSi }).map((_, i) => (
             <span key={`si-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-verde" />
           ))}
-          {/* Al usar row-reverse, los tokens añadidos al final aparecen a la izquierda (hacia el centro) */}
-          {Array.from({ length: misSi }).map((_, i) => (
+          {Array.from({ length: renderMisSi }).map((_, i) => (
             <span key={`si-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
           ))}
         </div>
@@ -89,10 +101,10 @@ function FilaPregunta({
   ocultarBorde?: boolean;
 }) {
   const prob = probabilidad(pregunta);
-  const totalApuestas = pregunta.poolSi + pregunta.poolNo;
+  const totalApuestas = (pregunta.poolSi || 0) + (pregunta.poolNo || 0);
   const tieneApuestas = totalApuestas > 0;
   const positivo = prob >= 50;
-  const tengoApuesta = pregunta.misSi + pregunta.misNo > 0;
+  const tengoApuesta = (pregunta.misSi || 0) + (pregunta.misNo || 0) > 0;
 
   const btnBase =
     "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium disabled:opacity-40";
@@ -121,7 +133,7 @@ function FilaPregunta({
           disabled={bloqueado}
           style={fuenteApple}
           className={`${btnBase} ${
-            pregunta.misNo > 0
+            (pregunta.misNo || 0) > 0
               ? "border-rojo bg-rojo text-white"
               : sinTokens
                 ? "border-linea bg-black/5 text-sutil"
@@ -129,7 +141,7 @@ function FilaPregunta({
           }`}
         >
           <span>NO</span>
-          {pregunta.misNo > 0 && (
+          {(pregunta.misNo || 0) > 0 && (
             <span className="font-mono text-[14px] font-semibold tabular-nums">· {pregunta.misNo}</span>
           )}
         </button>
@@ -139,7 +151,7 @@ function FilaPregunta({
           disabled={bloqueado}
           style={fuenteApple}
           className={`${btnBase} ${
-            pregunta.misSi > 0
+            (pregunta.misSi || 0) > 0
               ? "border-verde bg-verde text-white"
               : sinTokens
                 ? "border-linea bg-black/5 text-sutil"
@@ -147,7 +159,7 @@ function FilaPregunta({
           }`}
         >
           <span>SÍ</span>
-          {pregunta.misSi > 0 && (
+          {(pregunta.misSi || 0) > 0 && (
             <span className="font-mono text-[14px] font-semibold tabular-nums">· {pregunta.misSi}</span>
           )}
         </button>
@@ -305,11 +317,12 @@ export function MarketPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
 
+  // Fallbacks añadidos: si devuelven nulo o la función no existe, no rompemos el render
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
-  const asignaturas = mercado.leerAsignaturas();
+  const asignaturas = mercado.leerAsignaturas() || [];
   
   const rankingActual = (mercado as any).leerRanking?.() || [];
-  const actividadActual = mercado.leerApuestas() || [];
+  const actividadActual = (mercado as any).leerApuestas?.() || []; 
 
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
   const [actividadFija, setActividadFija] = useState<any[]>([]);
@@ -326,7 +339,6 @@ export function MarketPage() {
     }
   }, [actividadActual, actividadFija.length]);
 
-  // Seleccionar por defecto la única asignatura que tiene preguntas abiertas
   const asignaturasConPreguntas = asignaturas.filter((a) =>
     preguntas.some((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
   );
@@ -401,7 +413,7 @@ export function MarketPage() {
     .filter((p): p is Pregunta => Boolean(p));
 
   const intentarApostar = (id: string, lado: Lado) => {
-    if (mercado.saldo < 1) {
+    if ((mercado.saldo || 0) < 1) {
       document.body.animate(
         [
           { transform: "translateX(0)" },
@@ -430,7 +442,7 @@ export function MarketPage() {
         if (target.closest("button, a, input, select, textarea")) haptic();
       }}
     >
-<header style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
           <span
             style={fuenteApple}
@@ -447,7 +459,7 @@ export function MarketPage() {
             
             <Link to="/resueltas" className="text-ink transition-opacity hover:opacity-70" aria-label="Apuestas resueltas">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"></path>
+                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"></path>
                 <path d="M14 8H8"></path>
                 <path d="M16 12H8"></path>
                 <path d="M13 16H8"></path>
@@ -470,7 +482,7 @@ export function MarketPage() {
             <div className="flex items-center gap-3">
               <Moneda className="h-8 w-8" />
               <span className="font-mono text-[64px] leading-none tabular-nums tracking-tight text-ink">
-                {mercado.saldo}
+                {mercado.saldo || 0}
               </span>
             </div>
 
@@ -480,7 +492,6 @@ export function MarketPage() {
           </div>
         )}
 
-        {/* DOS COLUMNAS COMPACTAS: RANKING Y ACTIVIDAD (Limitadas a 4 y misma altura) */}
         <div className="mt-8 grid grid-cols-2 gap-6 px-1 items-start">
           <div className="flex flex-col">
             <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
@@ -518,7 +529,6 @@ export function MarketPage() {
           </div>
         </div>
 
-        {/* Nota del editor */}
         <div className="mt-8 px-1">
           <p className="text-[14px] font-normal leading-relaxed text-ink" style={fuenteApple}>
             <svg className="inline-block mr-1.5 h-4 w-4 shrink-0 text-ink align-[-2px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
@@ -531,19 +541,18 @@ export function MarketPage() {
 
         <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
 
-{abiertas.map((p, index) => (
+        {abiertas.map((p, index) => (
           <FilaPregunta
             key={p.id}
             pregunta={p}
             bloqueado={mercado.pausado}
-            sinTokens={mercado.saldo < 1}
+            sinTokens={(mercado.saldo || 0) < 1}
             ocultarBorde={index === abiertas.length - 1}
             onApostar={(lado) => intentarApostar(p.id, lado)}
             onRetirar={() => retirarPregunta(p.id)}
           />
         ))}
 
-        {/* NUEVO BOTÓN AQUÍ */}
         <div className="mt-8 mb-12 flex justify-center">
           <button
             onClick={() => {
@@ -571,7 +580,6 @@ export function MarketPage() {
         </div>
       </main>
 
-      {/* EL MODAL SE QUEDA DONDE ESTABA */}
       {modalAbierto && (
         <ModalNuevaPregunta
           asignaturas={asignaturas}
