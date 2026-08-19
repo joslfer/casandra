@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
+import { Settings, ClipboardList } from "lucide-react";
 import {
   haceTexto,
   probabilidad,
@@ -423,7 +424,7 @@ export function MarketPage() {
     .filter((p): p is Pregunta => Boolean(p));
 
   const intentarApostar = (id: string, lado: Lado) => {
-    haptic();
+    haptic(); // VIBRA AL APOSTAR
     if ((mercado.saldo || 0) < 1) {
       document.body.animate(
         [
@@ -441,7 +442,7 @@ export function MarketPage() {
   };
 
   const retirarPregunta = (id: string) => {
-    haptic();
+    haptic(); // VIBRA AL RETIRAR
     mercado.retirar(id);
   };
 
@@ -449,40 +450,46 @@ export function MarketPage() {
     <div
       className="min-h-screen bg-lienzo pb-28"
       style={fuenteApple}
+      onClickCapture={(event) => {
+        const target = event.target as Element;
+        // Solo para componentes menores que no tengan la vibración manual ya programada
+        if (target.closest("a, input, select, textarea")) haptic();
+      }}
     >
-      <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
-          <span
-            style={fuenteApple}
-            className="text-[15px] font-semibold tracking-tight"
-          >
-            Adivina preguntas
-          </span>
-          <div className="flex items-center gap-4">
-            {usuario.esAdmin && (
-              <Link to={"/admin" as never} className={mono}>
-                Admin
-              </Link>
-            )}
-            
-            <Link to="/resueltas" className="text-ink transition-opacity hover:opacity-70" aria-label="Apuestas resueltas">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"></path>
-                <path d="M14 8H8"></path>
-                <path d="M16 12H8"></path>
-                <path d="M13 16H8"></path>
-              </svg>
-            </Link>
+<header style={{ paddingTop: "env(safe-area-inset-top)" }}>
+  <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
+    <span
+      style={fuenteApple}
+      className="text-[15px] font-semibold tracking-tight"
+    >
+      Adivina preguntas
+    </span>
+    
+    <div className="flex items-center gap-2">
+      {usuario.esAdmin && (
+        <Link to={"/admin" as never} className={`${mono} mr-2`}>
+          Admin
+        </Link>
+      )}
 
-            <Link to="/profile" className="text-ink transition-opacity hover:opacity-70" aria-label="Perfil">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Link
+        to="/resueltas"
+        className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
+        aria-label="Apuestas resueltas"
+      >
+        <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
+      </Link>
+
+      <Link
+        to="/profile"
+        className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
+        aria-label="Perfil"
+      >
+        <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
+      </Link>
+    </div>
+  </div>
+</header>
 
       <main className="mx-auto max-w-[520px] px-5">
         {!mercado.pausado && (
@@ -533,6 +540,16 @@ export function MarketPage() {
                   </span>
                 </li>
               ))}
+              
+              {/* Placeholders discretos para mantener la simetría */}
+              {Array.from({ length: Math.max(0, 4 - (actividadFija?.length || 0)) }).map((_, i) => (
+                <li 
+                  key={`placeholder-act-${i}`} 
+                  className="flex items-center h-[22px] px-2"
+                >
+                  <span className="font-mono text-[14px] font-bold tracking-[0.2em] text-sutil/30">...</span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -551,7 +568,7 @@ export function MarketPage() {
           asignaturas={asignaturas} 
           asigId={asigId} 
           setAsigActiva={(id) => {
-            haptic();
+            haptic(); // VIBRA AL CAMBIAR DE ASIGNATURA
             setAsigActiva(id);
           }} 
           preguntas={preguntas} 
@@ -606,9 +623,24 @@ export function MarketPage() {
         />
       )}
 
-      {/* Elementos estáticos invisibles requeridos para el truco de hápticos en iOS (fixed para no saltar) */}
-      <input type="checkbox" id="haptic-checkbox" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} tabIndex={-1} aria-hidden="true" />
-      <label htmlFor="haptic-checkbox" id="haptic-label" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} aria-hidden="true"></label>
+      {/* 🟢 LA PIEZA CLAVE DE APPLE: ref con setAttribute("switch") y fixed para no hacer scroll */}
+      <input 
+        type="checkbox" 
+        id="haptic-checkbox" 
+        ref={(el) => {
+          // Engaña a iOS inyectando el atributo no estándar sin que TypeScript se queje
+          if (el) el.setAttribute("switch", "");
+        }}
+        style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} 
+        tabIndex={-1} 
+        aria-hidden="true" 
+      />
+      <label 
+        htmlFor="haptic-checkbox" 
+        id="haptic-label" 
+        style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} 
+        aria-hidden="true"
+      ></label>
 
     </div>
   );
