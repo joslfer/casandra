@@ -46,36 +46,27 @@ function EscalaPuntos({
   const otrosNo = Math.max(0, safeNo - safeMisNo);
   const otrosSi = Math.max(0, safeSi - safeMisSi);
 
-  // Escalar proporcionalmente para no reventar el DOM si hay cientos de tokens
-  const MAX_PUNTOS = 45;
-  const factorNo = safeNo > MAX_PUNTOS ? MAX_PUNTOS / safeNo : 1;
-  const factorSi = safeSi > MAX_PUNTOS ? MAX_PUNTOS / safeSi : 1;
-
-  const renderOtrosNo = Math.round(otrosNo * factorNo);
-  const renderMisNo = Math.round(safeMisNo * factorNo);
-  const renderOtrosSi = Math.round(otrosSi * factorSi);
-  const renderMisSi = Math.round(safeMisSi * factorSi);
-
+  // 1 token = 1 punto real. Nada de ratios ni compresiones.
   return (
     <div className="mt-2.5 flex min-h-[16px] w-full items-center">
       <div className="flex w-full gap-4 items-start" aria-hidden="true">
         
         {/* Lado NO (Izquierda) */}
         <div className="flex flex-1 flex-wrap content-start items-start justify-start gap-1">
-          {Array.from({ length: renderOtrosNo }).map((_, i) => (
+          {Array.from({ length: otrosNo }).map((_, i) => (
             <span key={`no-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-rojo" />
           ))}
-          {Array.from({ length: renderMisNo }).map((_, i) => (
+          {Array.from({ length: safeMisNo }).map((_, i) => (
             <span key={`no-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
           ))}
         </div>
 
         {/* Lado SÍ (Derecha) */}
         <div className="flex flex-1 flex-wrap flex-row-reverse content-start items-start gap-1">
-          {Array.from({ length: renderOtrosSi }).map((_, i) => (
+          {Array.from({ length: otrosSi }).map((_, i) => (
             <span key={`si-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-verde" />
           ))}
-          {Array.from({ length: renderMisSi }).map((_, i) => (
+          {Array.from({ length: safeMisSi }).map((_, i) => (
             <span key={`si-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
           ))}
         </div>
@@ -170,7 +161,7 @@ function FilaPregunta({
           onClick={onRetirar}
           disabled={bloqueado}
           style={fuenteApple}
-          className="mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[12px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink active:bg-black/5 disabled:opacity-40"
+          className="mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink active:bg-black/5 disabled:opacity-40"
         >
           Retirar apuesta
         </button>
@@ -183,27 +174,48 @@ function Asignaturas({
   asignaturas,
   asigId,
   setAsigActiva,
+  preguntas,
+  saldo, // 👈 1. Añade esto en los props
 }: {
   asignaturas: Array<{ id: string; nombre: string }>;
   asigId: string;
   setAsigActiva: (id: string) => void;
+  preguntas: Pregunta[];
+  saldo: number; // 👈 2. Y su tipo aquí
 }) {
   return (
     <div className="flex flex-wrap justify-center gap-2 py-6">
-      {asignaturas.map((a) => (
-        <button
-          key={a.id}
-          onClick={() => setAsigActiva(a.id)}
-          style={fuenteApple}
-          className={`touch-manipulation whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
-            a.id === asigId
-              ? "border-ink bg-ink text-white"
-              : "border-borde bg-white text-ink hover:border-ink/30"
-          }`}
-        >
-          {a.nombre}
-        </button>
-      ))}
+      {asignaturas.map((a) => {
+        const sinApostar = preguntas.filter(
+          (p) =>
+            p.asignaturaId === a.id &&
+            p.resultado === null &&
+            !p.archivada &&
+            (p.misSi || 0) + (p.misNo || 0) === 0
+        ).length;
+
+        return (
+          <button
+            key={a.id}
+            onClick={() => setAsigActiva(a.id)}
+            style={fuenteApple}
+            className={`relative touch-manipulation whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
+              a.id === asigId
+                ? "border-ink bg-ink text-white"
+                : "border-borde bg-white text-ink hover:border-ink/30"
+            }`}
+          >
+            {a.nombre}
+            
+            {/* 👈 3. Condición combinada: preguntas pendientes Y saldo mayor a 0 */}
+            {sinApostar > 0 && saldo > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-lienzo">
+                {sinApostar}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -317,7 +329,6 @@ export function MarketPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
 
-  // Fallbacks añadidos: si devuelven nulo o la función no existe, no rompemos el render
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
   
@@ -468,7 +479,7 @@ export function MarketPage() {
 
             <Link to="/profile" className="text-ink transition-opacity hover:opacity-70" aria-label="Perfil">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
             </Link>
@@ -539,7 +550,13 @@ export function MarketPage() {
           </p>
         </div>
 
-        <Asignaturas asignaturas={asignaturas} asigId={asigId} setAsigActiva={setAsigActiva} />
+        <Asignaturas 
+          asignaturas={asignaturas} 
+          asigId={asigId} 
+          setAsigActiva={setAsigActiva} 
+          preguntas={preguntas} 
+          saldo={mercado.saldo || 0} // 👈 Añade esta línea aquí
+        />
 
         {abiertas.map((p, index) => (
           <FilaPregunta
