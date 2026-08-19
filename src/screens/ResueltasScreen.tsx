@@ -14,7 +14,7 @@ export function ResueltasScreen() {
   }
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
-  const resueltasUsuario = preguntas.filter((p) => p.resultado !== null && (p.misSi > 0 || p.misNo > 0));
+  const resueltasUsuario = preguntas.filter((p) => p.resultado !== null && ((p.misSi || 0) > 0 || (p.misNo || 0) > 0));
 
   return (
     <div className="min-h-screen bg-lienzo pb-28" style={fuenteApple}>
@@ -35,12 +35,17 @@ export function ResueltasScreen() {
         ) : (
           <div className="space-y-4">
             {resueltasUsuario.map((p) => {
-              const acertoSi = p.resultado === true && p.misSi > 0;
-              const acertoNo = p.resultado === false && p.misNo > 0;
+              const misSi = p.misSi || 0;
+              const misNo = p.misNo || 0;
+              const poolSi = p.poolSi || 0;
+              const poolNo = p.poolNo || 0;
+
+              const acertoSi = p.resultado === true && misSi > 0;
+              const acertoNo = p.resultado === false && misNo > 0;
               const haGanado = acertoSi || acertoNo;
-              const apuestaUsuario = p.misSi > 0 ? p.misSi : p.misNo;
-              const poolGanador = p.resultado ? p.poolSi : p.poolNo;
-              const poolPerdedor = p.resultado ? p.poolNo : p.poolSi;
+              const apuestaUsuario = misSi > 0 ? misSi : misNo;
+              const poolGanador = p.resultado ? poolSi : poolNo;
+              const poolPerdedor = p.resultado ? poolNo : poolSi;
 
               let tokensRecuperados = 0;
               if (haGanado && poolGanador > 0) {
@@ -51,16 +56,32 @@ export function ResueltasScreen() {
               const beneficio = tokensRecuperados - apuestaUsuario;
 
               return (
-                <article key={p.id} className="rounded-2xl border border-borde bg-white p-5">
-                  <h2 className="text-[16px] font-medium leading-snug text-ink">{p.titulo}</h2>
-                  <div className="mt-3 flex items-center justify-between text-[13px]">
+                <article key={p.id} className="rounded-2xl border border-borde bg-white p-5 shadow-sm">
+                  
+                  {/* Etiqueta izquierda y Título */}
+                  <div className="flex items-start gap-3">
+                    <span 
+                      className={`shrink-0 font-mono text-[14px] font-bold tracking-widest uppercase mt-[2px] ${
+                        p.resultado === true 
+                          ? "text-verde" 
+                          : "text-rojo"
+                      }`}
+                    >
+                      {p.resultado === true ? "ENTRÓ" : "NO ENTRÓ"}
+                    </span>
+                    <h2 className="text-[16px] font-medium leading-snug text-ink">{p.titulo}</h2>
+                  </div>
+
+                  {/* Resumen de la apuesta */}
+                  <div className="mt-5 flex items-center justify-between border-t border-linea pt-4 text-[13px]">
                     <span className="text-sutil">
-                      Resultado: <strong className="text-ink">{p.resultado ? "Entró (SÍ)" : "No entró (NO)"}</strong>
+                      Apostaste: <strong className="text-ink">{misSi > 0 ? "SÍ" : "NO"}</strong>
                     </span>
                     <span className={`font-mono font-semibold ${haGanado ? "text-verde" : "text-rojo"}`}>
                       {haGanado ? `+${beneficio} tokens` : `-${apuestaUsuario} tokens`}
                     </span>
                   </div>
+                  
                 </article>
               );
             })}
