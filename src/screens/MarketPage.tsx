@@ -175,13 +175,13 @@ function Asignaturas({
   asigId,
   setAsigActiva,
   preguntas,
-  saldo, // 👈 1. Añade esto en los props
+  saldo,
 }: {
   asignaturas: Array<{ id: string; nombre: string }>;
   asigId: string;
   setAsigActiva: (id: string) => void;
   preguntas: Pregunta[];
-  saldo: number; // 👈 2. Y su tipo aquí
+  saldo: number;
 }) {
   return (
     <div className="flex flex-wrap justify-center gap-2 py-6">
@@ -207,7 +207,6 @@ function Asignaturas({
           >
             {a.nombre}
             
-            {/* 👈 3. Condición combinada: preguntas pendientes Y saldo mayor a 0 */}
             {sinApostar > 0 && saldo > 0 && (
               <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-lienzo">
                 {sinApostar}
@@ -424,6 +423,7 @@ export function MarketPage() {
     .filter((p): p is Pregunta => Boolean(p));
 
   const intentarApostar = (id: string, lado: Lado) => {
+    haptic();
     if ((mercado.saldo || 0) < 1) {
       document.body.animate(
         [
@@ -441,6 +441,7 @@ export function MarketPage() {
   };
 
   const retirarPregunta = (id: string) => {
+    haptic();
     mercado.retirar(id);
   };
 
@@ -448,10 +449,6 @@ export function MarketPage() {
     <div
       className="min-h-screen bg-lienzo pb-28"
       style={fuenteApple}
-      onClickCapture={(event) => {
-        const target = event.target as Element;
-        if (target.closest("button, a, input, select, textarea")) haptic();
-      }}
     >
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
@@ -553,9 +550,12 @@ export function MarketPage() {
         <Asignaturas 
           asignaturas={asignaturas} 
           asigId={asigId} 
-          setAsigActiva={setAsigActiva} 
+          setAsigActiva={(id) => {
+            haptic();
+            setAsigActiva(id);
+          }} 
           preguntas={preguntas} 
-          saldo={mercado.saldo || 0} // 👈 Añade esta línea aquí
+          saldo={mercado.saldo || 0}
         />
 
         {abiertas.map((p, index) => (
@@ -605,6 +605,11 @@ export function MarketPage() {
           onCrear={async (t, id) => { await mercado.crearPregunta(t, id); }}
         />
       )}
+
+      {/* Elementos estáticos invisibles requeridos para el truco de hápticos en iOS (fixed para no saltar) */}
+      <input type="checkbox" id="haptic-checkbox" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} tabIndex={-1} aria-hidden="true" />
+      <label htmlFor="haptic-checkbox" id="haptic-label" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} aria-hidden="true"></label>
+
     </div>
   );
 }
