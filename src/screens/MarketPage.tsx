@@ -379,7 +379,7 @@ export function MarketPage() {
       }
       return [...conservados, ...nuevos];
     });
-  }, [asigId, preguntas]);
+  }, [asigId, JSON.stringify(preguntas.map((p) => p.id))]);
 
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
