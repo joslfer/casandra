@@ -47,7 +47,6 @@ function EscalaPuntos({
   const otrosNo = Math.max(0, safeNo - safeMisNo);
   const otrosSi = Math.max(0, safeSi - safeMisSi);
 
-  // 1 token = 1 punto real. Nada de ratios ni compresiones.
   return (
     <div className="mt-2.5 flex min-h-[16px] w-full items-center">
       <div className="flex w-full gap-4 items-start" aria-hidden="true">
@@ -450,46 +449,53 @@ export function MarketPage() {
     <div
       className="min-h-screen bg-lienzo pb-28"
       style={fuenteApple}
-      onClickCapture={(event) => {
-        const target = event.target as Element;
-        // Solo para componentes menores que no tengan la vibración manual ya programada
-        if (target.closest("a, input, select, textarea")) haptic();
-      }}
-    >
-<header style={{ paddingTop: "env(safe-area-inset-top)" }}>
-  <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
-    <span
-      style={fuenteApple}
-      className="text-[15px] font-semibold tracking-tight"
-    >
-      Adivina preguntas
-    </span>
-    
-    <div className="flex items-center gap-2">
-      {usuario.esAdmin && (
-        <Link to={"/admin" as never} className={`${mono} mr-2`}>
-          Admin
-        </Link>
-      )}
+    onClickCapture={(event) => {
+      const target = event.target as Element;
+      
+      // CORRECCIÓN: Romper el bucle infinito del hack de haptics
+      if (target.id === "haptic-checkbox" || target.id === "haptic-label") return;
 
-      <Link
-        to="/resueltas"
-        className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
-        aria-label="Apuestas resueltas"
-      >
-        <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
-      </Link>
+      // NUEVO: Excluir inputs de texto y textareas para evitar que el hack les robe el foco
+      if (target.closest('input[type="text"], input:not([type]), textarea')) return;
 
-      <Link
-        to="/profile"
-        className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
-        aria-label="Perfil"
-      >
-        <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
-      </Link>
-    </div>
-  </div>
-</header>
+      // Solo para componentes menores que no tengan la vibración manual ya programada
+      if (target.closest("a, input, select")) haptic();
+    }}
+    >
+      <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
+          <span
+            style={fuenteApple}
+            className="text-[15px] font-semibold tracking-tight"
+          >
+            Adivina preguntas
+          </span>
+          
+          <div className="flex items-center gap-2">
+            {usuario.esAdmin && (
+              <Link to={"/admin" as never} className={`${mono} mr-2`}>
+                Admin
+              </Link>
+            )}
+
+            <Link
+              to="/resueltas"
+              className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
+              aria-label="Apuestas resueltas"
+            >
+              <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
+            </Link>
+
+            <Link
+              to="/profile"
+              className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
+              aria-label="Perfil"
+            >
+              <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
+            </Link>
+          </div>
+        </div>
+      </header>
 
       <main className="mx-auto max-w-[520px] px-5">
         {!mercado.pausado && (
@@ -541,7 +547,6 @@ export function MarketPage() {
                 </li>
               ))}
               
-              {/* Placeholders discretos para mantener la simetría */}
               {Array.from({ length: Math.max(0, 4 - (actividadFija?.length || 0)) }).map((_, i) => (
                 <li 
                   key={`placeholder-act-${i}`} 
@@ -568,7 +573,7 @@ export function MarketPage() {
           asignaturas={asignaturas} 
           asigId={asigId} 
           setAsigActiva={(id) => {
-            haptic(); // VIBRA AL CAMBIAR DE ASIGNATURA
+            haptic(); 
             setAsigActiva(id);
           }} 
           preguntas={preguntas} 
@@ -590,7 +595,6 @@ export function MarketPage() {
         <div className="mt-8 mb-12 flex justify-center">
           <button
             onClick={() => {
-              haptic();
               setModalAbierto(true);
             }}
             style={fuenteApple}
@@ -623,12 +627,11 @@ export function MarketPage() {
         />
       )}
 
-      {/* 🟢 LA PIEZA CLAVE DE APPLE: ref con setAttribute("switch") y fixed para no hacer scroll */}
+      {/* Hack de iOS */}
       <input 
         type="checkbox" 
         id="haptic-checkbox" 
         ref={(el) => {
-          // Engaña a iOS inyectando el atributo no estándar sin que TypeScript se queje
           if (el) el.setAttribute("switch", "");
         }}
         style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} 
