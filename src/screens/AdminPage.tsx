@@ -21,6 +21,8 @@ export function AdminPage() {
   const [detalleApuestas, setDetalleApuestas] = useState<ApuestaDetalle[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
+
+
   useEffect(() => {
     if (!modalResolucion) {
       setDetalleApuestas([]);
@@ -35,7 +37,7 @@ export function AdminPage() {
       }
     });
     return () => { cancelado = true; };
-  }, [modalResolucion, mercado]);
+  }, [modalResolucion?.pregunta.id]);
 
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
@@ -115,87 +117,147 @@ export function AdminPage() {
             ))}
           </div>
 
-          {vistaAdmin === "preguntas" &&
-            [...mercado.leerPreguntas({ estado: "todas" })]
+{vistaAdmin === "preguntas" && (() => {
+            // 1. Obtenemos y ordenamos todas las preguntas activas primero
+            const preguntasActivas = [...mercado.leerPreguntas({ estado: "todas" })]
               .filter((p) => !p.archivada)
-              .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { sensitivity: 'base' }))
-              .map((p) => (
-                <div key={p.id} className="border-b border-linea py-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-[14px] leading-snug font-medium text-ink">{p.titulo}</h2>
-                    <span className="font-mono text-[18px] tabular-nums text-sutil shrink-0">{probabilidad(p)}%</span>
-                  </div>
-                  <p className="mt-1 font-mono text-[11px] text-sutil">
-                    vol {volumen(p)} · {p.resultado === null ? "abierta" : p.resultado ? "entró" : "no entró"}
-                  </p>
-                  <select
-                    value={p.asignaturaId}
-                    onChange={(e) => mercado.moverPregunta(p.id, e.target.value)}
-                    style={{ fontSize: "16px" }} // Evita zoom en iOS al desplegar
-                    className="mt-3 w-full rounded-lg border border-borde bg-white px-2 py-2 text-[16px] text-ink outline-none"
-                  >
-                    {asignaturas.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {p.resultado === null ? (
-                      <>
-                        <button
-                          onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: true }); }}
-                          className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-verde hover:text-verde active:bg-black/5"
-                        >
-                          Entró
-                        </button>
-                        <button
-                          onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: false }); }}
-                          className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-rojo hover:text-rojo active:bg-black/5"
-                        >
-                          No entró
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => { haptic(); mercado.desresolver(p.id); }}
-                          className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5"
-                        >
-                          Desresolver
-                        </button>
-                        <button
-                          onClick={() => { haptic(); mercado.archivar(p.id, true); }}
-                          className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5"
-                        >
-                          Archivar
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => {
-                        haptic();
-                        const t = window.prompt("Nuevo título", p.titulo);
-                        if (t) mercado.editarTitulo(p.id, t);
-                      }}
-                      className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] active:bg-black/5"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => {
-                        haptic();
-                        if (window.confirm(`¿Seguro que quieres eliminar la pregunta "${p.titulo}"?`)) {
-                          mercado.eliminarPregunta(p.id);
-                        }
-                      }}
-                      className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] text-rojo active:bg-rojo/10"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              ))}
+              .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { sensitivity: 'base' }));
+
+            // 2. Separamos por asignatura
+            return (
+              <div className="space-y-6 pt-4">
+                {asignaturas.map((asignatura) => {
+                  const preguntasAsignatura = preguntasActivas.filter(p => p.asignaturaId === asignatura.id);
+                  
+                  // Ocultamos la asignatura si no tiene preguntas
+                  if (preguntasAsignatura.length === 0) return null; 
+
+                  return (
+                    <div key={asignatura.id} className="relative">
+                      {/* Cabecera sticky de la asignatura */}
+                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[12px] uppercase tracking-wider text-sutil">
+                        {asignatura.nombre}
+                      </h3>
+                      
+                      {/* Lista de preguntas de esta asignatura */}
+                      <div>
+                        {preguntasAsignatura.map((p) => (
+                          <div key={p.id} className="border-b border-linea py-5 last:border-0">
+                            <div className="flex items-start justify-between gap-4">
+                              <h2 className="text-[14px] leading-snug font-medium text-ink">{p.titulo}</h2>
+                              <span className="font-mono text-[18px] tabular-nums text-sutil shrink-0">{probabilidad(p)}%</span>
+                            </div>
+                            <p className="mt-1 font-mono text-[11px] text-sutil">
+                              vol {volumen(p)} · {p.resultado === null ? "abierta" : p.resultado ? "entró" : "no entró"}
+                            </p>
+                            <select
+                              value={p.asignaturaId}
+                              onChange={(e) => mercado.moverPregunta(p.id, e.target.value)}
+                              style={{ fontSize: "16px" }}
+                              className="mt-3 w-full rounded-lg border border-borde bg-white px-2 py-2 text-[16px] text-ink outline-none"
+                            >
+                              {asignaturas.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.nombre}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {p.resultado === null ? (
+                                <>
+                                  <button
+                                    onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: true }); }}
+                                    className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-verde hover:text-verde active:bg-black/5"
+                                  >
+                                    Entró
+                                  </button>
+                                  <button
+                                    onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: false }); }}
+                                    className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-rojo hover:text-rojo active:bg-black/5"
+                                  >
+                                    No entró
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => { haptic(); mercado.desresolver(p.id); }}
+                                    className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5"
+                                  >
+                                    Desresolver
+                                  </button>
+                                  <button
+                                    onClick={() => { haptic(); mercado.archivar(p.id, true); }}
+                                    className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5"
+                                  >
+                                    Archivar
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => {
+                                  haptic();
+                                  const t = window.prompt("Nuevo título", p.titulo);
+                                  if (t) mercado.editarTitulo(p.id, t);
+                                }}
+                                className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] active:bg-black/5"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  haptic();
+                                  if (window.confirm(`¿Seguro que quieres eliminar la pregunta "${p.titulo}"?`)) {
+                                    mercado.eliminarPregunta(p.id);
+                                  }
+                                }}
+                                className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] text-rojo active:bg-rojo/10"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* 3. Comprobación de seguridad: Preguntas huérfanas (asignatura borrada) */}
+                {(() => {
+                  const huerfanas = preguntasActivas.filter(p => !asignaturas.some(a => a.id === p.asignaturaId));
+                  if (huerfanas.length === 0) return null;
+                  
+                  return (
+                    <div className="relative">
+                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[12px] uppercase tracking-wider text-rojo">
+                        Sin asignatura / Huérfanas
+                      </h3>
+                      <div>
+                        {huerfanas.map((p) => (
+                           /* Renderizas la misma tarjeta de pregunta aquí (copias el div de arriba) */
+                           <div key={p.id} className="border-b border-linea py-5 last:border-0 text-rojo">
+                             <p className="text-[13px]">Mueve "{p.titulo}" a una asignatura válida.</p>
+                             <select
+                              value={p.asignaturaId || ""}
+                              onChange={(e) => mercado.moverPregunta(p.id, e.target.value)}
+                              style={{ fontSize: "16px" }}
+                              className="mt-3 w-full rounded-lg border border-rojo bg-white px-2 py-2 text-[16px] text-ink outline-none"
+                             >
+                               <option value="" disabled>Selecciona asignatura...</option>
+                               {asignaturas.map((a) => (
+                                 <option key={a.id} value={a.id}>{a.nombre}</option>
+                               ))}
+                             </select>
+                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
 
           {vistaAdmin === "archivado" && (
             <>
