@@ -36,6 +36,13 @@ export interface Apuesta {
   cuando: number;
 }
 
+export interface ApuestaDetalle {
+  usuarioId: string;
+  nombre: string;
+  lado: Lado;
+  tokens: number;
+}
+
 export interface Usuario {
   id: string;
   nombre: string;
@@ -203,11 +210,11 @@ export function useMercado(usuario: Usuario | null) {
   // --------------------------------------------------------
   const saldo = miPerfil ? miPerfil.saldo : 0;
   const pausado = miPerfil ? miPerfil.pausado : false;
-  
-  const perfil = miPerfil 
-    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash } 
+
+  const perfil = miPerfil
+    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash }
     : { nombre: "", usaHash: false, hash: "" };
-    
+
   const miNombre = perfil.usaHash ? `#${perfil.hash}` : perfil.nombre || usuario?.nombre || "Tú";
 
   const leerAsignaturas = useCallback((): Asignatura[] => asignaturas, [asignaturas]);
@@ -276,7 +283,7 @@ export function useMercado(usuario: Usuario | null) {
   // --------------------------------------------------------
   // ACCIONES DEL USUARIO (CONECTADAS A LA DB)
   // --------------------------------------------------------
-  
+
   const apostar = useCallback(async (id: string, lado: Lado, tokens = 1) => {
     if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
 
@@ -296,7 +303,7 @@ export function useMercado(usuario: Usuario | null) {
     // Llamada segura a la DB
     const { error } = await supabase.rpc("apostar", { p_pregunta_id: id, p_lado: lado, p_tokens: tokens });
     if (error) console.error("Error al apostar:", error);
-    
+
     await cargarDatos();
     return !error;
   }, [saldo, pausado, cargarDatos]);
@@ -330,16 +337,16 @@ export function useMercado(usuario: Usuario | null) {
   const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
     const t = titulo.trim();
     if (!t || pausado || !asignaturaId) return null;
-    
+
     const { data, error } = await supabase.from("preguntas").insert({
       titulo: t,
       asignatura_id: asignaturaId,
       historial: [50]
     }).select().single();
-    
+
     if (error || !data) return null;
     await cargarDatos();
-    return data as unknown as Pregunta; 
+    return data as unknown as Pregunta;
   }, [pausado, cargarDatos]);
 
   const simular = useCallback(() => {
@@ -353,7 +360,7 @@ export function useMercado(usuario: Usuario | null) {
   // --------------------------------------------------------
   // PERFIL
   // --------------------------------------------------------
-  
+
   const guardarNombre = useCallback(async (nombre: string) => {
     if (!usuario) return;
     setMiPerfil((prev) => (prev ? { ...prev, nombre } : prev));
@@ -381,6 +388,42 @@ export function useMercado(usuario: Usuario | null) {
     await cargarDatos();
     return !error;
   }, [esAdmin, cargarDatos]);
+
+  // Detalle de apuestas de una pregunta concreta, agrupado por usuario+lado.
+  // Usado por el modal de resolución en AdminPage para mostrar a quién van
+  // los tokens antes de confirmar.
+  const leerApuestasDePregunta = useCallback(async (preguntaId: string): Promise<ApuestaDetalle[]> => {
+    const { data, error } = await supabase
+      .from("apuestas")
+      .select("usuario_id, lado, tokens, perfiles(nombre, usa_hash, hash)")
+      .eq("pregunta_id", preguntaId);
+
+    if (error) {
+      console.error("Error al leer apuestas de la pregunta:", error);
+      return [];
+    }
+    if (!data) return [];
+
+    // Agrupamos por usuario+lado por si tiene varias apuestas en el mismo lado
+    const agrupado = new Map<string, ApuestaDetalle>();
+    for (const a of data as any[]) {
+      const p = a.perfiles;
+      const nombre = p ? (p.usa_hash ? `#${p.hash}` : p.nombre || "Anónimo") : "Anónimo";
+      const clave = `${a.usuario_id}-${a.lado}`;
+      const existente = agrupado.get(clave);
+      if (existente) {
+        existente.tokens += Number(a.tokens);
+      } else {
+        agrupado.set(clave, {
+          usuarioId: a.usuario_id,
+          nombre,
+          lado: a.lado as Lado,
+          tokens: Number(a.tokens)
+        });
+      }
+    }
+    return Array.from(agrupado.values());
+  }, []);
 
   const desresolver = useCallback(async (id: string) => {
     if (!esAdmin) return false;
@@ -464,6 +507,7 @@ export function useMercado(usuario: Usuario | null) {
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
+      leerApuestasDePregunta,
       leerRanking,
       resumen,
       apostar,
@@ -494,6 +538,7 @@ export function useMercado(usuario: Usuario | null) {
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
+      leerApuestasDePregunta,
       leerRanking,
       resumen,
       apostar,

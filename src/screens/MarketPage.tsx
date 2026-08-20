@@ -39,7 +39,7 @@ function EscalaPuntos({
   if (total === 0) {
     return (
       <div className="mt-2.5 flex min-h-[16px] items-center">
-        <p className="font-mono text-[11px] leading-none text-sutil">nadie ha apostado todavía</p>
+        <p className="font-mono text-[11px] leading-none text-sutil">sin apuestas</p>
       </div>
     );
   }
@@ -97,8 +97,19 @@ function FilaPregunta({
   const positivo = prob >= 50;
   const tengoApuesta = (pregunta.misSi || 0) + (pregunta.misNo || 0) > 0;
 
+  // ESTADO PARA EL MICRO-COOLDOWN
+  const [cooldown, setCooldown] = useState(false);
+
+  const handleApostar = (lado: Lado) => {
+    if (cooldown || bloqueado) return;
+    setCooldown(true);
+    onApostar(lado);
+    // Bloquea los clics durante 300ms para evitar desincronizaciones, SIN animar
+    setTimeout(() => setCooldown(false), 300);
+  };
+
   const btnBase =
-    "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium disabled:opacity-40";
+    "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium";
 
   return (
     <article 
@@ -120,10 +131,10 @@ function FilaPregunta({
       <div className="mt-3 flex gap-2">
         <button
           data-apuesta
-          onClick={() => onApostar("no")}
-          disabled={bloqueado}
+          onClick={() => handleApostar("no")}
+          disabled={bloqueado || cooldown}
           style={fuenteApple}
-          className={`${btnBase} ${
+          className={`${btnBase} ${bloqueado ? "opacity-40" : ""} ${
             (pregunta.misNo || 0) > 0
               ? "border-rojo bg-rojo text-white"
               : sinTokens
@@ -138,10 +149,10 @@ function FilaPregunta({
         </button>
         <button
           data-apuesta
-          onClick={() => onApostar("si")}
-          disabled={bloqueado}
+          onClick={() => handleApostar("si")}
+          disabled={bloqueado || cooldown}
           style={fuenteApple}
-          className={`${btnBase} ${
+          className={`${btnBase} ${bloqueado ? "opacity-40" : ""} ${
             (pregunta.misSi || 0) > 0
               ? "border-verde bg-verde text-white"
               : sinTokens
@@ -159,9 +170,9 @@ function FilaPregunta({
       {tengoApuesta && (
         <button
           onClick={onRetirar}
-          disabled={bloqueado}
+          disabled={bloqueado || cooldown}
           style={fuenteApple}
-          className="mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil transition-colors hover:border-ink/30 hover:text-ink active:bg-black/5 disabled:opacity-40"
+          className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink active:bg-black/5 ${bloqueado ? "opacity-40" : ""}`}
         >
           Retirar apuesta
         </button>
@@ -395,25 +406,37 @@ export function MarketPage() {
     return <div className="min-h-screen bg-lienzo" />;
   }
 
+  // --- PANTALLA INICIAL DE INICIO DE SESIÓN ---
   if (!usuario) {
+    const parrafo1 = "Consulta qué puede caer en el examen usando la opinión agregada de todo el mundo. ";
+    const parrafo2 = "Si tienes algo que aportar, apuesta.";
+
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-lienzo px-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Casandra</h1>
-        <p className="mt-2 max-w-xs text-center text-[14px] leading-relaxed text-sutil">
-          Mercado de predicción académico. Apuesta tokens a si una pregunta entra en el examen.
-        </p>
-        <button
-          onClick={async () => {
-            haptic();
-            setError(await entrarConGoogle());
-          }}
-          style={fuenteApple}
-          className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
-        >
-          Entrar con Google
-        </button>
-        {error && <p className="mt-3 text-[12px] text-rojo">{error}</p>}
-      </main>
+      <div className="flex min-h-screen flex-col bg-lienzo" style={fuenteApple}>
+        {/* Contenedor padre flex: centra todo el bloque en la pantalla */}
+        <main className="flex flex-1 flex-col items-center justify-center px-6 pt-12 pb-20">
+          
+          {/* Contenedor interno: le da ancho máximo y alinea el texto a la izquierda */}
+          <div className="w-full max-w-[340px] flex flex-col">
+            <h1 className="text-[32px] font-bold tracking-tight text-ink text-left">Casandra</h1>
+            
+            <div className="mt-5 space-y-4 text-[16px] leading-relaxed text-ink/80 text-left">
+              <p>{parrafo1}</p>
+              <p>{parrafo2}</p>
+            </div>
+
+            <button
+              onClick={async () => { haptic(); setError(await entrarConGoogle()); }}
+              className="mt-10 w-full touch-manipulation rounded-xl bg-ink py-4 text-[16px] font-medium text-white shadow-sm transition-transform active:scale-[0.98]"
+            >
+              Entrar con Google
+            </button>
+
+            {error && <p className="mt-3 text-[13px] text-rojo text-left">{error}</p>}
+          </div>
+
+        </main>
+      </div>
     );
   }
 
@@ -445,6 +468,8 @@ export function MarketPage() {
     mercado.retirar(id);
   };
 
+
+
   return (
     <div
       className="min-h-screen bg-lienzo pb-28"
@@ -468,7 +493,7 @@ export function MarketPage() {
             style={fuenteApple}
             className="text-[15px] font-semibold tracking-tight"
           >
-            Adivina preguntas
+            Consulta probabilidades y apuesta
           </span>
           
           <div className="flex items-center gap-2">
@@ -568,6 +593,7 @@ export function MarketPage() {
             <span className="font-semibold">Nota del editor:</span> Bienvenido! Aquí puedes hacer apuestas sobre lo que va a caer en el próximo examen. Quien acierte se lleva los tokens de los perdedores. Los mercados de predicción funcionan mejor cuantos más participantes, y pueden llegar a ser muy muy precisos. De momento los tokens no tienen valor real pero... quién sabe?
           </p>
         </div>
+        
 
         <Asignaturas 
           asignaturas={asignaturas} 
