@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
 import { Settings, ClipboardList } from "lucide-react";
+import { PantallaLogin } from "@/components/PantallaLogin";
 import {
   haceTexto,
   probabilidad,
@@ -408,36 +409,7 @@ export function MarketPage() {
 
   // --- PANTALLA INICIAL DE INICIO DE SESIÓN ---
   if (!usuario) {
-    const parrafo1 = "Consulta qué puede caer en el examen usando la opinión agregada de todo el mundo. ";
-    const parrafo2 = "Si tienes algo que aportar, apuesta.";
-
-    return (
-      <div className="flex min-h-screen flex-col bg-lienzo" style={fuenteApple}>
-        {/* Contenedor padre flex: centra todo el bloque en la pantalla */}
-        <main className="flex flex-1 flex-col items-center justify-center px-6 pt-12 pb-20">
-          
-          {/* Contenedor interno: le da ancho máximo y alinea el texto a la izquierda */}
-          <div className="w-full max-w-[340px] flex flex-col">
-            <h1 className="text-[32px] font-bold tracking-tight text-ink text-left">Casandra</h1>
-            
-            <div className="mt-5 space-y-4 text-[16px] leading-relaxed text-ink/80 text-left">
-              <p>{parrafo1}</p>
-              <p>{parrafo2}</p>
-            </div>
-
-            <button
-              onClick={async () => { haptic(); setError(await entrarConGoogle()); }}
-              className="mt-10 w-full touch-manipulation rounded-xl bg-ink py-4 text-[16px] font-medium text-white shadow-sm transition-transform active:scale-[0.98]"
-            >
-              Entrar con Google
-            </button>
-
-            {error && <p className="mt-3 text-[13px] text-rojo text-left">{error}</p>}
-          </div>
-
-        </main>
-      </div>
-    );
+    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
   const mapaPreguntas = new Map(preguntas.map((p) => [p.id, p]));
@@ -493,13 +465,13 @@ export function MarketPage() {
             style={fuenteApple}
             className="text-[15px] font-semibold tracking-tight"
           >
-            Consulta probabilidades y apuesta
+            Mercado
           </span>
           
           <div className="flex items-center gap-2">
             {usuario.esAdmin && (
               <Link to={"/admin" as never} className={`${mono} mr-2`}>
-                Admin
+                ADMN
               </Link>
             )}
 

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useSesion } from "@/hooks/useSesion";
 import { useMercado } from "@/hooks/useMercado";
+import { PantallaLogin } from "@/components/PantallaLogin";
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -13,20 +14,7 @@ export function ProfilePage() {
   }
 
   if (!usuario) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-lienzo px-6" style={fuenteApple}>
-        <h1 className="text-2xl font-semibold tracking-tight">Casandra</h1>
-        <p className="mt-2 max-w-xs text-center text-[14px] leading-relaxed text-sutil">
-          Mercado de predicción académico. Apuesta tokens a si una pregunta entra en el examen.
-        </p>
-        <button
-          onClick={entrarConGoogle}
-          className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
-        >
-          Entrar con Google
-        </button>
-      </main>
-    );
+    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
   return (
