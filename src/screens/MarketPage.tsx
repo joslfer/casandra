@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList, Lock } from "lucide-react"; // Importado Lock
+import { Settings, ClipboardList, Lock } from "lucide-react";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import {
   probabilidad,
@@ -111,12 +111,15 @@ function FilaPregunta({
 
   return (
     <article 
-      className={`py-6 ${ocultarBorde ? "" : "border-b border-linea"}`}
+      className={`py-6 w-full ${ocultarBorde ? "" : "border-b border-linea"}`}
     >
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
+        {/* break-words y min-w-0 evitan que textos largos rompan el ancho */}
+        <h2 className="min-w-0 flex-1 break-words text-[19px] font-medium leading-snug text-ink">
+          {pregunta.titulo}
+        </h2>
         <span
-          className={`font-mono text-[30px] leading-none tabular-nums ${
+          className={`shrink-0 font-mono text-[30px] leading-none tabular-nums ${
             !tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"
           }`}
         >
@@ -335,7 +338,7 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
 
   if (rankingFijo.length === 0 || miIndice === -1) {
     return (
-      <div className="mt-4 flex justify-center">
+      <div className="mt-4 flex w-full justify-center">
         <Link to="/ranking" className="text-[17px] font-medium text-sutil transition-colors hover:text-ink">
           Ver Clasificación Global →
         </Link>
@@ -349,9 +352,9 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
 
   if (miIndice === 0) {
     return (
-      <div className="mt-4 flex justify-center">
+      <div className="mt-4 flex w-full justify-center">
         <Link to="/ranking" className="group relative inline-flex items-center text-[17px] text-ink/90 transition-colors hover:text-ink">
-          <div className="absolute inset-0 -z-10 bg-amber-400/30 blur-xl scale-125 rounded-full" aria-hidden="true" />
+          <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
           
           <span>
             Vas <strong className="font-semibold text-ink">#1</strong>. ¡Mantén la distancia!
@@ -366,13 +369,13 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
   const faltan = diferencia >= 0 ? diferencia + 1 : 1; 
 
   return (
-    <div className="mt-4 flex justify-center">
+    <div className="mt-4 flex w-full justify-center">
       <Link to="/ranking" className="group relative inline-flex items-center text-[17px] text-ink/90 transition-colors hover:text-ink">
-        <div className="absolute inset-0 -z-10 bg-amber-400/30 blur-xl scale-125 rounded-full" aria-hidden="true" />
+        <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
 
         <span>
           Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
-          <span className="inline-flex items-center gap-0.5 font-mono font-bold text-ink mx-0.5">
+          <span className="mx-0.5 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
             {faltan} <Moneda className="h-4 w-4 align-[-2px]" />
           </span>{" "}
           para adelantar a <strong className="font-medium text-ink">{elDeArriba.usuario}</strong>
@@ -488,7 +491,8 @@ export function MarketPage() {
 
   return (
     <div
-      className="min-h-screen bg-lienzo pb-28"
+      /* AÑADIDO: w-full y overflow-x-hidden para bloquear cualquier scroll horizontal */
+      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28"
       style={fuenteApple}
       onClickCapture={(event) => {
         const target = event.target as Element;
@@ -498,7 +502,8 @@ export function MarketPage() {
       }}
     >
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
+        {/* AÑADIDO: w-full en el header para que no se exceda */}
+        <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           <span
             style={fuenteApple}
             className="text-[15px] font-bold tracking-tight"
@@ -515,7 +520,7 @@ export function MarketPage() {
 
             <Link
               to="/resueltas"
-              className="flex items-center justify-center p-2 text-ink opacity-100 touch-manipulation"
+              className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100"
               aria-label="Apuestas resueltas"
             >
               <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
@@ -523,7 +528,7 @@ export function MarketPage() {
 
             <Link
               to="/profile"
-              className="flex items-center justify-center p-2 text-ink opacity-100 touch-manipulation"
+              className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100"
               aria-label="Perfil"
             >
               <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
@@ -532,12 +537,13 @@ export function MarketPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5">
+      {/* AÑADIDO: w-full en el main para asegurar el margen interno */}
+      <main className="mx-auto w-full max-w-[520px] px-5">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
-            <div className="flex items-center gap-3 relative z-10">
+            <div className="relative z-10 flex items-center gap-3">
               <Moneda className="h-8 w-8" />
-              <span className="font-mono text-[64px] leading-none tabular-nums tracking-tight text-ink">
+              <span className="font-mono text-[64px] leading-none tracking-tight tabular-nums text-ink">
                 {mercado.saldo || 0}
               </span>
             </div>
@@ -551,7 +557,7 @@ export function MarketPage() {
 
         <div className="mt-8 px-1">
           <p className="text-[14px] font-normal leading-relaxed text-ink" style={fuenteApple}>
-            <svg className="inline-block mr-1.5 h-4 w-4 shrink-0 text-ink align-[-2px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="mr-1.5 inline-block h-4 w-4 shrink-0 align-[-2px] text-ink" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
               <path d="m3 11 18-5v12L3 14v-3z"></path>
               <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path>
             </svg>
@@ -583,13 +589,13 @@ export function MarketPage() {
         ))}
 
         {hayAsignaturasAbiertas && (
-          <div className="mt-8 mb-12 flex justify-center">
+          <div className="mb-12 mt-8 flex justify-center">
             <button
               onClick={() => {
                 setModalAbierto(true);
               }}
               style={fuenteApple}
-              className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform active:scale-95 hover:opacity-90"
+              className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
             >
               <svg 
                 width="18" 
