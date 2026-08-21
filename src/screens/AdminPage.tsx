@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { useHaptic } from "@/hooks/useHaptic";
 import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
+import { PantallaLogin } from "@/components/PantallaLogin";
+
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -60,21 +62,8 @@ export function AdminPage() {
     );
   }
 
-  if (!usuario.esAdmin) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-lienzo px-6 text-center" style={fuenteApple}>
-        <h1 className="text-2xl font-semibold tracking-tight">Sin permisos</h1>
-        <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-sutil">
-          Esta sección es solo para administradores.
-        </p>
-        <Link
-          to="/"
-          className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
-        >
-          Volver al mercado
-        </Link>
-      </main>
-    );
+  if (!usuario) {
+    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
   // Orden alfabético de asignaturas en el admin
