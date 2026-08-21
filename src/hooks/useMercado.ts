@@ -13,6 +13,7 @@ export type Lado = "si" | "no";
 export interface Asignatura {
   id: string;
   nombre: string;
+  cerrada: boolean;
 }
 
 export interface Pregunta {
@@ -139,7 +140,7 @@ export function useMercado(usuario: Usuario | null) {
       if (data) misApuestas = data;
     }
 
-    if (resAsig.data) setAsignaturas(resAsig.data.map((a: any) => ({ id: a.id, nombre: a.nombre })));
+    if (resAsig.data) setAsignaturas(resAsig.data.map((a: any) => ({ id: a.id, nombre: a.nombre, cerrada: a.cerrada })));
 
     if (resPerf.data) {
       const alums = resPerf.data.map((p: any) => ({
@@ -287,6 +288,11 @@ export function useMercado(usuario: Usuario | null) {
   const apostar = useCallback(async (id: string, lado: Lado, tokens = 1) => {
     if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
 
+    // No se puede apostar en preguntas de una asignatura/examen cerrado
+    const pregunta = preguntas.find((p) => p.id === id);
+    const asignatura = pregunta ? asignaturas.find((a) => a.id === pregunta.asignaturaId) : undefined;
+    if (asignatura?.cerrada) return false;
+
     // Actualización optimista de la UI para que se sienta instantánea
     setPreguntas((prev) => prev.map((p) => {
       if (p.id !== id) return p;
@@ -306,7 +312,7 @@ export function useMercado(usuario: Usuario | null) {
 
     await cargarDatos();
     return !error;
-  }, [saldo, pausado, cargarDatos]);
+  }, [saldo, pausado, cargarDatos, preguntas, asignaturas]);
 
   const retirar = useCallback(async (id: string) => {
     if (pausado) return 0;
@@ -481,6 +487,17 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
+
+  // Pausa/reabre un examen (=asignatura) entero: bloquea apostar() en
+  // todas sus preguntas sin tener que tocar cada una individualmente.
+  const pausarExamen = useCallback(async (asignaturaId: string, valor: boolean) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase.from("asignaturas").update({ cerrada: valor }).eq("id", asignaturaId);
+    if (error) console.error("Error al pausar examen:", error);
+    await cargarDatos();
+    return !error;
+  }, [esAdmin, cargarDatos]);
+
   const darTokens = useCallback(async (alumnoId: string, delta: number) => {
     if (!esAdmin) return false;
     const { error } = await supabase.rpc("admin_dar_tokens", { p_alumno_id: alumnoId, p_delta: delta });
@@ -523,6 +540,7 @@ export function useMercado(usuario: Usuario | null) {
       crearAsignatura,
       eliminarAsignatura,
       renombrarAsignatura,
+      pausarExamen,
       darTokens,
       pausarAlumno,
       guardarNombre,
@@ -554,6 +572,7 @@ export function useMercado(usuario: Usuario | null) {
       crearAsignatura,
       eliminarAsignatura,
       renombrarAsignatura,
+      pausarExamen,
       darTokens,
       pausarAlumno,
       guardarNombre,

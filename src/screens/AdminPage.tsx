@@ -5,7 +5,6 @@ import { useHaptic } from "@/hooks/useHaptic";
 import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 
-
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -22,8 +21,6 @@ export function AdminPage() {
 
   const [detalleApuestas, setDetalleApuestas] = useState<ApuestaDetalle[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
-
-
 
   useEffect(() => {
     if (!modalResolucion) {
@@ -46,24 +43,24 @@ export function AdminPage() {
   }
 
   if (!usuario) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-lienzo px-6" style={fuenteApple}>
-        <h1 className="text-2xl font-semibold tracking-tight">Casandra</h1>
-        <p className="mt-2 max-w-xs text-center text-[14px] leading-relaxed text-sutil">
-          Mercado de predicción académico. Apuesta tokens a si una pregunta entra en el examen.
-        </p>
-        <button
-          onClick={entrarConGoogle}
-          className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
-        >
-          Entrar con Google
-        </button>
-      </main>
-    );
+    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
-  if (!usuario) {
-    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
+  if (!usuario.esAdmin) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-lienzo px-6 text-center" style={fuenteApple}>
+        <h1 className="text-2xl font-semibold tracking-tight">Sin permisos</h1>
+        <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-sutil">
+          Esta sección es solo para administradores.
+        </p>
+        <Link
+          to="/"
+          className="mt-8 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85"
+        >
+          Volver al mercado
+        </Link>
+      </main>
+    );
   }
 
   // Orden alfabético de asignaturas en el admin
@@ -106,7 +103,7 @@ export function AdminPage() {
             ))}
           </div>
 
-{vistaAdmin === "preguntas" && (() => {
+          {vistaAdmin === "preguntas" && (() => {
             // 1. Obtenemos y ordenamos todas las preguntas activas primero
             const preguntasActivas = [...mercado.leerPreguntas({ estado: "todas" })]
               .filter((p) => !p.archivada)
@@ -224,7 +221,6 @@ export function AdminPage() {
                       </h3>
                       <div>
                         {huerfanas.map((p) => (
-                           /* Renderizas la misma tarjeta de pregunta aquí (copias el div de arriba) */
                            <div key={p.id} className="border-b border-linea py-5 last:border-0 text-rojo">
                              <p className="text-[13px]">Mueve "{p.titulo}" a una asignatura válida.</p>
                              <select
@@ -331,24 +327,45 @@ export function AdminPage() {
           {vistaAdmin === "asignaturas" && (
             <>
               {asignaturas.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 border-b border-linea py-3.5">
-                  <input
-                    value={a.nombre}
-                    onChange={(e) => mercado.renombrarAsignatura(a.id, e.target.value)}
-                    style={{ fontSize: "16px" }} // Evita zoom en iOS Safari
-                    className="min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none focus:border-b focus:border-ink/30"
-                  />
-                  <button
-                    onClick={() => {
-                      haptic();
-                      if (window.confirm(`¿Seguro que quieres eliminar la asignatura "${a.nombre}"?`)) {
-                        mercado.eliminarAsignatura(a.id);
-                      }
-                    }}
-                    className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-3 py-1.5 text-[12px] text-rojo active:bg-rojo/10"
-                  >
-                    Eliminar
-                  </button>
+                <div key={a.id} className="flex flex-col gap-2 border-b border-linea py-3.5">
+                  <div className="flex items-center gap-3">
+                    <input
+                      value={a.nombre}
+                      onChange={(e) => mercado.renombrarAsignatura(a.id, e.target.value)}
+                      style={{ fontSize: "16px" }} 
+                      className={`min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none focus:border-b focus:border-ink/30 ${a.cerrada ? "opacity-50" : ""}`}
+                    />
+                    
+                    {/* BOTÓN PARA PAUSAR/REANUDAR ASIGNATURA CORREGIDO */}
+                    <button
+                      onClick={() => {
+                        haptic();
+                        mercado.pausarExamen(a.id, !a.cerrada);
+                      }}
+                      className={`shrink-0 touch-manipulation rounded-lg border px-3 py-1.5 text-[12px] transition-colors ${
+                        a.cerrada ? "border-ink bg-ink text-white" : "border-borde bg-white text-ink hover:border-ink/30"
+                      }`}
+                    >
+                      {a.cerrada ? "Reabrir" : "Cerrar exam"}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        haptic();
+                        if (window.confirm(`¿Seguro que quieres eliminar la asignatura "${a.nombre}"?`)) {
+                          mercado.eliminarAsignatura(a.id);
+                        }
+                      }}
+                      className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-3 py-1.5 text-[12px] text-rojo active:bg-rojo/10"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                  {a.cerrada && (
+                    <p className="text-[12px] text-sutil font-mono uppercase">
+                      Examen cerrado. No se admiten apuestas.
+                    </p>
+                  )}
                 </div>
               ))}
               <form
@@ -369,7 +386,7 @@ export function AdminPage() {
                   value={nuevaAsig}
                   onChange={(e) => setNuevaAsig(e.target.value)}
                   placeholder="Nueva asignatura..."
-                  style={{ fontSize: "16px" }} // Evita zoom en iOS Safari
+                  style={{ fontSize: "16px" }} 
                   className="min-w-0 flex-1 border-b border-borde bg-transparent pb-2 text-[16px] text-ink outline-none placeholder:text-sutil focus:border-ink"
                 />
                 <button 
