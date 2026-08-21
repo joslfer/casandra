@@ -82,11 +82,11 @@ function PaginaRanking() {
         </div>
 
           <h1 className="text-[28px] font-bold tracking-tight text-ink">
-            Los que mejor predicen son...
+            Clasificaicón 
           </h1>
     
         <p className="mt-1.5 text-[15px] text-sutil leading-relaxed">
-            Gracias a ellos el mercado es fiable.
+  
           </p>
         
         <ul className="text-[17px] text-ink">
