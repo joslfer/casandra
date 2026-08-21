@@ -334,12 +334,15 @@ function ModalNuevaPregunta({
 }
 
 function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
+  // 👇 AQUÍ PUEDES MODIFICAR EL TAMAÑO DEL TEXTO PARA TODO EL BOTÓN 👇
+  const TAMANO_TEXTO = "text-[15px]"; 
+
   const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
 
   if (rankingFijo.length === 0 || miIndice === -1) {
     return (
-      <div className="mt-4 flex w-full justify-center">
-        <Link to="/ranking" className="text-[17px] font-medium text-sutil transition-colors hover:text-ink">
+      <div className="mt-4 flex w-full justify-center px-4">
+        <Link to="/ranking" className={`${TAMANO_TEXTO} font-medium text-sutil transition-colors hover:text-ink truncate`}>
           Ver Clasificación Global →
         </Link>
       </div>
@@ -352,14 +355,14 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
 
   if (miIndice === 0) {
     return (
-      <div className="mt-4 flex w-full justify-center">
-        <Link to="/ranking" className="group relative inline-flex items-center text-[17px] text-ink/90 transition-colors hover:text-ink">
+      <div className="mt-4 flex w-full justify-center px-4">
+        <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
           <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
           
-          <span>
+          <span className="block truncate">
             Vas <strong className="font-semibold text-ink">#1</strong>. ¡Mantén la distancia!
           </span>
-          <span className="ml-1.5 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
+          <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
         </Link>
       </div>
     );
@@ -369,19 +372,20 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
   const faltan = diferencia >= 0 ? diferencia + 1 : 1; 
 
   return (
-    <div className="mt-4 flex w-full justify-center">
-      <Link to="/ranking" className="group relative inline-flex items-center text-[17px] text-ink/90 transition-colors hover:text-ink">
+    <div className="mt-4 flex w-full justify-center px-4">
+      <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
         <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
 
-        <span>
+        {/* El "truncate" fuerza a que se quede en 1 sola línea */}
+        <span className="block truncate">
           Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
           <span className="mx-0.5 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
-            {faltan} <Moneda className="h-4 w-4 align-[-2px]" />
+            {faltan} <Moneda className="h-3.5 w-3.5 align-[-2px]" />
           </span>{" "}
-          para adelantar a <strong className="font-medium text-ink">{elDeArriba.usuario}</strong>
+          hasta <strong className="font-medium text-ink">{elDeArriba.usuario}</strong>
         </span>
         
-        <span className="ml-1.5 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
+        <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
       </Link>
     </div>
   );
@@ -508,7 +512,7 @@ export function MarketPage() {
             style={fuenteApple}
             className="text-[15px] font-bold tracking-tight"
           >
-            Casandra
+            Consulta y opina
           </span>
           
           <div className="flex items-center gap-2">
