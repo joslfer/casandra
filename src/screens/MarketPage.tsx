@@ -2,10 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList } from "lucide-react";
+import { Settings, ClipboardList, Lock } from "lucide-react"; // Importado Lock
 import { PantallaLogin } from "@/components/PantallaLogin";
 import {
-  haceTexto,
   probabilidad,
   useMercado,
   type Lado,
@@ -98,14 +97,12 @@ function FilaPregunta({
   const positivo = prob >= 50;
   const tengoApuesta = (pregunta.misSi || 0) + (pregunta.misNo || 0) > 0;
 
-  // ESTADO PARA EL MICRO-COOLDOWN
   const [cooldown, setCooldown] = useState(false);
 
   const handleApostar = (lado: Lado) => {
     if (cooldown || bloqueado) return;
     setCooldown(true);
     onApostar(lado);
-    // Bloquea los clics durante 300ms para evitar desincronizaciones, SIN animar
     setTimeout(() => setCooldown(false), 300);
   };
 
@@ -189,7 +186,7 @@ function Asignaturas({
   preguntas,
   saldo,
 }: {
-  asignaturas: Array<{ id: string; nombre: string }>;
+  asignaturas: Array<{ id: string; nombre: string; cerrada?: boolean }>;
   asigId: string;
   setAsigActiva: (id: string) => void;
   preguntas: Pregunta[];
@@ -211,13 +208,14 @@ function Asignaturas({
             key={a.id}
             onClick={() => setAsigActiva(a.id)}
             style={fuenteApple}
-            className={`relative touch-manipulation whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
+            className={`relative touch-manipulation whitespace-nowrap rounded-full border flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
               a.id === asigId
                 ? "border-ink bg-ink text-white"
                 : "border-borde bg-white text-ink hover:border-ink/30"
             }`}
           >
-            {a.nombre}
+            <span>{a.nombre}</span>
+            {a.cerrada && <Lock className="h-3 w-3 opacity-60" />}
             
             {sinApostar > 0 && saldo > 0 && (
               <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-lienzo">
@@ -237,7 +235,7 @@ function ModalNuevaPregunta({
   onCerrar,
   onCrear,
 }: {
-  asignaturas: Array<{ id: string; nombre: string }>;
+  asignaturas: Array<{ id: string; nombre: string; cerrada?: boolean }>;
   asigInicial: string;
   onCerrar: () => void;
   onCrear: (titulo: string, asignaturaId: string) => Promise<any>;
@@ -332,34 +330,78 @@ function ModalNuevaPregunta({
   );
 }
 
+function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
+  const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
+
+  if (rankingFijo.length === 0 || miIndice === -1) {
+    return (
+      <div className="mt-4 flex justify-center">
+        <Link to="/ranking" className="text-[17px] font-medium text-sutil transition-colors hover:text-ink">
+          Ver Clasificación Global →
+        </Link>
+      </div>
+    );
+  }
+
+  const yo = rankingFijo[miIndice];
+  const elDeArriba = rankingFijo[miIndice - 1];
+  const miPosicion = miIndice + 1;
+
+  if (miIndice === 0) {
+    return (
+      <div className="mt-4 flex justify-center">
+        <Link to="/ranking" className="group relative inline-flex items-center text-[17px] text-ink/90 transition-colors hover:text-ink">
+          <div className="absolute inset-0 -z-10 bg-amber-400/30 blur-xl scale-125 rounded-full" aria-hidden="true" />
+          
+          <span>
+            Vas <strong className="font-semibold text-ink">#1</strong>. ¡Mantén la distancia!
+          </span>
+          <span className="ml-1.5 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
+        </Link>
+      </div>
+    );
+  }
+
+  const diferencia = elDeArriba.tokens - yo.tokens;
+  const faltan = diferencia >= 0 ? diferencia + 1 : 1; 
+
+  return (
+    <div className="mt-4 flex justify-center">
+      <Link to="/ranking" className="group relative inline-flex items-center text-[17px] text-ink/90 transition-colors hover:text-ink">
+        <div className="absolute inset-0 -z-10 bg-amber-400/30 blur-xl scale-125 rounded-full" aria-hidden="true" />
+
+        <span>
+          Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
+          <span className="inline-flex items-center gap-0.5 font-mono font-bold text-ink mx-0.5">
+            {faltan} <Moneda className="h-4 w-4 align-[-2px]" />
+          </span>{" "}
+          para adelantar a <strong className="font-medium text-ink">{elDeArriba.usuario}</strong>
+        </span>
+        
+        <span className="ml-1.5 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
+      </Link>
+    </div>
+  );
+}
+
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
   const haptic = useHaptic();
 
-  const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
   
-  const rankingActual = (mercado as any).leerRanking?.() || [];
-  const actividadActual = (mercado as any).leerApuestas?.() || []; 
-
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
-  const [actividadFija, setActividadFija] = useState<any[]>([]);
 
   useEffect(() => {
-    if (rankingFijo.length === 0 && rankingActual.length > 0) {
-      setRankingFijo(rankingActual);
+    const rankingCalculado = mercado.leerRanking();
+    if (rankingFijo.length === 0 && rankingCalculado.length > 0) {
+      setRankingFijo(rankingCalculado);
     }
-  }, [rankingActual, rankingFijo.length]);
-
-  useEffect(() => {
-    if (actividadFija.length === 0 && actividadActual.length > 0) {
-      setActividadFija(actividadActual);
-    }
-  }, [actividadActual, actividadFija.length]);
+  }, [mercado.leerRanking, rankingFijo.length]);
 
   const asignaturasConPreguntas = asignaturas.filter((a) =>
     preguntas.some((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
@@ -407,10 +449,14 @@ export function MarketPage() {
     return <div className="min-h-screen bg-lienzo" />;
   }
 
-  // --- PANTALLA INICIAL DE INICIO DE SESIÓN ---
   if (!usuario) {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
+
+  const asigActivaObj = asignaturas.find((a) => a.id === asigId);
+  const asigCerrada = asigActivaObj?.cerrada === true;
+
+  const hayAsignaturasAbiertas = asignaturas.some((a) => !a.cerrada);
 
   const mapaPreguntas = new Map(preguntas.map((p) => [p.id, p]));
   const abiertas = ordenAbiertasIds
@@ -418,7 +464,7 @@ export function MarketPage() {
     .filter((p): p is Pregunta => Boolean(p));
 
   const intentarApostar = (id: string, lado: Lado) => {
-    haptic(); // VIBRA AL APOSTAR
+    haptic(); 
     if ((mercado.saldo || 0) < 1) {
       document.body.animate(
         [
@@ -436,36 +482,28 @@ export function MarketPage() {
   };
 
   const retirarPregunta = (id: string) => {
-    haptic(); // VIBRA AL RETIRAR
+    haptic(); 
     mercado.retirar(id);
   };
-
-
 
   return (
     <div
       className="min-h-screen bg-lienzo pb-28"
       style={fuenteApple}
-    onClickCapture={(event) => {
-      const target = event.target as Element;
-      
-      // CORRECCIÓN: Romper el bucle infinito del hack de haptics
-      if (target.id === "haptic-checkbox" || target.id === "haptic-label") return;
-
-      // NUEVO: Excluir inputs de texto y textareas para evitar que el hack les robe el foco
-      if (target.closest('input[type="text"], input:not([type]), textarea')) return;
-
-      // Solo para componentes menores que no tengan la vibración manual ya programada
-      if (target.closest("a, input, select")) haptic();
-    }}
+      onClickCapture={(event) => {
+        const target = event.target as Element;
+        if (target.id === "haptic-checkbox" || target.id === "haptic-label") return;
+        if (target.closest('input[type="text"], input:not([type]), textarea')) return;
+        if (target.closest("a, input, select")) haptic();
+      }}
     >
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
           <span
             style={fuenteApple}
-            className="text-[15px] font-semibold tracking-tight"
+            className="text-[15px] font-bold tracking-tight"
           >
-            Mercado
+            Casandra
           </span>
           
           <div className="flex items-center gap-2">
@@ -477,7 +515,7 @@ export function MarketPage() {
 
             <Link
               to="/resueltas"
-              className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
+              className="flex items-center justify-center p-2 text-ink opacity-100 touch-manipulation"
               aria-label="Apuestas resueltas"
             >
               <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
@@ -485,7 +523,7 @@ export function MarketPage() {
 
             <Link
               to="/profile"
-              className="flex items-center justify-center p-2 text-ink transition-opacity hover:opacity-70 active:opacity-40 touch-manipulation"
+              className="flex items-center justify-center p-2 text-ink opacity-100 touch-manipulation"
               aria-label="Perfil"
             >
               <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
@@ -497,64 +535,19 @@ export function MarketPage() {
       <main className="mx-auto max-w-[520px] px-5">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 relative z-10">
               <Moneda className="h-8 w-8" />
               <span className="font-mono text-[64px] leading-none tabular-nums tracking-tight text-ink">
                 {mercado.saldo || 0}
               </span>
             </div>
-
-            <span style={fuenteApple} className="mt-4 text-[13px] font-medium uppercase tracking-widest text-sutil">
-              Tokens disponibles
-            </span>
+            
+            <BotonRankingDinamico 
+              rankingFijo={rankingFijo} 
+              miNombre={mercado.miNombre} 
+            />
           </div>
         )}
-
-        <div className="mt-8 grid grid-cols-2 gap-6 px-1 items-start">
-          <div className="flex flex-col">
-            <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
-              Ranking
-            </h3>
-            <ul className="space-y-3 text-[13px] text-ink" style={fuenteApple}>
-              {rankingFijo.slice(0, 4).map((r: any, i: number) => (
-                <li key={i} className="flex items-center justify-between gap-2 h-[22px]">
-                  <span className="truncate font-medium">{r.usuario}</span>
-                  <span className="flex shrink-0 items-center gap-1 font-mono tabular-nums text-[13px]">
-                    {r.tokens} <Moneda className="h-2.5 w-2.5" />
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="flex flex-col">
-            <h3 style={fuenteApple} className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-sutil shrink-0">
-              Actividad
-            </h3>
-            <ul className="space-y-3 text-[13px] text-ink" style={fuenteApple}>
-              {actividadFija.slice(0, 4).map((a: any, i: number) => (
-                <li 
-                  key={a.id || i} 
-                  className="flex items-center justify-between gap-2 h-[22px] px-2 rounded-md bg-amber-50/50 border border-amber-200/40 shadow-[0_0_8px_rgba(251,191,36,0.15)]"
-                >
-                  <span className="truncate font-medium">{a.usuario}</span>
-                  <span className="shrink-0 text-[11px] text-sutil">
-                    {haceTexto(a.cuando)}
-                  </span>
-                </li>
-              ))}
-              
-              {Array.from({ length: Math.max(0, 4 - (actividadFija?.length || 0)) }).map((_, i) => (
-                <li 
-                  key={`placeholder-act-${i}`} 
-                  className="flex items-center h-[22px] px-2"
-                >
-                  <span className="font-mono text-[14px] font-bold tracking-[0.2em] text-sutil/30">...</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
 
         <div className="mt-8 px-1">
           <p className="text-[14px] font-normal leading-relaxed text-ink" style={fuenteApple}>
@@ -566,7 +559,6 @@ export function MarketPage() {
           </p>
         </div>
         
-
         <Asignaturas 
           asignaturas={asignaturas} 
           asigId={asigId} 
@@ -582,7 +574,7 @@ export function MarketPage() {
           <FilaPregunta
             key={p.id}
             pregunta={p}
-            bloqueado={mercado.pausado}
+            bloqueado={mercado.pausado || asigCerrada} 
             sinTokens={(mercado.saldo || 0) < 1}
             ocultarBorde={index === abiertas.length - 1}
             onApostar={(lado) => intentarApostar(p.id, lado)}
@@ -590,36 +582,38 @@ export function MarketPage() {
           />
         ))}
 
-        <div className="mt-8 mb-12 flex justify-center">
-          <button
-            onClick={() => {
-              setModalAbierto(true);
-            }}
-            style={fuenteApple}
-            className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform active:scale-95 hover:opacity-90"
-          >
-            <svg 
-              width="18" 
-              height="18" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
+        {hayAsignaturasAbiertas && (
+          <div className="mt-8 mb-12 flex justify-center">
+            <button
+              onClick={() => {
+                setModalAbierto(true);
+              }}
+              style={fuenteApple}
+              className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform active:scale-95 hover:opacity-90"
             >
-              <path d="M12 5v14"></path>
-              <path d="M5 12h14"></path>
-            </svg>
-            Proponer pregunta
-          </button>
-        </div>
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14"></path>
+                <path d="M5 12h14"></path>
+              </svg>
+              Proponer pregunta
+            </button>
+          </div>
+        )}
       </main>
 
       {modalAbierto && (
         <ModalNuevaPregunta
-          asignaturas={asignaturas}
-          asigInicial={asigId}
+          asignaturas={asignaturas.filter(a => !a.cerrada)}
+          asigInicial={asigCerrada ? "" : asigId}
           onCerrar={() => setModalAbierto(false)}
           onCrear={async (t, id) => { await mercado.crearPregunta(t, id); }}
         />
