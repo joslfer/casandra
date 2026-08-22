@@ -88,17 +88,10 @@ function CountdownExamen({
   };
 
   return (
-    <article className="relative w-full py-6">
-      <button
-        onClick={() => setMostrarInfo((v) => !v)}
-        aria-label="Información sobre la fecha del examen"
-        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-borde text-[12px] font-medium text-sutil active:bg-black/5"
-      >
-        ?
-      </button>
-
-      {/* Reloj metido dentro del contenedor con pr-10 para que nunca pise el botón ? */}
-      <div className="flex w-full items-baseline justify-center pr-10 pl-2">
+    <article className="relative flex w-full flex-col items-center py-6">
+      
+      {/* Reloj libre y centrado sin el botón ? solapando */}
+      <div className="flex w-full items-baseline justify-center">
         <span className="flex items-baseline gap-1">
           <span className="inline-block min-w-[1.4ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{dias}</span>
           <span className="text-[18px] font-normal leading-none text-sutil">días</span>
@@ -120,51 +113,71 @@ function CountdownExamen({
         </span>
       </div>
 
+      {/* Nuevo texto disclaimer clicable debajo del reloj */}
+      <button
+        onClick={() => setMostrarInfo(true)}
+        className="mt-2.5 touch-manipulation text-center text-[12px] text-sutil underline decoration-sutil/40 underline-offset-4 transition-colors hover:text-ink hover:decoration-ink/40 active:opacity-70"
+      >
+        fecha informativa, puedes corregirla si está mal
+      </button>
+
+      {/* POPUP Modal centrado con letras al mismo tamaño */}
       {mostrarInfo && (
-        <div onClick={cerrarPopup} className="fixed inset-0 z-30">
+        <div onClick={cerrarPopup} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
           <div
             onClick={(e) => e.stopPropagation()}
             style={fuenteApple}
-            className="absolute right-5 top-[calc(env(safe-area-inset-top)+3.5rem)] mt-2 w-72 rounded-lg border border-borde bg-white p-3 text-[12px] leading-relaxed text-ink shadow-lg"
+            className="w-full max-w-[300px] rounded-2xl border border-borde bg-white p-6 text-center text-[16px] font-normal leading-relaxed text-ink shadow-2xl"
           >
             {!editando ? (
               <>
                 <p>
-                  La fecha programada es: <strong className="font-semibold">{fechaFormateada}</strong>
+                  La fecha programada es:<br />
+                  {fechaFormateada}
                 </p>
-                <p className="mt-1.5 text-sutil">
+                <p className="mt-3">
                   Atención: esto puede estar equivocado.
                 </p>
-                <button
-                  onClick={() => setEditando(true)}
-                  className="mt-3 w-full touch-manipulation rounded-md border border-borde bg-white py-1.5 text-[12px] font-medium text-ink active:bg-black/5"
-                >
-                  Corregir fecha
-                </button>
+                <div className="mt-6 flex gap-2">
+                  <button
+                    onClick={cerrarPopup}
+                    className="flex-1 touch-manipulation rounded-xl border border-borde bg-white py-3 text-[16px] text-ink active:bg-black/5"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => setEditando(true)}
+                    className="flex-1 touch-manipulation rounded-xl bg-ink py-3 text-[16px] text-white active:opacity-70"
+                  >
+                    Corregir
+                  </button>
+                </div>
               </>
             ) : (
               <>
-                <p className="text-sutil">Cualquiera puede corregir esta fecha si está mal.</p>
+                <p>
+                  Cualquiera puede corregir esta fecha si está mal.
+                </p>
                 <input
                   type="datetime-local"
                   value={valorInput}
                   onChange={(e) => setValorInput(e.target.value)}
                   disabled={guardando}
                   style={{ fontSize: "16px" }}
-                  className="mt-2 w-full rounded-md border border-borde bg-white px-2 py-1.5 text-[13px] text-ink outline-none focus:border-ink/40 disabled:opacity-50"
+                  className="mt-5 w-full rounded-xl border border-borde bg-white px-3 py-3 text-center text-[16px] text-ink outline-none focus:border-ink/40 disabled:opacity-50"
                 />
-                <div className="mt-2 flex gap-1.5">
+                <div className="mt-6 flex gap-2">
                   <button
                     onClick={() => setEditando(false)}
                     disabled={guardando}
-                    className="flex-1 touch-manipulation rounded-md border border-borde bg-white py-1.5 text-[12px] font-medium text-ink active:bg-black/5 disabled:opacity-50"
+                    className="flex-1 touch-manipulation rounded-xl border border-borde bg-white py-3 text-[16px] text-ink active:bg-black/5 disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={guardarFecha}
                     disabled={guardando || !valorInput}
-                    className="flex-1 touch-manipulation rounded-md bg-ink py-1.5 text-[12px] font-medium text-white active:opacity-70 disabled:opacity-50"
+                    className="flex-1 touch-manipulation rounded-xl bg-ink py-3 text-[16px] text-white active:opacity-70 disabled:opacity-50"
                   >
                     {guardando ? "Guardando..." : "Guardar"}
                   </button>
@@ -493,14 +506,15 @@ function ModalNuevaPregunta({
 }
 
 function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
-  const TAMANO_TEXTO = "text-[15px]"; 
+  // Ajuste de tipografía elástica: varía de 12px a 15px según el ancho de la pantalla (4.5vw)
+  const CLASE_TEXTO = "text-[clamp(12px,4.5vw,15px)]"; 
 
   const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
 
   if (rankingFijo.length === 0 || miIndice === -1) {
     return (
       <div className="mt-4 flex w-full justify-center px-4">
-        <Link to="/ranking" className={`${TAMANO_TEXTO} font-medium text-sutil transition-colors hover:text-ink truncate`}>
+        <Link to="/ranking" className={`${CLASE_TEXTO} font-medium text-sutil transition-colors hover:text-ink truncate`}>
           Ver Clasificación Global →
         </Link>
       </div>
@@ -514,7 +528,7 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
   if (miIndice === 0) {
     return (
       <div className="mt-4 flex w-full justify-center px-4">
-        <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
+        <Link to="/ranking" className={`group relative flex max-w-full items-center ${CLASE_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
           <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
           
           <span className="block truncate">
@@ -531,17 +545,33 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
 
   return (
     <div className="mt-4 flex w-full justify-center px-4">
-      <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
+      <Link to="/ranking" className={`group relative flex max-w-full items-center ${CLASE_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
         <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
 
-        <span className="block truncate">
-          Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
-          <span className="mx-0.5 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
+        {/* Contenedor flex inteligente con 'min-w-0' para permitir cortes y 'shrink' */}
+        <div className="flex min-w-0 shrink items-center overflow-hidden whitespace-nowrap">
+          {/* Este bloque NO se encogerá nunca (shrink-0) */}
+          <span className="shrink-0">
+            Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
+          </span>
+          
+          {/* Este bloque tampoco se encogerá (shrink-0) */}
+          <span className="mx-0.5 shrink-0 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
             {faltan} <Moneda className="h-3.5 w-3.5 align-[-2px]" />
-          </span>{" "}
-          hasta <strong className="font-medium text-ink">{elDeArriba.usuario}</strong>
-        </span>
+          </span>
+          
+          {/* Ni esto (shrink-0) */}
+          <span className="shrink-0">
+            {" "}hasta{" "}
+          </span>
+          
+          {/* SOLO ESTO se cortará con '...' si físicamente no cabe en la pantalla */}
+          <strong className="truncate font-medium text-ink">
+            {elDeArriba.usuario}
+          </strong>
+        </div>
         
+        {/* La flecha nunca se esconde */}
         <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
       </Link>
     </div>
