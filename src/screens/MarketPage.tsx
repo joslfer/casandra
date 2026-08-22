@@ -18,6 +18,166 @@ function Moneda({ className = "" }: { className?: string }) {
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
+// Convierte un timestamp (ms) al formato que espera <input type="datetime-local">
+// ("YYYY-MM-DDTHH:mm"), respetando la hora LOCAL del navegador.
+function aValorInputLocal(ts: number): string {
+  const d = new Date(ts);
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+// Cuenta atrás días/horas/min/seg hasta `fechaExamen` (timestamp en ms).
+// Se recalcula cada segundo. Desaparece sola cuando la fecha ya ha pasado.
+function CountdownExamen({
+  fechaExamen,
+  asignaturaId,
+  onEditar,
+}: {
+  fechaExamen: number;
+  asignaturaId: string;
+  onEditar: (asignaturaId: string, fecha: Date | null) => Promise<boolean>;
+}) {
+  const [restanteMs, setRestanteMs] = useState(() => fechaExamen - Date.now());
+  const [mostrarInfo, setMostrarInfo] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [valorInput, setValorInput] = useState(() => aValorInputLocal(fechaExamen));
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    setRestanteMs(fechaExamen - Date.now());
+    const id = setInterval(() => {
+      setRestanteMs(fechaExamen - Date.now());
+    }, 1000);
+    return () => clearInterval(id);
+  }, [fechaExamen]);
+
+  useEffect(() => {
+    setValorInput(aValorInputLocal(fechaExamen));
+  }, [fechaExamen]);
+
+  if (restanteMs <= 0) return null;
+
+  const totalSeg = Math.floor(restanteMs / 1000);
+  const dias = Math.floor(totalSeg / 86400);
+  const horas = Math.floor((totalSeg % 86400) / 3600);
+  const min = Math.floor((totalSeg % 3600) / 60);
+  const seg = totalSeg % 60;
+
+  const fechaFormateada = new Date(fechaExamen).toLocaleString("es-ES", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const cerrarPopup = () => {
+    setMostrarInfo(false);
+    setEditando(false);
+  };
+
+  const guardarFecha = async () => {
+    if (!valorInput) return;
+    setGuardando(true);
+    const ok = await onEditar(asignaturaId, new Date(valorInput));
+    setGuardando(false);
+    if (ok) {
+      setEditando(false);
+      setMostrarInfo(false);
+    }
+  };
+
+  return (
+    <article className="relative w-full py-6">
+      <button
+        onClick={() => setMostrarInfo((v) => !v)}
+        aria-label="Información sobre la fecha del examen"
+        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-borde text-[12px] font-medium text-sutil active:bg-black/5"
+      >
+        ?
+      </button>
+
+      {/* Reloj metido dentro del contenedor con pr-10 para que nunca pise el botón ? */}
+      <div className="flex w-full items-baseline justify-center pr-10 pl-2">
+        <span className="flex items-baseline gap-1">
+          <span className="inline-block min-w-[1.4ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{dias}</span>
+          <span className="text-[18px] font-normal leading-none text-sutil">días</span>
+        </span>
+        <span className="mx-2 font-mono text-[18px] font-medium leading-none text-ink">:</span>
+        <span className="flex items-baseline gap-1">
+          <span className="inline-block min-w-[2ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{horas}</span>
+          <span className="text-[18px] font-normal leading-none text-sutil">horas</span>
+        </span>
+        <span className="mx-2 font-mono text-[18px] font-medium leading-none text-ink">:</span>
+        <span className="flex items-baseline gap-1">
+          <span className="inline-block min-w-[2ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{min}</span>
+          <span className="text-[18px] font-normal leading-none text-sutil">min</span>
+        </span>
+        <span className="mx-2 font-mono text-[18px] font-medium leading-none text-ink">:</span>
+        <span className="flex items-baseline gap-1">
+          <span className="inline-block min-w-[2ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{seg}</span>
+          <span className="text-[18px] font-normal leading-none text-sutil">sec</span>
+        </span>
+      </div>
+
+      {mostrarInfo && (
+        <div onClick={cerrarPopup} className="fixed inset-0 z-30">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={fuenteApple}
+            className="absolute right-5 top-[calc(env(safe-area-inset-top)+3.5rem)] mt-2 w-72 rounded-lg border border-borde bg-white p-3 text-[12px] leading-relaxed text-ink shadow-lg"
+          >
+            {!editando ? (
+              <>
+                <p>
+                  La fecha programada es: <strong className="font-semibold">{fechaFormateada}</strong>
+                </p>
+                <p className="mt-1.5 text-sutil">
+                  Atención: esto puede estar equivocado.
+                </p>
+                <button
+                  onClick={() => setEditando(true)}
+                  className="mt-3 w-full touch-manipulation rounded-md border border-borde bg-white py-1.5 text-[12px] font-medium text-ink active:bg-black/5"
+                >
+                  Corregir fecha
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sutil">Cualquiera puede corregir esta fecha si está mal.</p>
+                <input
+                  type="datetime-local"
+                  value={valorInput}
+                  onChange={(e) => setValorInput(e.target.value)}
+                  disabled={guardando}
+                  style={{ fontSize: "16px" }}
+                  className="mt-2 w-full rounded-md border border-borde bg-white px-2 py-1.5 text-[13px] text-ink outline-none focus:border-ink/40 disabled:opacity-50"
+                />
+                <div className="mt-2 flex gap-1.5">
+                  <button
+                    onClick={() => setEditando(false)}
+                    disabled={guardando}
+                    className="flex-1 touch-manipulation rounded-md border border-borde bg-white py-1.5 text-[12px] font-medium text-ink active:bg-black/5 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarFecha}
+                    disabled={guardando || !valorInput}
+                    className="flex-1 touch-manipulation rounded-md bg-ink py-1.5 text-[12px] font-medium text-white active:opacity-70 disabled:opacity-50"
+                  >
+                    {guardando ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
 function EscalaPuntos({
   si,
   no,
@@ -114,7 +274,6 @@ function FilaPregunta({
       className={`py-6 w-full ${ocultarBorde ? "" : "border-b border-linea"}`}
     >
       <div className="flex items-start justify-between gap-4">
-        {/* break-words y min-w-0 evitan que textos largos rompan el ancho */}
         <h2 className="min-w-0 flex-1 break-words text-[19px] font-medium leading-snug text-ink">
           {pregunta.titulo}
         </h2>
@@ -189,7 +348,7 @@ function Asignaturas({
   preguntas,
   saldo,
 }: {
-  asignaturas: Array<{ id: string; nombre: string; cerrada?: boolean }>;
+  asignaturas: Array<{ id: string; nombre: string; cerrada?: boolean; fechaExamen?: number | null }>;
   asigId: string;
   setAsigActiva: (id: string) => void;
   preguntas: Pregunta[];
@@ -334,7 +493,6 @@ function ModalNuevaPregunta({
 }
 
 function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
-  // 👇 AQUÍ PUEDES MODIFICAR EL TAMAÑO DEL TEXTO PARA TODO EL BOTÓN 👇
   const TAMANO_TEXTO = "text-[15px]"; 
 
   const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
@@ -376,7 +534,6 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
       <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
         <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
 
-        {/* El "truncate" fuerza a que se quede en 1 sola línea */}
         <span className="block truncate">
           Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
           <span className="mx-0.5 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
@@ -410,22 +567,19 @@ export function MarketPage() {
     }
   }, [mercado.leerRanking, rankingFijo.length]);
 
-  const asignaturasConPreguntas = asignaturas.filter((a) =>
-    preguntas.some((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
-  );
-
-  const asigUnicaDefault =
-    asignaturasConPreguntas.length === 1 ? asignaturasConPreguntas[0].id : "";
+  // 1. ORDENAMOS LAS ASIGNATURAS PRIMERO (Examen más próximo primero)
+  const asignaturasOrdenadas = [...asignaturas].sort((a, b) => {
+    if (a.cerrada !== b.cerrada) return a.cerrada ? 1 : -1;
+    if (a.fechaExamen == null && b.fechaExamen == null) return 0;
+    if (a.fechaExamen == null) return 1;
+    if (b.fechaExamen == null) return -1;
+    return a.fechaExamen - b.fechaExamen;
+  });
 
   const [asigActiva, setAsigActiva] = useState<string>("");
 
-  useEffect(() => {
-    if (!asigActiva && asigUnicaDefault) {
-      setAsigActiva(asigUnicaDefault);
-    }
-  }, [asigActiva, asigUnicaDefault]);
-
-  const asigId = asigActiva || asignaturas[0]?.id || "";
+  // 2. LA ASIGNATURA POR DEFECTO ES LA PRIMERA DE LA LISTA ORDENADA
+  const asigId = asigActiva || (asignaturasOrdenadas[0]?.id || "");
 
   const asigAnteriorRef = useRef<string>("");
   const [ordenAbiertasIds, setOrdenAbiertasIds] = useState<string[]>([]);
@@ -495,7 +649,6 @@ export function MarketPage() {
 
   return (
     <div
-      /* AÑADIDO: w-full y overflow-x-hidden para bloquear cualquier scroll horizontal */
       className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28"
       style={fuenteApple}
       onClickCapture={(event) => {
@@ -506,7 +659,6 @@ export function MarketPage() {
       }}
     >
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        {/* AÑADIDO: w-full en el header para que no se exceda */}
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           <span
             style={fuenteApple}
@@ -541,7 +693,6 @@ export function MarketPage() {
         </div>
       </header>
 
-      {/* AÑADIDO: w-full en el main para asegurar el margen interno */}
       <main className="mx-auto w-full max-w-[520px] px-5">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
@@ -570,7 +721,7 @@ export function MarketPage() {
         </div>
         
         <Asignaturas 
-          asignaturas={asignaturas} 
+          asignaturas={asignaturasOrdenadas}
           asigId={asigId} 
           setAsigActiva={(id) => {
             haptic(); 
@@ -579,6 +730,14 @@ export function MarketPage() {
           preguntas={preguntas} 
           saldo={mercado.saldo || 0}
         />
+
+        {asigActivaObj?.fechaExamen && (
+          <CountdownExamen
+            fechaExamen={asigActivaObj.fechaExamen}
+            asignaturaId={asigActivaObj.id}
+            onEditar={mercado.editarFechaExamenPublica}
+          />
+        )}
 
         {abiertas.map((p, index) => (
           <FilaPregunta

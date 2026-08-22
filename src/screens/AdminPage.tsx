@@ -10,6 +10,14 @@ const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI"
 
 type VistaAdmin = "preguntas" | "archivado" | "usuarios" | "asignaturas";
 
+// Convierte un timestamp (ms) al formato que espera <input type="datetime-local">
+// ("YYYY-MM-DDTHH:mm"), respetando la hora LOCAL del navegador.
+function aValorInputLocal(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function AdminPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
@@ -361,6 +369,32 @@ export function AdminPage() {
                       Eliminar
                     </button>
                   </div>
+
+                  {/* Fecha/hora del examen: alimenta el countdown en MarketPage */}
+                  <div className="flex items-center gap-3">
+                    <label className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-sutil">
+                      Examen
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={a.fechaExamen ? aValorInputLocal(a.fechaExamen) : ""}
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        mercado.editarFechaExamen(a.id, valor ? new Date(valor) : null);
+                      }}
+                      style={{ fontSize: "16px" }}
+                      className="min-w-0 flex-1 rounded-lg border border-borde bg-white px-2 py-1.5 text-[14px] text-ink outline-none focus:border-ink/40"
+                    />
+                    {a.fechaExamen && (
+                      <button
+                        onClick={() => { haptic(); mercado.editarFechaExamen(a.id, null); }}
+                        className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-2.5 py-1.5 text-[12px] text-sutil active:bg-black/5"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+
                   {a.cerrada && (
                     <p className="text-[12px] text-sutil font-mono uppercase">
                       Examen cerrado. No se admiten apuestas.
