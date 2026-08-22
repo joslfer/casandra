@@ -106,11 +106,13 @@ function CountdownExamen({
           <span className="inline-block min-w-[2ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{min}</span>
           <span className="text-[18px] font-normal leading-none text-sutil">min</span>
         </span>
+        {/* Segundos desactivados por ahora. Descomentar estas dos líneas (el separador ':' y el bloque de segundos) para volver a mostrarlos.
         <span className="mx-2 font-mono text-[18px] font-medium leading-none text-ink">:</span>
         <span className="flex items-baseline gap-1">
           <span className="inline-block min-w-[2ch] text-right font-mono text-[26px] font-medium leading-none tabular-nums text-ink">{seg}</span>
           <span className="text-[18px] font-normal leading-none text-sutil">sec</span>
         </span>
+        */}
       </div>
 
       {/* Nuevo texto disclaimer clicable debajo del reloj */}
@@ -121,33 +123,35 @@ function CountdownExamen({
         fecha informativa, puedes corregirla si está mal
       </button>
 
-      {/* POPUP Modal centrado con letras al mismo tamaño */}
+      {/* POPUP con el fondo blur, pero con el mismo lenguaje visual que el resto de la app */}
       {mostrarInfo && (
         <div onClick={cerrarPopup} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
           <div
             onClick={(e) => e.stopPropagation()}
             style={fuenteApple}
-            className="w-full max-w-[300px] rounded-2xl border border-borde bg-white p-6 text-center text-[16px] font-normal leading-relaxed text-ink shadow-2xl"
+            className="w-full max-w-[320px] rounded-lg border border-borde bg-white p-5 text-left text-ink"
           >
             {!editando ? (
               <>
-                <p>
-                  La fecha programada es:<br />
+                <p className="text-[17px] leading-relaxed text-sutil">
+                  Fecha programada
+                </p>
+                <p className="mt-1 text-[17px] leading-relaxed">
                   {fechaFormateada}
                 </p>
-                <p className="mt-3">
-                  Atención: esto puede estar equivocado.
+                <p className="mt-4 text-[17px] leading-relaxed text-sutil">
+                  Esta fecha es informativa y puede estar equivocada.
                 </p>
-                <div className="mt-6 flex gap-2">
+                <div className="mt-5 flex gap-2">
                   <button
                     onClick={cerrarPopup}
-                    className="flex-1 touch-manipulation rounded-xl border border-borde bg-white py-3 text-[16px] text-ink active:bg-black/5"
+                    className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2.5 text-[17px] font-medium text-ink active:bg-black/5"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={() => setEditando(true)}
-                    className="flex-1 touch-manipulation rounded-xl bg-ink py-3 text-[16px] text-white active:opacity-70"
+                    className="flex-1 touch-manipulation rounded-lg bg-ink py-2.5 text-[17px] font-medium text-white active:opacity-70"
                   >
                     Corregir
                   </button>
@@ -155,7 +159,10 @@ function CountdownExamen({
               </>
             ) : (
               <>
-                <p>
+                <p className="text-[17px] leading-relaxed text-sutil">
+                  Corregir fecha
+                </p>
+                <p className="mt-1 text-[17px] leading-relaxed text-sutil">
                   Cualquiera puede corregir esta fecha si está mal.
                 </p>
                 <input
@@ -163,21 +170,21 @@ function CountdownExamen({
                   value={valorInput}
                   onChange={(e) => setValorInput(e.target.value)}
                   disabled={guardando}
-                  style={{ fontSize: "16px" }}
-                  className="mt-5 w-full rounded-xl border border-borde bg-white px-3 py-3 text-center text-[16px] text-ink outline-none focus:border-ink/40 disabled:opacity-50"
+                  style={{ fontSize: "17px" }}
+                  className="mt-4 w-full rounded-lg border border-borde bg-white px-3 py-2.5 text-left text-[17px] text-ink outline-none focus:border-ink/40 disabled:opacity-50 select-text"
                 />
-                <div className="mt-6 flex gap-2">
+                <div className="mt-5 flex gap-2">
                   <button
                     onClick={() => setEditando(false)}
                     disabled={guardando}
-                    className="flex-1 touch-manipulation rounded-xl border border-borde bg-white py-3 text-[16px] text-ink active:bg-black/5 disabled:opacity-50"
+                    className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2.5 text-[17px] font-medium text-ink active:bg-black/5 disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={guardarFecha}
                     disabled={guardando || !valorInput}
-                    className="flex-1 touch-manipulation rounded-xl bg-ink py-3 text-[16px] text-white active:opacity-70 disabled:opacity-50"
+                    className="flex-1 touch-manipulation rounded-lg bg-ink py-2.5 text-[17px] font-medium text-white active:opacity-70 disabled:opacity-50"
                   >
                     {guardando ? "Guardando..." : "Guardar"}
                   </button>
@@ -404,7 +411,7 @@ function Asignaturas({
   );
 }
 
-function ModalNuevaPregunta({
+function PantallaNuevaPregunta({
   asignaturas,
   asigInicial,
   onCerrar,
@@ -425,7 +432,7 @@ function ModalNuevaPregunta({
       setError("Escribe un enunciado");
       return;
     }
-    
+
     try {
       setCargando(true);
       setError(null);
@@ -441,28 +448,67 @@ function ModalNuevaPregunta({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center"
-      onClick={onCerrar}
+      className="fixed inset-0 z-40 flex flex-col bg-lienzo"
+      style={{ height: "100dvh" }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full rounded-t-md bg-lienzo p-5 sm:max-w-sm sm:rounded-md"
-        style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+      {/* Cabecera fija: nunca se mueve, publicar está siempre visible aunque salga el teclado */}
+      <header
+        className="flex shrink-0 items-center justify-between border-b border-linea px-4"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)",
+          paddingBottom: "0.75rem",
+        }}
       >
-        <h2 className="text-[15px] font-semibold text-ink">Cuanto más específica mejor</h2>
+        <button
+          onClick={onCerrar}
+          disabled={cargando}
+          style={fuenteApple}
+          className="touch-manipulation px-1 py-1 text-[17px] text-ink disabled:opacity-40"
+        >
+          Cancelar
+        </button>
 
-        <input
+        <span style={fuenteApple} className="text-[15px] font-semibold text-ink">
+          Nueva pregunta
+        </span>
+
+        <button
+          onClick={enviar}
+          disabled={cargando || !titulo.trim()}
+          style={fuenteApple}
+          className="touch-manipulation px-1 py-1 text-[17px] font-semibold text-ink disabled:opacity-30"
+        >
+          {cargando ? "..." : "Publicar"}
+        </button>
+      </header>
+
+      {/* Contenido: única zona que hace scroll, así el header/footer no bailan */}
+      <div
+        className="flex-1 overflow-y-auto px-5 py-6"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <h1 style={fuenteApple} className="text-[15px] font-semibold text-ink">
+          Cuanto más específica mejor, frases largas. 
+        </h1>
+
+        <textarea
           value={titulo}
           onChange={(e) => {
             setTitulo(e.target.value);
             if (error) setError(null);
           }}
           disabled={cargando}
+          autoFocus
+          rows={4}
+          placeholder="¿Qué pregunta quieres proponer?"
           style={{ fontSize: "16px" }}
-          className="mt-3 w-full rounded-md border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50"
+          className="mt-3 w-full resize-none rounded-md border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50 select-text"
         />
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <p style={fuenteApple} className="mt-5 text-[13px] font-medium text-sutil">
+          Asignatura
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
           {asignaturas.map((a) => (
             <button
               key={a.id}
@@ -480,26 +526,7 @@ function ModalNuevaPregunta({
           ))}
         </div>
 
-        {error && <p className="mt-2 text-[12px] text-rojo">{error}</p>}
-
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={onCerrar}
-            disabled={cargando}
-            style={fuenteApple}
-            className="flex-1 touch-manipulation rounded-md border border-borde bg-white py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30 active:bg-black/5 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={enviar}
-            disabled={cargando}
-            style={fuenteApple}
-            className="flex-1 touch-manipulation rounded-md bg-ink py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 active:opacity-70 disabled:opacity-50"
-          >
-            {cargando ? "Publicando..." : "Publicar"}
-          </button>
-        </div>
+        {error && <p className="mt-4 text-[13px] text-rojo">{error}</p>}
       </div>
     </div>
   );
@@ -562,7 +589,7 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
           
           {/* Ni esto (shrink-0) */}
           <span className="shrink-0">
-            {" "}hasta{" "}
+            {" "} hasta {" "}
           </span>
           
           {/* SOLO ESTO se cortará con '...' si físicamente no cabe en la pantalla */}
@@ -679,7 +706,7 @@ export function MarketPage() {
 
   return (
     <div
-      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28"
+      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28 select-none"
       style={fuenteApple}
       onClickCapture={(event) => {
         const target = event.target as Element;
@@ -810,7 +837,7 @@ export function MarketPage() {
       </main>
 
       {modalAbierto && (
-        <ModalNuevaPregunta
+        <PantallaNuevaPregunta
           asignaturas={asignaturas.filter(a => !a.cerrada)}
           asigInicial={asigCerrada ? "" : asigId}
           onCerrar={() => setModalAbierto(false)}
