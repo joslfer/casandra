@@ -15,6 +15,55 @@ function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
 }
 
+// Easter Egg: Confeti Amarillo nativo (Explosión 360º y súper duradera)
+function lanzarConfetiAmarillo(e: React.MouseEvent) {
+  const colores = ["#FCD34D", "#FBBF24", "#F59E0B", "#D97706"];
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height / 2;
+
+  // 300 piezas
+  for (let i = 0; i < 300; i++) {
+    const confeti = document.createElement("div");
+    confeti.style.position = "fixed";
+    confeti.style.left = `${originX}px`;
+    confeti.style.top = `${originY}px`;
+    confeti.style.width = `${Math.random() * 8 + 4}px`;
+    confeti.style.height = `${Math.random() * 12 + 6}px`;
+    confeti.style.backgroundColor = colores[Math.floor(Math.random() * colores.length)];
+    confeti.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+    confeti.style.zIndex = "9999";
+    confeti.style.pointerEvents = "none";
+    document.body.appendChild(confeti);
+
+    const angle = Math.random() * Math.PI * 2; // 360 grados en todas direcciones
+    const velocity = Math.random() * 1200 + 400; // Más fuerza para que lleguen a los bordes
+    
+    // Sin nada de gravedad (pura expansión circular)
+    const destX = Math.cos(angle) * velocity;
+    const destY = Math.sin(angle) * velocity; 
+    
+    const rotation = Math.random() * 1080 - 540; 
+    
+    // Duración inmensa: flotando entre 4 y 8 segundos
+    const duration = Math.random() * 4000 + 4000; 
+
+    confeti.animate(
+      [
+        { transform: "translate(-50%, -50%) rotate(0deg) scale(1)", opacity: 1 },
+        // Cambiado de scale(0) a scale(0.8) para que no encoja y desaparezca antes de tiempo
+        { transform: `translate(calc(-50% + ${destX}px), calc(-50% + ${destY}px)) rotate(${rotation}deg) scale(0.8)`, opacity: 0 }
+      ],
+      {
+        duration: duration,
+        // Curva suave para que se ralentice lentamente pero no frene de golpe
+        easing: "cubic-bezier(0.25, 1, 0.5, 1)", 
+        fill: "forwards"
+      }
+    ).onfinish = () => confeti.remove(); 
+  }
+}
+
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -219,7 +268,7 @@ function EscalaPuntos({
   if (total === 0) {
     return (
       <div className="mt-2.5 flex min-h-[16px] items-center">
-        <p className="font-mono text-[11px] leading-none text-sutil">sin apuestas</p>
+        <p className="font-mono text-[11px] leading-none text-sutil">esperando apuestas</p>
       </div>
     );
   }
@@ -488,7 +537,7 @@ function PantallaNuevaPregunta({
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <h1 style={fuenteApple} className="text-[15px] font-semibold text-ink">
-          Cuanto más específica mejor, frases largas. 
+          Cuanto más específica mejor, frases largas.
         </h1>
 
         <textarea
@@ -570,36 +619,49 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
   const diferencia = elDeArriba.tokens - yo.tokens;
   const faltan = diferencia >= 0 ? diferencia + 1 : 1; 
 
+  // 👇 CAMBIA ESTO: Puedes usar "text-[14px]", "text-[15px]", "text-[16px]", etc. 👇
+  const TAMANO_LETRA = "text-[16px]";
+
   return (
     <div className="mt-4 flex w-full justify-center px-4">
-      <Link to="/ranking" className={`group relative flex max-w-full items-center ${CLASE_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
+      <Link 
+        to="/ranking" 
+        className={`group relative flex max-w-full items-center ${TAMANO_LETRA} text-ink/90 transition-colors hover:text-ink`}
+      >
         <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
 
-        {/* Contenedor flex inteligente con 'min-w-0' para permitir cortes y 'shrink' */}
-        <div className="flex min-w-0 shrink items-center overflow-hidden whitespace-nowrap">
-          {/* Este bloque NO se encogerá nunca (shrink-0) */}
+        {/* 
+          1. Aquí está la magia de los espacios: usamos 'gap-1.5'. 
+          Esto añade una separación idéntica y perfecta entre cada bloque, sin usar espacios manuales.
+        */}
+        <div className="flex min-w-0 shrink items-center overflow-hidden whitespace-nowrap gap-1.5">
+          
+          {/* Bloque 1: Posición */}
           <span className="shrink-0">
-            Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan{" "}
+            Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan
           </span>
           
-          {/* Este bloque tampoco se encogerá (shrink-0) */}
-          <span className="mx-0.5 shrink-0 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
-            {faltan} <Moneda className="h-3.5 w-3.5 align-[-2px]" />
+          {/* Bloque 2: Tokens y Moneda (alineados perfectamente con items-center) */}
+          <span className="shrink-0 inline-flex items-center gap-0.5 font-mono font-bold text-ink">
+            {faltan} <Moneda className="h-3.5 w-3.5" />
           </span>
           
-          {/* Ni esto (shrink-0) */}
+          {/* Bloque 3: Texto intermedio */}
           <span className="shrink-0">
-            {" "} hasta {" "}
+            hasta
           </span>
           
-          {/* SOLO ESTO se cortará con '...' si físicamente no cabe en la pantalla */}
+          {/* Bloque 4: Nombre del rival (se corta si no cabe) */}
           <strong className="truncate font-medium text-ink">
-            {elDeArriba.usuario}
+            {elDeArriba?.usuario}
           </strong>
+
         </div>
         
-        {/* La flecha nunca se esconde */}
-        <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
+        {/* Bloque 5: Flecha */}
+        <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">
+          →
+        </span>
       </Link>
     </div>
   );
@@ -721,7 +783,7 @@ export function MarketPage() {
             style={fuenteApple}
             className="text-[15px] font-bold tracking-tight"
           >
-            Consulta y opina
+            Mercado de predicción
           </span>
           
           <div className="flex items-center gap-2">
@@ -750,11 +812,25 @@ export function MarketPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[520px] px-5">
+<main className="mx-auto w-full max-w-[520px] px-5">
         {!mercado.pausado && (
           <div className="my-10 flex flex-col items-center justify-center">
             <div className="relative z-10 flex items-center gap-3">
-              <Moneda className="h-8 w-8" />
+              
+              {/* 👇 CAMBIA EL TAMAÑO SOLO AQUÍ 👇 
+                  Modifica los "32px". Si pones "50px", asegúrate de ponerlo en el width y en el height. */}
+              <button
+                onClick={(e) => {
+                  haptic(); 
+                  lanzarConfetiAmarillo(e);
+                }}
+                style={{ width: "42px", height: "42px" }}
+                className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
+              >
+                {/* La moneda ahora siempre copiará el tamaño exacto del botón sin deformarse */}
+                <Moneda className="!h-full !w-full" />
+              </button>
+              
               <span className="font-mono text-[64px] leading-none tracking-tight tabular-nums text-ink">
                 {mercado.saldo || 0}
               </span>
