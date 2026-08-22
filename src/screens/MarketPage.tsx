@@ -842,7 +842,8 @@ export function MarketPage() {
             />
           </div>
         )}
-
+        
+        {/*
         <div className="mt-8 px-1">
           <p className="text-[14px] font-normal leading-relaxed text-ink" style={fuenteApple}>
             <svg className="mr-1.5 inline-block h-4 w-4 shrink-0 align-[-2px] text-ink" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
@@ -852,7 +853,7 @@ export function MarketPage() {
             <span className="font-semibold">Nota del editor:</span> Bienvenido! Aquí puedes hacer apuestas sobre lo que va a caer en el próximo examen. Quien acierte se lleva los tokens de los perdedores. Los mercados de predicción funcionan mejor cuantos más participantes, y pueden llegar a ser muy muy precisos. De momento los tokens no tienen valor real pero... quién sabe?
           </p>
         </div>
-        
+        */}
         <Asignaturas 
           asignaturas={asignaturasOrdenadas}
           asigId={asigId} 
