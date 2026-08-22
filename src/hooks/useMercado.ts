@@ -14,6 +14,7 @@ export interface Asignatura {
   id: string;
   nombre: string;
   cerrada: boolean;
+  fechaExamen: number | null;
 }
 
 export interface Pregunta {
@@ -140,7 +141,15 @@ export function useMercado(usuario: Usuario | null) {
       if (data) misApuestas = data;
     }
 
-    if (resAsig.data) setAsignaturas(resAsig.data.map((a: any) => ({ id: a.id, nombre: a.nombre, cerrada: a.cerrada })));
+    if (resAsig.data)
+      setAsignaturas(
+        resAsig.data.map((a: any) => ({
+          id: a.id,
+          nombre: a.nombre,
+          cerrada: a.cerrada,
+          fechaExamen: a.fecha_examen ? new Date(a.fecha_examen).getTime() : null
+        }))
+      );
 
     if (resPerf.data) {
       const alums = resPerf.data.map((p: any) => ({
@@ -487,7 +496,6 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
-
   // Pausa/reabre un examen (=asignatura) entero: bloquea apostar() en
   // todas sus preguntas sin tener que tocar cada una individualmente.
   const pausarExamen = useCallback(async (asignaturaId: string, valor: boolean) => {
@@ -497,6 +505,34 @@ export function useMercado(usuario: Usuario | null) {
     await cargarDatos();
     return !error;
   }, [esAdmin, cargarDatos]);
+
+  // Fija (o quita, pasando null) la fecha/hora del examen de una asignatura.
+  // Se usa para mostrar el countdown en MarketPage.
+  const editarFechaExamen = useCallback(async (asignaturaId: string, fecha: Date | null) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase
+      .from("asignaturas")
+      .update({ fecha_examen: fecha ? fecha.toISOString() : null })
+      .eq("id", asignaturaId);
+    if (error) console.error("Error al editar fecha de examen:", error);
+    await cargarDatos();
+    return !error;
+  }, [esAdmin, cargarDatos]);
+
+  // Igual que la anterior pero SIN restricción de admin: cualquier usuario
+  // logueado puede corregir la fecha desde el popup del countdown en
+  // MarketPage. Pasa por una RPC que solo puede tocar fecha_examen (no
+  // puede renombrar, cerrar ni borrar la asignatura).
+  const editarFechaExamenPublica = useCallback(async (asignaturaId: string, fecha: Date | null) => {
+    if (!usuario) return false;
+    const { error } = await supabase.rpc("actualizar_fecha_examen", {
+      p_asignatura_id: asignaturaId,
+      p_fecha: fecha ? fecha.toISOString() : null
+    });
+    if (error) console.error("Error al actualizar fecha de examen (público):", error);
+    await cargarDatos();
+    return !error;
+  }, [usuario, cargarDatos]);
 
   const darTokens = useCallback(async (alumnoId: string, delta: number) => {
     if (!esAdmin) return false;
@@ -541,6 +577,8 @@ export function useMercado(usuario: Usuario | null) {
       eliminarAsignatura,
       renombrarAsignatura,
       pausarExamen,
+      editarFechaExamen,
+      editarFechaExamenPublica,
       darTokens,
       pausarAlumno,
       guardarNombre,
@@ -573,6 +611,8 @@ export function useMercado(usuario: Usuario | null) {
       eliminarAsignatura,
       renombrarAsignatura,
       pausarExamen,
+      editarFechaExamen,
+      editarFechaExamenPublica,
       darTokens,
       pausarAlumno,
       guardarNombre,

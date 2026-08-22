@@ -47,20 +47,22 @@ export function ProfilePage() {
         <section className="overflow-hidden rounded-xl border border-borde bg-white shadow-sm">
           {/* Campo Nombre */}
           <div className="flex items-center justify-between border-b border-linea p-4">
-            <label className="text-[15px] font-medium text-ink">Nombre</label>
+            <label className="text-[15px] font-medium text-ink">
+              Nombre (recomendado)
+            </label>
             <input
               value={mercado.perfil.nombre}
               onChange={(e) => mercado.guardarNombre(e.target.value)}
               disabled={mercado.perfil.usaHash}
               placeholder={usuario.nombre}
-              className="w-1/2 bg-transparent text-right text-[15px] text-sutil outline-none placeholder:text-sutil/50 focus:text-ink disabled:opacity-40"
+              className="w-1/2 rounded-lg border border-borde bg-lienzo px-2.5 py-1 text-right text-[15px] text-ink outline-none placeholder:text-sutil/50 focus:border-ink/30 focus:bg-white disabled:border-transparent disabled:bg-transparent disabled:opacity-40"
             />
           </div>
 
           {/* Switch Modo Anónimo */}
           <div className="flex items-center justify-between p-4">
             <div className="flex flex-col">
-              <span className="text-[15px] font-medium text-ink">Sin nombre de usuario (recomendado)</span>
+              <span className="text-[15px] font-medium text-ink">Sin nombre de usuario</span>
               <span className="mt-0.5 text-[12px] text-sutil">Ocultar tu nombre a los demás</span>
             </div>
             
