@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
@@ -9,6 +10,16 @@ export function ProfilePage() {
   const { usuario, cargando, entrarConGoogle, salir } = useSesion();
   const mercado = useMercado(usuario);
 
+  // Estado local para que escribir vaya perfecto sin lag
+  const [nombreLocal, setNombreLocal] = useState("");
+
+  // Sincronizamos el estado local con el real cuando carga la página
+  useEffect(() => {
+    if (mercado.perfil?.nombre) {
+      setNombreLocal(mercado.perfil.nombre);
+    }
+  }, [mercado.perfil?.nombre]);
+
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
   }
@@ -16,6 +27,13 @@ export function ProfilePage() {
   if (!usuario) {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
+
+  // Función que guarda de verdad solo cuando salimos del input (onBlur)
+  const guardarSiCambio = () => {
+    if (nombreLocal !== mercado.perfil.nombre) {
+      mercado.guardarNombre(nombreLocal);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-lienzo pb-28" style={fuenteApple}>
@@ -36,27 +54,37 @@ export function ProfilePage() {
       <main className="mx-auto max-w-[520px] px-5 pt-24">
         <h1 className="mb-2 text-[28px] font-bold tracking-tight text-ink">Perfil</h1>
         
-        {/* --- ESPACIO PARA TU TEXTO LIBRE --- */}
         <div className="mb-6 text-[14px] leading-relaxed text-ink">
           <p>
-        El objetivo de este mercado es agregar información sumando muchas opiniones distintas. Apuesta pensando por tu cuenta. Cuanto más pensamiento individual mejor.
-        </p>
+            El objetivo de este mercado es agregar información sumando muchas opiniones distintas. Apuesta pensando por tu cuenta. Cuanto más pensamiento individual mejor.
+          </p>
         </div>
-        {/* ----------------------------------- */}
         
         <section className="overflow-hidden rounded-xl border border-borde bg-white shadow-sm">
-          {/* Campo Nombre */}
-          <div className="flex items-center justify-between border-b border-linea p-4">
-            <label className="text-[15px] font-medium text-ink">
+          
+          {/* Campo Nombre: Ahora con diseño de "caja editable" e icono de lápiz */}
+          <div className="flex flex-col border-b border-linea p-4">
+            <label className="text-[14px] font-medium text-sutil">
               Nombre (recomendado)
             </label>
-            <input
-              value={mercado.perfil.nombre}
-              onChange={(e) => mercado.guardarNombre(e.target.value)}
-              disabled={mercado.perfil.usaHash}
-              placeholder={usuario.nombre}
-              className="w-1/2 rounded-lg border border-borde bg-lienzo px-2.5 py-1 text-right text-[15px] text-ink outline-none placeholder:text-sutil/50 focus:border-ink/30 focus:bg-white disabled:border-transparent disabled:bg-transparent disabled:opacity-40"
-            />
+            <div className="relative mt-2">
+              <input
+                value={nombreLocal}
+                onChange={(e) => setNombreLocal(e.target.value)}
+                onBlur={guardarSiCambio}
+                disabled={mercado.perfil.usaHash}
+                placeholder={usuario.nombre}
+                className="w-full rounded-lg border border-borde bg-black/5 px-3 py-2 pr-10 text-[22px] font-semibold text-ink outline-none transition-colors placeholder:text-sutil/40 focus:border-ink/30 focus:bg-white disabled:border-transparent disabled:bg-transparent disabled:opacity-40"
+              />
+              {/* Icono de Lápiz */}
+              {!mercado.perfil.usaHash && (
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sutil/60">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                  </svg>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Switch Modo Anónimo */}
