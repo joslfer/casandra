@@ -15,6 +15,7 @@ function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
 }
 
+/* --- EASTER EGG COMENTADO TEMPORALMENTE ---
 // Easter Egg: Confeti Amarillo nativo (Explosión 360º y súper duradera)
 function lanzarConfetiAmarillo(e: React.MouseEvent) {
   const colores = ["#FCD34D", "#FBBF24", "#F59E0B", "#D97706"];
@@ -63,6 +64,7 @@ function lanzarConfetiAmarillo(e: React.MouseEvent) {
     ).onfinish = () => confeti.remove(); 
   }
 }
+--------------------------------------------- */
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -424,7 +426,7 @@ function Asignaturas({
   saldo: number;
 }) {
   return (
-    <div className="flex flex-wrap justify-center gap-2 py-6">
+    <div className="flex flex-wrap justify-center gap-2 pb-6 pt-2">
       {asignaturas.map((a) => {
         const sinApostar = preguntas.filter(
           (p) =>
@@ -814,15 +816,13 @@ export function MarketPage() {
 
 <main className="mx-auto w-full max-w-[520px] px-5">
         {!mercado.pausado && (
-          <div className="my-10 flex flex-col items-center justify-center">
+          <div className="mt-10 mb-4 flex flex-col items-center justify-center">
             <div className="relative z-10 flex items-center gap-3">
               
-              {/* 👇 CAMBIA EL TAMAÑO SOLO AQUÍ 👇 
-                  Modifica los "32px". Si pones "50px", asegúrate de ponerlo en el width y en el height. */}
               <button
                 onClick={(e) => {
                   haptic(); 
-                  lanzarConfetiAmarillo(e);
+                  // lanzarConfetiAmarillo(e); // <-- EASTER EGG COMENTADO TEMPORALMENTE
                 }}
                 style={{ width: "42px", height: "42px" }}
                 className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
