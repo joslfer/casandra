@@ -337,8 +337,9 @@ function FilaPregunta({
     setTimeout(() => setCooldown(false), 300);
   };
 
+  // Se añade transition-transform, duration y active:scale para el hundimiento
   const btnBase =
-    "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium";
+    "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium transition-transform duration-150 active:scale-95";
 
   return (
     <article 
@@ -403,7 +404,7 @@ function FilaPregunta({
           onClick={onRetirar}
           disabled={bloqueado || cooldown}
           style={fuenteApple}
-          className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink active:bg-black/5 ${bloqueado ? "opacity-40" : ""}`}
+          className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink transition-transform duration-150 active:scale-95 active:bg-black/5 ${bloqueado ? "opacity-40" : ""}`}
         >
           Retirar apuesta
         </button>
@@ -785,7 +786,7 @@ export function MarketPage() {
             style={fuenteApple}
             className="text-[15px] font-bold tracking-tight"
           >
-            Mercado de predicción
+            Probabilidad fiable?
           </span>
           
           <div className="flex items-center gap-2">
