@@ -458,9 +458,10 @@ export function MarketPage() {
   
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
-  // Referencia para la animación actual
+  // Referencias para la animación y bloqueo del observer
   const animRef = useRef<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScroll = useRef(false);
 
   useEffect(() => {
     const rankingCalculado = mercado.leerRanking();
@@ -482,12 +483,14 @@ export function MarketPage() {
   const asigId = asigActiva || (asignaturasOrdenadas[0]?.id || "");
 
   useEffect(() => {
-    // Si no hay asignaturas, no hacemos nada
     if (asignaturasOrdenadas.length === 0 || !scrollContainerRef.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Buscamos cuál es el feed (asignatura) que más se ve en pantalla
+        // MUY IMPORTANTE: Si estamos animando por click, ignoramos el observer
+        // Esto evita que React se actualice constantemente y bloquee el hilo principal (el scroll vertical)
+        if (isProgrammaticScroll.current) return;
+
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const id = entry.target.getAttribute("data-id");
@@ -499,7 +502,7 @@ export function MarketPage() {
       },
       {
         root: scrollContainerRef.current,
-        threshold: 0.5, // Tiene que estar al 50% en pantalla para considerarse "activa"
+        threshold: 0.5,
       }
     );
 
@@ -509,59 +512,53 @@ export function MarketPage() {
     return () => observer.disconnect();
   }, [asignaturasOrdenadas.length, asigActiva]);
 
-  // FUNCIÓN PARA CANCELAR LA ANIMACIÓN (se dispara en cuanto tocas la pantalla)
-  const detenerAnimacion = () => {
-    if (animRef.current !== null) {
-      cancelAnimationFrame(animRef.current);
-      animRef.current = null;
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.style.scrollSnapType = ''; // Devolver snapping
-      }
-    }
-  };
-
-  // ANIMACIÓN DE SCROLL HORIZONTAL MUY RÁPIDA Y CANCELABLE
+  // ANIMACIÓN DE SCROLL HORIZONTAL
   const scrollToAsig = (id: string) => {
     haptic();
-    setAsigActiva(id);
+    setAsigActiva(id); // Actualizamos el estado visual instantáneamente
     
     const container = scrollContainerRef.current;
     if (!container) return;
     
     const slide = container.querySelector(`[data-id="${id}"]`);
     if (slide) {
-      // 1. Detenemos cualquier animación en curso por si el usuario pulsa varios botones rápido
-      detenerAnimacion();
-
-      // 2. Apagamos el snapping temporalmente
+      // 1. Silenciamos el Observer para no saturar a React durante la transición
+      isProgrammaticScroll.current = true;
+      
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
+      
+      // Apagamos snapping temporalmente
       container.style.scrollSnapType = 'none';
 
-      // 3. Calculamos distancias
       const containerRect = container.getBoundingClientRect();
       const slideRect = slide.getBoundingClientRect();
       const startLeft = container.scrollLeft;
       const targetLeft = startLeft + (slideRect.left - containerRect.left);
       const distance = targetLeft - startLeft;
       
-      // 4. Animación ultra rápida (150ms) usando requestAnimationFrame
+      // Animación de 200ms
       let startTime: number | null = null;
-      const duration = 150; 
+      const duration = 200; 
       
       const animarScroll = (currentTime: number) => {
         if (startTime === null) startTime = currentTime;
         const timeElapsed = currentTime - startTime;
         const progress = Math.min(timeElapsed / duration, 1);
         
-        // Curva de aceleración/deceleración muy limpia
         const ease = 1 - Math.pow(1 - progress, 3);
         container.scrollLeft = startLeft + distance * ease;
         
         if (progress < 1) {
           animRef.current = requestAnimationFrame(animarScroll);
         } else {
-          // 5. Limpiamos al terminar
+          // Restauramos todo al terminar
           animRef.current = null;
           container.style.scrollSnapType = '';
+          
+          // Devolvemos el control al observer un instante después
+          setTimeout(() => {
+            isProgrammaticScroll.current = false;
+          }, 50);
         }
       };
       
@@ -656,7 +653,7 @@ export function MarketPage() {
         <Asignaturas 
           asignaturas={asignaturasOrdenadas}
           asigId={asigId} 
-          setAsigActiva={scrollToAsig} // Aquí usamos nuestra animación rápida y no-bloqueante
+          setAsigActiva={scrollToAsig}
           preguntas={preguntas} 
           saldo={mercado.saldo || 0}
         />
@@ -665,9 +662,6 @@ export function MarketPage() {
       {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
       <div 
         ref={scrollContainerRef}
-        onTouchStart={detenerAnimacion} // Si tocas la pantalla, se interrumpe y puedes hacer scroll
-        onWheel={detenerAnimacion}      // Lo mismo si usas rueda de ratón en escritorio
-        onMouseDown={detenerAnimacion}  // Lo mismo al hacer click sostenido
         className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {asignaturasOrdenadas.map((asig) => {
@@ -706,7 +700,7 @@ export function MarketPage() {
                 ))
               )}
 
-              {/* Botón Proponer Pregunta (renderizado al final de la lista de la asignatura activa) */}
+              {/* Botón Proponer Pregunta */}
               {!asig.cerrada && hayAsignaturasAbiertas && (
                 <div className="mb-12 mt-8 flex justify-center">
                   <button
