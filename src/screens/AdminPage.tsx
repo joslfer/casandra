@@ -47,7 +47,7 @@ export function AdminPage() {
   }, [modalResolucion?.pregunta.id]);
 
   if (cargando) {
-    return <div className="min-h-screen bg-lienzo" />;
+    return <div className="min-h-screen bg-lienzo" />
   }
 
   if (!usuario) {
@@ -128,8 +128,8 @@ export function AdminPage() {
 
                   return (
                     <div key={asignatura.id} className="relative">
-                      {/* Cabecera sticky de la asignatura */}
-                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[12px] uppercase tracking-wider text-sutil">
+                      {/* Cabecera sticky de la asignatura MODIFICADA */}
+                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[14px] font-bold uppercase tracking-wider text-ink">
                         {asignatura.nombre}
                       </h3>
                       
@@ -224,7 +224,8 @@ export function AdminPage() {
                   
                   return (
                     <div className="relative">
-                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[12px] uppercase tracking-wider text-rojo">
+                      {/* Cabecera huerfanas MODIFICADA */}
+                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[14px] font-bold uppercase tracking-wider text-rojo">
                         Sin asignatura / Huérfanas
                       </h3>
                       <div>
@@ -337,11 +338,12 @@ export function AdminPage() {
               {asignaturas.map((a) => (
                 <div key={a.id} className="flex flex-col gap-2 border-b border-linea py-3.5">
                   <div className="flex items-center gap-3">
+                    {/* Input asignatura MODIFICADO */}
                     <input
                       value={a.nombre}
                       onChange={(e) => mercado.renombrarAsignatura(a.id, e.target.value)}
                       style={{ fontSize: "16px" }} 
-                      className={`min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none focus:border-b focus:border-ink/30 ${a.cerrada ? "opacity-50" : ""}`}
+                      className={`min-w-0 flex-1 bg-transparent text-[16px] font-bold text-ink outline-none focus:border-b focus:border-ink/30 ${a.cerrada ? "opacity-50" : ""}`}
                     />
                     
                     {/* BOTÓN PARA PAUSAR/REANUDAR ASIGNATURA CORREGIDO */}

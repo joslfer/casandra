@@ -454,11 +454,16 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
+  // Elimina una pregunta. Si aún estaba abierta (sin resolver), el RPC
+  // reembolsa primero los tokens apostados a cada usuario antes de borrar
+  // la pregunta y sus apuestas (que caen en cascada). Si ya estaba resuelta,
+  // no reembolsa nada porque los tokens ya se repartieron en resolver_pregunta.
   const eliminarPregunta = useCallback(async (id: string) => {
     if (!esAdmin) return false;
-    await supabase.from("preguntas").delete().eq("id", id);
+    const { error } = await supabase.rpc("eliminar_pregunta", { p_pregunta_id: id });
+    if (error) console.error("Error al eliminar pregunta:", error);
     await cargarDatos();
-    return true;
+    return !error;
   }, [esAdmin, cargarDatos]);
 
   const moverPregunta = useCallback(async (id: string, asignaturaId: string) => {
