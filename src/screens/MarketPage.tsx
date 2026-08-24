@@ -458,10 +458,16 @@ export function MarketPage() {
   
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
-  // Referencias para la animación y bloqueo del observer
+  // Referencias para la animación (SOLO la usan las TAGS) y el bloqueo del observer
   const animRef = useRef<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScroll = useRef(false);
+
+  // Variables para la detección del Swipe Manual
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchStartTime = useRef(0);
+  const startAsigId = useRef<string>("");
 
   useEffect(() => {
     const rankingCalculado = mercado.leerRanking();
@@ -487,8 +493,7 @@ export function MarketPage() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // MUY IMPORTANTE: Si estamos animando por click, ignoramos el observer
-        // Esto evita que React se actualice constantemente y bloquee el hilo principal
+        // Ignoramos el observer si el salto programático (clic en tag o swipe) se está ejecutando
         if (isProgrammaticScroll.current) return;
 
         entries.forEach((entry) => {
@@ -512,19 +517,104 @@ export function MarketPage() {
     return () => observer.disconnect();
   }, [asignaturasOrdenadas.length, asigActiva]);
 
-  // Función para matar la animación de cuajo si el usuario toca la pantalla
+  // Cancela la animación de las TAGS si el usuario interrumpe con un gesto manual
   const detenerAnimacion = () => {
     if (animRef.current !== null) {
       cancelAnimationFrame(animRef.current);
       animRef.current = null;
       if (scrollContainerRef.current) {
-        scrollContainerRef.current.style.scrollSnapType = ''; // Devolver snapping
+        scrollContainerRef.current.style.scrollSnapType = ''; 
+        scrollContainerRef.current.style.overflowX = ''; 
       }
       isProgrammaticScroll.current = false;
     }
   };
 
-  // ANIMACIÓN DE SCROLL HORIZONTAL
+  // Lógica para detectar si el usuario desliza el dedo manualmente (SWIPE)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+    startAsigId.current = asigActiva;
+    detenerAnimacion(); 
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaX = touchStartX.current - touchEndX;
+    const deltaY = touchStartY.current - touchEndY;
+    const timeElapsed = Date.now() - touchStartTime.current;
+
+    // Solo intervenimos si el movimiento ha sido claramente horizontal
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
+      const startIndex = asignaturasOrdenadas.findIndex(a => a.id === startAsigId.current);
+      let targetIndex = startIndex;
+      const velocity = deltaX / timeElapsed; // positivo = usuario hizo swipe hacia la izquierda
+
+      // Si ha deslizado con fuerza o ha arrastrado más de 30px
+      if (deltaX > 30 || velocity > 0.4) {
+        targetIndex = Math.min(startIndex + 1, asignaturasOrdenadas.length - 1); // Va al siguiente
+      } else if (deltaX < -30 || velocity < -0.4) {
+        targetIndex = Math.max(startIndex - 1, 0); // Va al anterior
+      } else {
+        // Arrastró un poco y paró en el centro (buscamos el más cercano)
+        const container = scrollContainerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const containerCenter = containerRect.left + containerRect.width / 2;
+          let minDistance = Infinity;
+          
+          asignaturasOrdenadas.forEach((asig, i) => {
+            const slide = container.querySelector(`[data-id="${asig.id}"]`);
+            if (slide) {
+              const slideRect = slide.getBoundingClientRect();
+              const slideCenter = slideRect.left + slideRect.width / 2;
+              const dist = Math.abs(slideCenter - containerCenter);
+              if (dist < minDistance) {
+                minDistance = dist;
+                targetIndex = i;
+              }
+            }
+          });
+        }
+      }
+
+      // Swipe táctil -> salto INSTANTÁNEO, sin animación ni bloqueo de overflow,
+      // para que justo al soltar el dedo puedas seguir scrolleando verticalmente sin hueco.
+      if (asignaturasOrdenadas[targetIndex]) {
+        scrollToAsigInstantaneo(asignaturasOrdenadas[targetIndex].id);
+      }
+    }
+  };
+
+  // SALTO INSTANTÁNEO (lo usa el swipe táctil de la zona de preguntas).
+  // Antes el swipe reutilizaba la misma animación de las tags (60ms con rAF)
+  // y eso bloqueaba overflowX durante ese tiempo: justo la ventana en la que
+  // sueltas el dedo y quieres seguir bajando. Al asignar scrollLeft directamente
+  // no hay ninguna animación que "secuestre" el hilo, así que no hay bloqueo.
+  const scrollToAsigInstantaneo = (id: string) => {
+    haptic();
+    setAsigActiva(id);
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const slide = container.querySelector(`[data-id="${id}"]`);
+    if (slide) {
+      isProgrammaticScroll.current = true;
+
+      const containerRect = container.getBoundingClientRect();
+      const slideRect = slide.getBoundingClientRect();
+      container.scrollLeft += slideRect.left - containerRect.left;
+
+      requestAnimationFrame(() => {
+        isProgrammaticScroll.current = false;
+      });
+    }
+  };
+
+  // ANIMACIÓN DE SCROLL HORIZONTAL (SOLO para las TAGS de arriba, tal cual estaba: 60ms)
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id); 
@@ -534,11 +624,12 @@ export function MarketPage() {
     
     const slide = container.querySelector(`[data-id="${id}"]`);
     if (slide) {
-      detenerAnimacion(); // Detenemos cualquier rastro previo
-      isProgrammaticScroll.current = true; // Silenciamos observer
+      detenerAnimacion();
+      isProgrammaticScroll.current = true;
       
-      // Apagamos snapping temporalmente para evitar peleas con el CSS nativo
+      // Apagamos las físicas de iOS/Android de raíz para que no peleen con el JS
       container.style.scrollSnapType = 'none';
+      container.style.overflowX = 'hidden'; 
 
       const containerRect = container.getBoundingClientRect();
       const slideRect = slide.getBoundingClientRect();
@@ -546,7 +637,7 @@ export function MarketPage() {
       const targetLeft = startLeft + (slideRect.left - containerRect.left);
       const distance = targetLeft - startLeft;
       
-      // Animación de súper-rápida (60ms)
+      // Animación súper rápida (60ms)
       let startTime: number | null = null;
       const duration = 60; 
       
@@ -561,9 +652,10 @@ export function MarketPage() {
         if (progress < 1) {
           animRef.current = requestAnimationFrame(animarScroll);
         } else {
-          // Restauramos todo al terminar
+          // Devolvemos el control inmediatamente
           animRef.current = null;
-          container.style.scrollSnapType = '';
+          container.style.overflowX = ''; 
+          container.style.scrollSnapType = ''; 
           setTimeout(() => {
             isProgrammaticScroll.current = false;
           }, 10);
@@ -670,8 +762,8 @@ export function MarketPage() {
       {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
       <div 
         ref={scrollContainerRef}
-        onTouchStart={detenerAnimacion} // Si el usuario toca la pantalla, cortamos animación
-        onTouchMove={detenerAnimacion}  // Garantía de corte por movimiento
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         onWheel={detenerAnimacion}
         className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
