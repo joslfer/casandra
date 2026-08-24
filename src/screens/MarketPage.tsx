@@ -500,6 +500,10 @@ export function MarketPage() {
           if (entry.isIntersecting) {
             const id = entry.target.getAttribute("data-id");
             if (id && id !== asigActiva) {
+              // Si no es el montaje inicial y ha cambiado la pestaña, disparamos haptic
+              if (asigActiva !== "") {
+                haptic();
+              }
               setAsigActiva(id);
             }
           }
