@@ -488,7 +488,7 @@ export function MarketPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         // MUY IMPORTANTE: Si estamos animando por click, ignoramos el observer
-        // Esto evita que React se actualice constantemente y bloquee el hilo principal (el scroll vertical)
+        // Esto evita que React se actualice constantemente y bloquee el hilo principal
         if (isProgrammaticScroll.current) return;
 
         entries.forEach((entry) => {
@@ -512,22 +512,32 @@ export function MarketPage() {
     return () => observer.disconnect();
   }, [asignaturasOrdenadas.length, asigActiva]);
 
+  // Función para matar la animación de cuajo si el usuario toca la pantalla
+  const detenerAnimacion = () => {
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.scrollSnapType = ''; // Devolver snapping
+      }
+      isProgrammaticScroll.current = false;
+    }
+  };
+
   // ANIMACIÓN DE SCROLL HORIZONTAL
   const scrollToAsig = (id: string) => {
     haptic();
-    setAsigActiva(id); // Actualizamos el estado visual instantáneamente
+    setAsigActiva(id); 
     
     const container = scrollContainerRef.current;
     if (!container) return;
     
     const slide = container.querySelector(`[data-id="${id}"]`);
     if (slide) {
-      // 1. Silenciamos el Observer para no saturar a React durante la transición
-      isProgrammaticScroll.current = true;
+      detenerAnimacion(); // Detenemos cualquier rastro previo
+      isProgrammaticScroll.current = true; // Silenciamos observer
       
-      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
-      
-      // Apagamos snapping temporalmente
+      // Apagamos snapping temporalmente para evitar peleas con el CSS nativo
       container.style.scrollSnapType = 'none';
 
       const containerRect = container.getBoundingClientRect();
@@ -536,9 +546,9 @@ export function MarketPage() {
       const targetLeft = startLeft + (slideRect.left - containerRect.left);
       const distance = targetLeft - startLeft;
       
-      // Animación de 200ms
+      // Animación de súper-rápida (60ms)
       let startTime: number | null = null;
-      const duration = 200; 
+      const duration = 60; 
       
       const animarScroll = (currentTime: number) => {
         if (startTime === null) startTime = currentTime;
@@ -554,11 +564,9 @@ export function MarketPage() {
           // Restauramos todo al terminar
           animRef.current = null;
           container.style.scrollSnapType = '';
-          
-          // Devolvemos el control al observer un instante después
           setTimeout(() => {
             isProgrammaticScroll.current = false;
-          }, 50);
+          }, 10);
         }
       };
       
@@ -662,6 +670,9 @@ export function MarketPage() {
       {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
       <div 
         ref={scrollContainerRef}
+        onTouchStart={detenerAnimacion} // Si el usuario toca la pantalla, cortamos animación
+        onTouchMove={detenerAnimacion}  // Garantía de corte por movimiento
+        onWheel={detenerAnimacion}
         className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {asignaturasOrdenadas.map((asig) => {
