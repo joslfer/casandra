@@ -80,10 +80,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Casandra" },
       { name: "description", content: "Mercado de predicción académico: apuesta tokens a si una pregunta entra en el examen." },
       { property: "og:title", content: "Casandra" },
-      { property: "og:description", content: "Mercado de predicción académico entre alumnos." },
+      { name: "apple-mobile-web-app-title", content: "Casandra" },
+      { property: "og:description", content: "Mercado de predicción de preguntas de exámenes entre alumnos." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

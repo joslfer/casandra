@@ -4,13 +4,13 @@ import { MarketPage } from "@/screens/MarketPage";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Casandra — mercado de predicción de exámenes" },
+      { title: "Casandra" },
       {
         name: "description",
         content:
-          "Apuesta tokens con tus compañeros a si una pregunta entra o no entra en el examen. Probabilidades en vivo.",
+          "Apuesta tokens con tus compañeros a si una pregunta entra o no entra en el examen. Probabilidades públicas.",
       },
-      { property: "og:title", content: "Casandra — mercado de predicción de exámenes" },
+      { property: "og:title", content: "Casandra" },
       {
         property: "og:description",
         content: "Apuesta tokens a si una pregunta entra o no entra en el examen.",
