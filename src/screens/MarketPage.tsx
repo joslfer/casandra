@@ -255,7 +255,7 @@ function FilaPregunta({
           className={`${btnBase} ${bloqueado ? "opacity-40" : ""} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
           <span>NO</span>
-          {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[14px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
+          {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[15px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
         </button>
         <button
           data-apuesta
@@ -265,7 +265,7 @@ function FilaPregunta({
           className={`${btnBase} ${bloqueado ? "opacity-40" : ""} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
           <span>SÍ</span>
-          {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[14px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
+          {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[15px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
         </button>
       </div>
 
@@ -453,6 +453,25 @@ export function MarketPage() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
 
+  // Aviso "sin tokens": toast gris que aparece y se desvanece solo,
+  // no requiere cerrarlo. `avisoToken` guarda un timestamp (la key
+  // del div) para forzar que la animación se reinicie cada vez que
+  // el usuario vuelve a tocar SÍ/NO sin tokens.
+  const [avisoToken, setAvisoToken] = useState<number | null>(null);
+  const avisoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
+    };
+  }, []);
+
+  const mostrarAvisoSinTokens = () => {
+    if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
+    setAvisoToken(Date.now());
+    avisoTimeoutRef.current = setTimeout(() => setAvisoToken(null), 1400);
+  };
+
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
   
@@ -487,6 +506,65 @@ export function MarketPage() {
 
   const [asigActiva, setAsigActiva] = useState<string>("");
   const asigId = asigActiva || (asignaturasOrdenadas[0]?.id || "");
+
+  // ─────────────────────────────────────────────────────────────
+  // ORDEN CONGELADO DE PREGUNTAS POR ASIGNATURA
+  // Guardamos, por cada asignatura, el orden (array de ids) en el
+  // que se mostraron sus preguntas la última vez que "entraste" en
+  // ella. Ese orden solo se recalcula:
+  //   1) la primera vez que se carga esa asignatura (entrada a la app)
+  //   2) cuando vuelves a esa asignatura (cambio de pestaña/swipe)
+  // Mientras votas sin cambiar de asignatura, el orden NO se toca:
+  // solo se actualizan los valores (prob, pools...) de cada tarjeta.
+  // ─────────────────────────────────────────────────────────────
+  const [ordenSnapshot, setOrdenSnapshot] = useState<Record<string, string[]>>({});
+  const ordenSnapshotRef = useRef(ordenSnapshot);
+  ordenSnapshotRef.current = ordenSnapshot;
+
+  const idsAbiertasDeAsig = (asignaturaId: string) =>
+    preguntas
+      .filter((p) => p.asignaturaId === asignaturaId && p.resultado === null && !p.archivada)
+      .map((p) => p.id);
+
+  // Recalcula el orden de una asignatura conservando el orden ya congelado
+  // y añadiendo al final solo las preguntas que sean nuevas.
+  const sincronizarOrden = (asignaturaId: string) => {
+    const actuales = idsAbiertasDeAsig(asignaturaId);
+    const previo = ordenSnapshotRef.current[asignaturaId];
+
+    const nuevo = !previo
+      ? actuales
+      : [
+          ...previo.filter((id) => actuales.includes(id)),
+          ...actuales.filter((id) => !previo.includes(id)),
+        ];
+
+    const sinCambios =
+      previo &&
+      previo.length === nuevo.length &&
+      previo.every((id, i) => id === nuevo[i]);
+
+    if (!sinCambios) {
+      setOrdenSnapshot((prev) => ({ ...prev, [asignaturaId]: nuevo }));
+    }
+  };
+
+  // 1) Entrada a la app / aparición de asignaturas o preguntas nuevas:
+  //    calculamos el orden inicial de cualquier asignatura que aún no lo tenga.
+  useEffect(() => {
+    asignaturasOrdenadas.forEach((a) => {
+      if (!ordenSnapshotRef.current[a.id]) {
+        sincronizarOrden(a.id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asignaturasOrdenadas.map((a) => a.id).join(","), preguntas.length]);
+
+  // 2) Cambio de asignatura activa: resincronizamos SOLO esa asignatura.
+  useEffect(() => {
+    if (asigId) sincronizarOrden(asigId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asigId]);
 
   useEffect(() => {
     if (asignaturasOrdenadas.length === 0 || !scrollContainerRef.current) return;
@@ -689,6 +767,7 @@ export function MarketPage() {
         { transform: "translateX(0)" }, { transform: "translateX(-7px)" },
         { transform: "translateX(6px)" }, { transform: "translateX(-4px)" }, { transform: "translateX(0)" }
       ], { duration: 280, easing: "ease-in-out" });
+      mostrarAvisoSinTokens();
       return;
     }
     mercado.apostar(id, lado); 
@@ -718,6 +797,15 @@ export function MarketPage() {
         *::-webkit-scrollbar {
           display: none; /* Chrome, Safari, iOS, Android */
         }
+@keyframes avisoFantasma {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  14% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+}
+.aviso-fantasma {
+  animation: avisoFantasma 1.4s ease forwards;
+}
       `}</style>
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
@@ -772,10 +860,17 @@ export function MarketPage() {
         className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {asignaturasOrdenadas.map((asig) => {
-          // Filtramos las preguntas ABIERTAS de esta asignatura específica
-          const preguntasAsignatura = preguntas.filter(
-            (p) => p.asignaturaId === asig.id && p.resultado === null && !p.archivada
-          );
+          // Orden congelado: partimos del snapshot de ids y resolvemos cada
+          // id contra el array `preguntas` actual, así los valores (prob,
+          // pools, misSi/misNo) están siempre al día pero la POSICIÓN no
+          // cambia hasta que vuelvas a entrar en esta asignatura.
+          const idsOrden = ordenSnapshot[asig.id];
+          const preguntasAsignatura = (idsOrden ?? idsAbiertasDeAsig(asig.id))
+            .map((id) => preguntas.find((p) => p.id === id))
+            .filter(
+              (p): p is Pregunta =>
+                !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada
+            );
 
           return (
             <div 
@@ -837,6 +932,16 @@ export function MarketPage() {
         />
       )}
 
+      {/* Aviso "sin tokens" — toast fantasma, aparece y se desvanece solo */}
+{avisoToken !== null && (
+  <div
+    key={avisoToken}
+    style={fuenteApple}
+    className="aviso-fantasma pointer-events-none fixed top-1/2 left-1/2 z-[60] rounded-2xl bg-neutral-800/40 px-8 py-6 text-[16px] font-medium text-white shadow-lg backdrop-blur-sm"
+  >
+    Ya has apostado todos tus tokens.
+  </div>
+)}
       {/* Hack de iOS */}
       <input type="checkbox" id="haptic-checkbox" ref={(el) => { if (el) el.setAttribute("switch", ""); }} style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} tabIndex={-1} aria-hidden="true" />
       <label htmlFor="haptic-checkbox" id="haptic-label" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} aria-hidden="true"></label>
