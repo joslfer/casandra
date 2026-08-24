@@ -508,12 +508,50 @@ export function MarketPage() {
     return () => observer.disconnect();
   }, [asignaturasOrdenadas.length, asigActiva]);
 
-  // FUNCIÓN PARA CUANDO HACES CLIC EN LA PÍLDORA (Hace scroll automático a ese feed)
+  // ANIMACIÓN DE SCROLL HORIZONTAL MUY RÁPIDA, NO-BLOQUEANTE Y SIN SALTO VERTICAL
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id);
-    const slide = scrollContainerRef.current?.querySelector(`[data-id="${id}"]`);
-    slide?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const slide = container.querySelector(`[data-id="${id}"]`);
+    if (slide) {
+      // 1. Apagamos el snapping temporalmente para que no pelee con la animación manual
+      container.style.scrollSnapType = 'none';
+
+      // 2. Calculamos la distancia exacta solo en el eje X
+      const containerRect = container.getBoundingClientRect();
+      const slideRect = slide.getBoundingClientRect();
+      const startLeft = container.scrollLeft;
+      const targetLeft = startLeft + (slideRect.left - containerRect.left);
+      const distance = targetLeft - startLeft;
+      
+      // 3. Animación ultra rápida (150ms) usando requestAnimationFrame
+      // (Al hacer solo cambios en X no bloquea el scroll de la página global)
+      let startTime: number | null = null;
+      const duration = 150; 
+      
+      const animarScroll = (currentTime: number) => {
+        if (startTime === null) startTime = currentTime;
+        const timeElapsed = currentTime - startTime;
+        const progress = Math.min(timeElapsed / duration, 1);
+        
+        // Curva de aceleración/deceleración muy limpia (ease-out-cubic)
+        const ease = 1 - Math.pow(1 - progress, 3);
+        container.scrollLeft = startLeft + distance * ease;
+        
+        if (progress < 1) {
+          requestAnimationFrame(animarScroll);
+        } else {
+          // 4. Restauramos el snapping al terminar
+          container.style.scrollSnapType = '';
+        }
+      };
+      
+      requestAnimationFrame(animarScroll);
+    }
   };
 
   if (cargando) {
@@ -556,6 +594,15 @@ export function MarketPage() {
         if (target.closest("a, input, select, button")) haptic();
       }}
     >
+      <style>{`
+        * {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE y Edge */
+        }
+        *::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, iOS, Android */
+        }
+      `}</style>
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
@@ -594,36 +641,36 @@ export function MarketPage() {
         <Asignaturas 
           asignaturas={asignaturasOrdenadas}
           asigId={asigId} 
-          setAsigActiva={scrollToAsig} // Aquí pasamos nuestra nueva función con auto-scroll
+          setAsigActiva={scrollToAsig} // Aquí usamos nuestra animación rápida y no-bloqueante
           preguntas={preguntas} 
           saldo={mercado.saldo || 0}
         />
       </div>
 
-{/* CONTENEDOR DESLIZABLE HORIZONTAL */}
-<div 
-  ref={scrollContainerRef}
-  className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
->
-  {asignaturasOrdenadas.map((asig) => {
-    // Filtramos las preguntas ABIERTAS de esta asignatura específica
-    const preguntasAsignatura = preguntas.filter(
-      (p) => p.asignaturaId === asig.id && p.resultado === null && !p.archivada
-    );
-
-    return (
+      {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
       <div 
-        key={asig.id} 
-        data-id={asig.id} 
-        className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
+        ref={scrollContainerRef}
+        className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
-        {asig.fechaExamen && (
-          <CountdownExamen
-            fechaExamen={asig.fechaExamen}
-            asignaturaId={asig.id}
-            onEditar={mercado.editarFechaExamenPublica}
-          />
-        )}
+        {asignaturasOrdenadas.map((asig) => {
+          // Filtramos las preguntas ABIERTAS de esta asignatura específica
+          const preguntasAsignatura = preguntas.filter(
+            (p) => p.asignaturaId === asig.id && p.resultado === null && !p.archivada
+          );
+
+          return (
+            <div 
+              key={asig.id} 
+              data-id={asig.id} 
+              className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
+            >
+              {asig.fechaExamen && (
+                <CountdownExamen
+                  fechaExamen={asig.fechaExamen}
+                  asignaturaId={asig.id}
+                  onEditar={mercado.editarFechaExamenPublica}
+                />
+              )}
 
               {preguntasAsignatura.length === 0 ? (
                 <p className="text-center text-sutil text-[14px] mt-10">No hay preguntas abiertas.</p>
