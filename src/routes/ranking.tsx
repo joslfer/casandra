@@ -107,7 +107,7 @@ function PaginaRanking() {
         <div></div>
 
         <h1 className="text-[28px] font-bold tracking-tight text-ink">
-          Clasificación 
+          Mejores predictores:
         </h1>
     
         <p className="mt-1.5 text-[15px] leading-relaxed text-sutil"></p>
