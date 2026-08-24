@@ -458,6 +458,10 @@ export function MarketPage() {
   
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
+  // Referencia para la animación actual
+  const animRef = useRef<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const rankingCalculado = mercado.leerRanking();
     if (rankingFijo.length === 0 && rankingCalculado.length > 0) {
@@ -476,9 +480,6 @@ export function MarketPage() {
 
   const [asigActiva, setAsigActiva] = useState<string>("");
   const asigId = asigActiva || (asignaturasOrdenadas[0]?.id || "");
-
-  // REFERENCIA PARA EL SCROLL HORIZONTAL Y EL OBSERVER
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Si no hay asignaturas, no hacemos nada
@@ -508,7 +509,18 @@ export function MarketPage() {
     return () => observer.disconnect();
   }, [asignaturasOrdenadas.length, asigActiva]);
 
-  // ANIMACIÓN DE SCROLL HORIZONTAL MUY RÁPIDA, NO-BLOQUEANTE Y SIN SALTO VERTICAL
+  // FUNCIÓN PARA CANCELAR LA ANIMACIÓN (se dispara en cuanto tocas la pantalla)
+  const detenerAnimacion = () => {
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.scrollSnapType = ''; // Devolver snapping
+      }
+    }
+  };
+
+  // ANIMACIÓN DE SCROLL HORIZONTAL MUY RÁPIDA Y CANCELABLE
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id);
@@ -518,18 +530,20 @@ export function MarketPage() {
     
     const slide = container.querySelector(`[data-id="${id}"]`);
     if (slide) {
-      // 1. Apagamos el snapping temporalmente para que no pelee con la animación manual
+      // 1. Detenemos cualquier animación en curso por si el usuario pulsa varios botones rápido
+      detenerAnimacion();
+
+      // 2. Apagamos el snapping temporalmente
       container.style.scrollSnapType = 'none';
 
-      // 2. Calculamos la distancia exacta solo en el eje X
+      // 3. Calculamos distancias
       const containerRect = container.getBoundingClientRect();
       const slideRect = slide.getBoundingClientRect();
       const startLeft = container.scrollLeft;
       const targetLeft = startLeft + (slideRect.left - containerRect.left);
       const distance = targetLeft - startLeft;
       
-      // 3. Animación ultra rápida (150ms) usando requestAnimationFrame
-      // (Al hacer solo cambios en X no bloquea el scroll de la página global)
+      // 4. Animación ultra rápida (150ms) usando requestAnimationFrame
       let startTime: number | null = null;
       const duration = 150; 
       
@@ -538,19 +552,20 @@ export function MarketPage() {
         const timeElapsed = currentTime - startTime;
         const progress = Math.min(timeElapsed / duration, 1);
         
-        // Curva de aceleración/deceleración muy limpia (ease-out-cubic)
+        // Curva de aceleración/deceleración muy limpia
         const ease = 1 - Math.pow(1 - progress, 3);
         container.scrollLeft = startLeft + distance * ease;
         
         if (progress < 1) {
-          requestAnimationFrame(animarScroll);
+          animRef.current = requestAnimationFrame(animarScroll);
         } else {
-          // 4. Restauramos el snapping al terminar
+          // 5. Limpiamos al terminar
+          animRef.current = null;
           container.style.scrollSnapType = '';
         }
       };
       
-      requestAnimationFrame(animarScroll);
+      animRef.current = requestAnimationFrame(animarScroll);
     }
   };
 
@@ -650,6 +665,9 @@ export function MarketPage() {
       {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
       <div 
         ref={scrollContainerRef}
+        onTouchStart={detenerAnimacion} // Si tocas la pantalla, se interrumpe y puedes hacer scroll
+        onWheel={detenerAnimacion}      // Lo mismo si usas rueda de ratón en escritorio
+        onMouseDown={detenerAnimacion}  // Lo mismo al hacer click sostenido
         className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {asignaturasOrdenadas.map((asig) => {
