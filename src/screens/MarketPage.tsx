@@ -419,7 +419,7 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
       <div className="mt-4 flex w-full justify-center px-4">
         <Link to="/ranking" className={`group relative flex max-w-full items-center ${CLASE_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
           <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
-          <span className="block truncate">Vas <strong className="font-semibold text-ink">#1</strong>. ¡Mantén la distancia!</span>
+          <span className="block truncate">Vas <strong className="font-semibold text-ink">#1</strong>. ¡Gracias por mejorar la precisión!</span>
           <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
         </Link>
       </div>
@@ -452,25 +452,6 @@ export function MarketPage() {
   const haptic = useHaptic();
 
   const [modalAbierto, setModalAbierto] = useState(false);
-
-  // Aviso "sin tokens": toast gris que aparece y se desvanece solo,
-  // no requiere cerrarlo. `avisoToken` guarda un timestamp (la key
-  // del div) para forzar que la animación se reinicie cada vez que
-  // el usuario vuelve a tocar SÍ/NO sin tokens.
-  const [avisoToken, setAvisoToken] = useState<number | null>(null);
-  const avisoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
-    };
-  }, []);
-
-  const mostrarAvisoSinTokens = () => {
-    if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
-    setAvisoToken(Date.now());
-    avisoTimeoutRef.current = setTimeout(() => setAvisoToken(null), 1400);
-  };
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
@@ -767,7 +748,6 @@ export function MarketPage() {
         { transform: "translateX(0)" }, { transform: "translateX(-7px)" },
         { transform: "translateX(6px)" }, { transform: "translateX(-4px)" }, { transform: "translateX(0)" }
       ], { duration: 280, easing: "ease-in-out" });
-      mostrarAvisoSinTokens();
       return;
     }
     mercado.apostar(id, lado); 
@@ -797,15 +777,6 @@ export function MarketPage() {
         *::-webkit-scrollbar {
           display: none; /* Chrome, Safari, iOS, Android */
         }
-@keyframes avisoFantasma {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
-  14% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
-}
-.aviso-fantasma {
-  animation: avisoFantasma 1.4s ease forwards;
-}
       `}</style>
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
@@ -932,16 +903,6 @@ export function MarketPage() {
         />
       )}
 
-      {/* Aviso "sin tokens" — toast fantasma, aparece y se desvanece solo */}
-{avisoToken !== null && (
-  <div
-    key={avisoToken}
-    style={fuenteApple}
-    className="aviso-fantasma pointer-events-none fixed top-1/2 left-1/2 z-[60] rounded-2xl bg-neutral-800/40 px-8 py-6 text-[16px] font-medium text-white shadow-lg backdrop-blur-sm"
-  >
-    Ya has apostado todos tus tokens.
-  </div>
-)}
       {/* Hack de iOS */}
       <input type="checkbox" id="haptic-checkbox" ref={(el) => { if (el) el.setAttribute("switch", ""); }} style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} tabIndex={-1} aria-hidden="true" />
       <label htmlFor="haptic-checkbox" id="haptic-label" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} aria-hidden="true"></label>

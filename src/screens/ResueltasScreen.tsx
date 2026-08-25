@@ -57,7 +57,7 @@ export function ResueltasScreen() {
       <main className="mx-auto max-w-[520px] px-5 pt-[calc(5rem+env(safe-area-inset-top))]">
         {resueltasUsuario.length === 0 ? (
           <div className="mt-20 text-center">
-            <p className="text-[14px] text-sutil">No tienes apuestas en preguntas resueltas todavía.</p>
+            <p className="text-[14px] text-sutil">Cuando se resuelva una apuesta, apareceerá aquí para que puedas comprobar que todo está correcto.</p>
           </div>
         ) : (
           <div className="space-y-10">
