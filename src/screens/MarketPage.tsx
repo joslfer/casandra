@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList, Lock } from "lucide-react";
+import { Settings, ClipboardList, Lock, RefreshCw } from "lucide-react";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import {
@@ -231,10 +231,12 @@ function FilaPregunta({
     if (cooldown || bloqueado) return;
     setCooldown(true);
     onApostar(lado);
-    setTimeout(() => setCooldown(false), 300);
+    // Le damos un tiempo para que la animación termine limpia y el backend responda
+    setTimeout(() => setCooldown(false), 400);
   };
 
-  const btnBase = "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium transition-transform duration-150 active:scale-95";
+  const visuallyBlocked = bloqueado && !cooldown;
+  const btnBase = "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium transition-all duration-150 ease-out";
 
   return (
     <article className={`py-6 w-full ${ocultarBorde ? "" : "border-b border-linea"}`}>
@@ -251,9 +253,9 @@ function FilaPregunta({
         <button
           data-apuesta
           onClick={() => handleApostar("no")}
-          disabled={bloqueado || cooldown}
+          disabled={visuallyBlocked}
           style={fuenteApple}
-          className={`${btnBase} ${bloqueado ? "opacity-40" : ""} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
+          className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
           <span>NO</span>
           {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[15px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
@@ -261,9 +263,9 @@ function FilaPregunta({
         <button
           data-apuesta
           onClick={() => handleApostar("si")}
-          disabled={bloqueado || cooldown}
+          disabled={visuallyBlocked}
           style={fuenteApple}
-          className={`${btnBase} ${bloqueado ? "opacity-40" : ""} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
+          className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
           <span>SÍ</span>
           {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[15px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
@@ -273,9 +275,9 @@ function FilaPregunta({
       {tengoApuesta && (
         <button
           onClick={onRetirar}
-          disabled={bloqueado || cooldown}
+          disabled={visuallyBlocked || cooldown}
           style={fuenteApple}
-          className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink transition-transform duration-150 active:scale-95 active:bg-black/5 ${bloqueado ? "opacity-40" : ""}`}
+          className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink transition-transform duration-150 active:bg-black/5 ${visuallyBlocked ? "opacity-40" : "active:scale-95"}`}
         >
           Retirar apuesta
         </button>
@@ -398,14 +400,13 @@ function PantallaNuevaPregunta({
 }
 
 function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
-  const CLASE_TEXTO = "text-[clamp(12px,4.5vw,15px)]";
   const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
 
   if (rankingFijo.length === 0 || miIndice === -1) {
     return (
       <div className="mt-4 flex w-full justify-center px-4">
-        <Link to="/ranking" className={`${CLASE_TEXTO} font-medium text-sutil transition-colors hover:text-ink truncate`}>
-          Ver Clasificación Global →
+        <Link to="/ranking" className="text-[17px] text-ink/90 transition-colors hover:text-ink text-left">
+          ver clasificación global →
         </Link>
       </div>
     );
@@ -414,50 +415,125 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
   const yo = rankingFijo[miIndice];
   const elDeArriba = rankingFijo[miIndice - 1];
   const miPosicion = miIndice + 1;
-
-  if (miIndice === 0) {
-    return (
-      <div className="mt-4 flex w-full justify-center px-4">
-        <Link to="/ranking" className={`group relative flex max-w-full items-center ${CLASE_TEXTO} text-ink/90 transition-colors hover:text-ink`}>
-          <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
-          <span className="block truncate">Vas <strong className="font-semibold text-ink">#1</strong>. ¡Gracias por mejorar la precisión!</span>
-          <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
-        </Link>
-      </div>
-    );
-  }
-
-  const diferencia = elDeArriba.tokens - yo.tokens;
-  const esEmpate = diferencia === 0;
-  const faltan = diferencia >= 0 ? diferencia + 1 : 1; 
-  const TAMANO_LETRA = "text-[16px]";
+  const esEmpate = elDeArriba?.tokens - yo?.tokens === 0;
+  const faltan = elDeArriba?.tokens - yo?.tokens >= 0 ? (elDeArriba?.tokens - yo?.tokens) + 1 : 1; 
 
   return (
-    <div className="mt-4 flex w-full justify-center px-4">
-      <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_LETRA} text-ink/90 transition-colors hover:text-ink`}>
-        <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
-        <div className="flex min-w-0 shrink items-center overflow-hidden whitespace-nowrap gap-1.5">
-          <span className="shrink-0">Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>,</span>
-          {esEmpate ? (
-            <>
-              <span className="shrink-0">empatado con</span>
-              <strong className="truncate font-medium text-ink">{elDeArriba?.usuario}</strong>
-            </>
+    <div className="mt-5 flex w-full justify-center px-4">
+      <Link to="/ranking" className="group relative inline-block max-w-[340px] text-left transition-colors">
+        <div className="text-[17px] text-ink/90 leading-snug break-words group-hover:text-ink transition-colors">
+          Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>
+          {miIndice === 0 ? (
+            <>. ¡Gracias por tu precisión!</>
+          ) : esEmpate ? (
+            <>, empatado con <strong className="font-medium text-ink">{elDeArriba?.usuario}</strong></>
           ) : (
-            <>
-              <span className="shrink-0">te faltan</span>
-              <span className="shrink-0 inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-3.5 w-3.5" /></span>
-              <span className="shrink-0">hasta</span>
-              <strong className="truncate font-medium text-ink">{elDeArriba?.usuario}</strong>
-            </>
+            <>, a <span className="inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-[14px] w-[14px] -mt-0.5" /></span> de <strong className="font-medium text-ink">{elDeArriba?.usuario}</strong></>
           )}
+          <br />
+          <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80 transition-colors">
+            mira la clasificación
+          </span> <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
         </div>
-        <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
       </Link>
     </div>
   );
 }
 
+function SaldoAnimado({ valor }: { valor: number }) {
+  const [renderVal, setRenderVal] = useState(valor);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const floatValRef = useRef(valor);
+  const animRef = useRef<number | null>(null);
+
+  const [maxLen, setMaxLen] = useState(() => Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0));
+
+  useEffect(() => {
+    const curLen = Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0);
+    if (curLen > maxLen) {
+      setMaxLen(curLen);
+    }
+  }, [valor, maxLen]);
+
+  useEffect(() => {
+    const startVal = floatValRef.current;
+    const endVal = valor;
+    if (startVal === endVal) return;
+
+    setIsAnimating(true);
+    const duration = 800;
+    let startTime: number | null = null;
+
+    const anim = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const currentFloat = startVal + (endVal - startVal) * ease;
+      
+      floatValRef.current = currentFloat;
+      setRenderVal(currentFloat);
+
+      if (progress < 1) {
+        animRef.current = requestAnimationFrame(anim);
+      } else {
+        setRenderVal(endVal);
+        floatValRef.current = endVal;
+        setIsAnimating(false);
+      }
+    };
+
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    animRef.current = requestAnimationFrame(anim);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [valor]);
+
+  const base = Math.floor(renderVal);
+  const frac = renderVal - base;
+  const items = [base + 2, base + 1, base, base - 1];
+
+  return (
+    <span
+      className="relative inline-flex flex-col items-end font-mono text-[64px] leading-none tracking-tight text-ink tabular-nums overflow-hidden"
+      style={{
+        minWidth: `${maxLen}ch`,
+        height: "1em",
+        boxSizing: "content-box",
+        paddingTop: isAnimating ? "0.15em" : "0",
+        paddingBottom: isAnimating ? "0.15em" : "0",
+        marginTop: isAnimating ? "-0.15em" : "0",
+        marginBottom: isAnimating ? "-0.15em" : "0",
+        maskImage: isAnimating
+          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
+          : "none",
+        WebkitMaskImage: isAnimating
+          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
+          : "none",
+      }}
+    >
+      <span
+        className="flex flex-col items-end w-full will-change-transform"
+        style={{
+          transform: `translateY(-${2 - frac}em)`,
+        }}
+      >
+        {items.map((num) => (
+          <span key={num} className="flex h-[1em] w-full items-center justify-end whitespace-nowrap">
+            {num}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+// ============================================================================
+// MARKET PAGE CON PULL TO REFRESH NATIVO Y ORDEN CONGELADO CORREGIDO
+// ============================================================================
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
@@ -470,16 +546,77 @@ export function MarketPage() {
   
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
-  // Referencias para la animación (SOLO la usan las TAGS) y el bloqueo del observer
   const animRef = useRef<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScroll = useRef(false);
 
-  // Variables para la detección del Swipe Manual
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const touchStartTime = useRef(0);
   const startAsigId = useRef<string>("");
+
+  // -----------------------------------------------------
+  // ESTADOS PULL TO REFRESH
+  // -----------------------------------------------------
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+  const pullStartY = useRef(0);
+  
+  const MAX_PULL_DISTANCE = 80;
+  const REFRESH_THRESHOLD = 60;
+
+  const handleMainTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      pullStartY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    }
+  };
+
+  const handleMainTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling || isRefreshing) return;
+
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - pullStartY.current;
+
+    if (diff > 0) {
+      const distance = Math.min(MAX_PULL_DISTANCE, Math.log(diff + 1) * 15);
+      setPullDistance(distance);
+      
+      if (document.body.style.overscrollBehaviorY !== 'none') {
+        document.body.style.overscrollBehaviorY = 'none';
+      }
+    }
+  };
+
+  const handleMainTouchEnd = async () => {
+    if (!isPulling) return;
+    
+    setIsPulling(false);
+    document.body.style.overscrollBehaviorY = '';
+
+    if (pullDistance > REFRESH_THRESHOLD && !isRefreshing) {
+      haptic();
+      setIsRefreshing(true);
+      setPullDistance(50); 
+
+      try {
+        if (typeof mercado.recargar === 'function') {
+          await mercado.recargar();
+          // Vaciamos el orden para que todo se recoloque como si acabáramos de entrar
+          setOrdenSnapshot({});
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } finally {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  };
 
   useEffect(() => {
     const rankingCalculado = mercado.leerRanking();
@@ -488,7 +625,6 @@ export function MarketPage() {
     }
   }, [mercado.leerRanking, rankingFijo.length]);
 
-  // ORDENAMOS ASIGNATURAS
   const asignaturasOrdenadas = [...asignaturas].sort((a, b) => {
     if (a.cerrada !== b.cerrada) return a.cerrada ? 1 : -1;
     if (a.fechaExamen == null && b.fechaExamen == null) return 0;
@@ -501,98 +637,43 @@ export function MarketPage() {
   const asigId = asigActiva || (asignaturasOrdenadas[0]?.id || "");
 
   // ─────────────────────────────────────────────────────────────
-  // ORDEN CONGELADO DE PREGUNTAS POR ASIGNATURA
-  // Guardamos, por cada asignatura, el orden (array de ids) en el
-  // que se mostraron sus preguntas la última vez que "entraste" en
-  // ella. Ese orden solo se recalcula:
-  //   1) la primera vez que se carga esa asignatura (entrada a la app)
-  //   2) cuando vuelves a esa asignatura (cambio de pestaña/swipe)
-  // Mientras votas sin cambiar de asignatura, el orden NO se toca:
-  // solo se actualizan los valores (prob, pools...) de cada tarjeta.
+  // ORDEN CONGELADO: Ahora SOLO se actualiza si cambias de asig
+  // o si haces un refresh manual. NUNCA al cambiar las probabilidades.
   // ─────────────────────────────────────────────────────────────
   const [ordenSnapshot, setOrdenSnapshot] = useState<Record<string, string[]>>({});
-  const ordenSnapshotRef = useRef(ordenSnapshot);
-  ordenSnapshotRef.current = ordenSnapshot;
 
-  const idsAbiertasDeAsig = (asignaturaId: string) =>
-    preguntas
-      .filter((p) => p.asignaturaId === asignaturaId && p.resultado === null && !p.archivada)
-      .map((p) => p.id);
-
-  // Recalcula el orden de una asignatura conservando el orden ya congelado
-  // y añadiendo al final solo las preguntas que sean nuevas.
-  const sincronizarOrden = (asignaturaId: string) => {
-    const actuales = idsAbiertasDeAsig(asignaturaId);
-    const previo = ordenSnapshotRef.current[asignaturaId];
-
-    const nuevo = !previo
-      ? actuales
-      : [
-          ...previo.filter((id) => actuales.includes(id)),
-          ...actuales.filter((id) => !previo.includes(id)),
-        ];
-
-    const sinCambios =
-      previo &&
-      previo.length === nuevo.length &&
-      previo.every((id, i) => id === nuevo[i]);
-
-    if (!sinCambios) {
-      setOrdenSnapshot((prev) => ({ ...prev, [asignaturaId]: nuevo }));
-    }
-  };
-
-  // 1) Entrada a la app / aparición de asignaturas o preguntas nuevas:
-  //    calculamos el orden inicial de cualquier asignatura que aún no lo tenga.
   useEffect(() => {
-    asignaturasOrdenadas.forEach((a) => {
-      if (!ordenSnapshotRef.current[a.id]) {
-        sincronizarOrden(a.id);
-      }
+    setOrdenSnapshot((prev) => {
+      const nuevoOrden = { ...prev };
+      let huboCambios = false;
+
+      asignaturasOrdenadas.forEach((a) => {
+        // Solo generamos orden inicial si la asignatura NO tiene orden guardado
+        if (!nuevoOrden[a.id]) {
+          nuevoOrden[a.id] = preguntas
+            .filter((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
+            // IMPORTANTE: Aquí SÍ nos guiamos por la probabilidad inicial para construirlo la primera vez
+            .sort((p1, p2) => probabilidad(p2) - probabilidad(p1))
+            .map((p) => p.id);
+          huboCambios = true;
+        }
+      });
+
+      return huboCambios ? nuevoOrden : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [asignaturasOrdenadas.map((a) => a.id).join(","), preguntas.length]);
+  }, [asignaturasOrdenadas, preguntas]);
 
-  // 2) Cambio de asignatura activa: resincronizamos SOLO esa asignatura.
+  // Bloqueo del Swipe to go back en iOS
   useEffect(() => {
-    if (asigId) sincronizarOrden(asigId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [asigId]);
-
-  useEffect(() => {
-    if (asignaturasOrdenadas.length === 0 || !scrollContainerRef.current) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Ignoramos el observer si el salto programático (clic en tag o swipe) se está ejecutando
-        if (isProgrammaticScroll.current) return;
-
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const id = entry.target.getAttribute("data-id");
-            if (id && id !== asigActiva) {
-              // Si no es el montaje inicial y ha cambiado la pestaña, disparamos haptic
-              if (asigActiva !== "") {
-                haptic();
-              }
-              setAsigActiva(id);
-            }
-          }
-        });
-      },
-      {
-        root: scrollContainerRef.current,
-        threshold: 0.5,
+    const bloquearSwipeIOS = (e: TouchEvent) => {
+      if (e.touches[0].clientX < 25) {
+        e.preventDefault();
       }
-    );
+    };
+    document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
+    return () => document.removeEventListener("touchstart", bloquearSwipeIOS);
+  }, []);
 
-    const slides = scrollContainerRef.current.querySelectorAll(".snap-slide");
-    slides.forEach((slide) => observer.observe(slide));
-
-    return () => observer.disconnect();
-  }, [asignaturasOrdenadas.length, asigActiva]);
-
-  // Cancela la animación de las TAGS si el usuario interrumpe con un gesto manual
   const detenerAnimacion = () => {
     if (animRef.current !== null) {
       cancelAnimationFrame(animRef.current);
@@ -605,7 +686,6 @@ export function MarketPage() {
     }
   };
 
-  // Lógica para detectar si el usuario desliza el dedo manualmente (SWIPE)
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
@@ -621,19 +701,16 @@ export function MarketPage() {
     const deltaY = touchStartY.current - touchEndY;
     const timeElapsed = Date.now() - touchStartTime.current;
 
-    // Solo intervenimos si el movimiento ha sido claramente horizontal
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
       const startIndex = asignaturasOrdenadas.findIndex(a => a.id === startAsigId.current);
       let targetIndex = startIndex;
-      const velocity = deltaX / timeElapsed; // positivo = usuario hizo swipe hacia la izquierda
+      const velocity = deltaX / timeElapsed; 
 
-      // Si ha deslizado con fuerza o ha arrastrado más de 30px
       if (deltaX > 30 || velocity > 0.4) {
-        targetIndex = Math.min(startIndex + 1, asignaturasOrdenadas.length - 1); // Va al siguiente
+        targetIndex = Math.min(startIndex + 1, asignaturasOrdenadas.length - 1); 
       } else if (deltaX < -30 || velocity < -0.4) {
-        targetIndex = Math.max(startIndex - 1, 0); // Va al anterior
+        targetIndex = Math.max(startIndex - 1, 0); 
       } else {
-        // Arrastró un poco y paró en el centro (buscamos el más cercano)
         const container = scrollContainerRef.current;
         if (container) {
           const containerRect = container.getBoundingClientRect();
@@ -655,19 +732,12 @@ export function MarketPage() {
         }
       }
 
-      // Swipe táctil -> salto INSTANTÁNEO, sin animación ni bloqueo de overflow,
-      // para que justo al soltar el dedo puedas seguir scrolleando verticalmente sin hueco.
       if (asignaturasOrdenadas[targetIndex]) {
         scrollToAsigInstantaneo(asignaturasOrdenadas[targetIndex].id);
       }
     }
   };
 
-  // SALTO INSTANTÁNEO (lo usa el swipe táctil de la zona de preguntas).
-  // Antes el swipe reutilizaba la misma animación de las tags (60ms con rAF)
-  // y eso bloqueaba overflowX durante ese tiempo: justo la ventana en la que
-  // sueltas el dedo y quieres seguir bajando. Al asignar scrollLeft directamente
-  // no hay ninguna animación que "secuestre" el hilo, así que no hay bloqueo.
   const scrollToAsigInstantaneo = (id: string) => {
     haptic();
     setAsigActiva(id);
@@ -689,7 +759,6 @@ export function MarketPage() {
     }
   };
 
-  // ANIMACIÓN DE SCROLL HORIZONTAL (SOLO para las TAGS de arriba, tal cual estaba: 60ms)
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id); 
@@ -702,7 +771,6 @@ export function MarketPage() {
       detenerAnimacion();
       isProgrammaticScroll.current = true;
       
-      // Apagamos las físicas de iOS/Android de raíz para que no peleen con el JS
       container.style.scrollSnapType = 'none';
       container.style.overflowX = 'hidden'; 
 
@@ -712,7 +780,6 @@ export function MarketPage() {
       const targetLeft = startLeft + (slideRect.left - containerRect.left);
       const distance = targetLeft - startLeft;
       
-      // Animación súper rápida (60ms)
       let startTime: number | null = null;
       const duration = 60; 
       
@@ -727,7 +794,6 @@ export function MarketPage() {
         if (progress < 1) {
           animRef.current = requestAnimationFrame(animarScroll);
         } else {
-          // Devolvemos el control inmediatamente
           animRef.current = null;
           container.style.overflowX = ''; 
           container.style.scrollSnapType = ''; 
@@ -780,7 +846,11 @@ export function MarketPage() {
 
   return (
     <div
-      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28 select-none"
+      ref={mainContainerRef}
+      onTouchStart={handleMainTouchStart}
+      onTouchMove={handleMainTouchMove}
+      onTouchEnd={handleMainTouchEnd}
+      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28 select-none relative"
       style={fuenteApple}
       onClickCapture={(event) => {
         const target = event.target as Element;
@@ -798,6 +868,22 @@ export function MarketPage() {
           display: none; /* Chrome, Safari, iOS, Android */
         }
       `}</style>
+      
+      {/* INDICADOR PULL TO REFRESH */}
+      <div 
+        className="absolute top-0 left-0 w-full flex justify-center items-center pointer-events-none z-10"
+        style={{
+          height: `${pullDistance}px`,
+          opacity: pullDistance / REFRESH_THRESHOLD,
+          transition: isPulling ? 'none' : 'height 0.3s ease-out, opacity 0.3s ease-out'
+        }}
+      >
+        <RefreshCw 
+          className={`h-5 w-5 text-sutil ${isRefreshing ? 'animate-spin' : ''}`} 
+          style={{ transform: `rotate(${pullDistance * 3}deg)` }}
+        />
+      </div>
+
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
@@ -814,105 +900,112 @@ export function MarketPage() {
         </div>
       </header>
 
-      {/* HEADER PRINCIPAL (SALDO + TABS) FUERA DEL SCROLL HORIZONTAL */}
-      <div className="mx-auto w-full max-w-[520px]">
-        {!mercado.pausado && (
-          <div className="mt-10 mb-4 flex flex-col items-center justify-center">
-            <div className="relative z-10 flex items-center gap-3">
-              <button
-                style={{ width: "42px", height: "42px" }}
-                className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
-              >
-                <Moneda className="!h-full !w-full" />
-              </button>
-              <span className="font-mono text-[64px] leading-none tracking-tight tabular-nums text-ink">
-                {mercado.saldo || 0}
-              </span>
-            </div>
-            <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
-          </div>
-        )}
-        
-        <Asignaturas 
-          asignaturas={asignaturasOrdenadas}
-          asigId={asigId} 
-          setAsigActiva={scrollToAsig}
-          preguntas={preguntas} 
-          saldo={mercado.saldo || 0}
-        />
-      </div>
-
-      {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
+      {/* ENVOLTORIO PRINCIPAL QUE BAJA AL TIRAR */}
       <div 
-        ref={scrollContainerRef}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onWheel={detenerAnimacion}
-        className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        style={{
+          transform: `translateY(${pullDistance}px)`,
+          transition: isPulling ? 'none' : 'transform 0.3s ease-out'
+        }}
       >
-        {asignaturasOrdenadas.map((asig) => {
-          // Orden congelado: partimos del snapshot de ids y resolvemos cada
-          // id contra el array `preguntas` actual, así los valores (prob,
-          // pools, misSi/misNo) están siempre al día pero la POSICIÓN no
-          // cambia hasta que vuelvas a entrar en esta asignatura.
-          const idsOrden = ordenSnapshot[asig.id];
-          const preguntasAsignatura = (idsOrden ?? idsAbiertasDeAsig(asig.id))
-            .map((id) => preguntas.find((p) => p.id === id))
-            .filter(
-              (p): p is Pregunta =>
-                !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada
-            );
-
-          return (
-            <div 
-              key={asig.id} 
-              data-id={asig.id} 
-              className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
-            >
-              {asig.fechaExamen && (
-                <CountdownExamen
-                  fechaExamen={asig.fechaExamen}
-                  asignaturaId={asig.id}
-                  onEditar={mercado.editarFechaExamenPublica}
-                />
-              )}
-
-              {preguntasAsignatura.length === 0 ? (
-                <p className="text-center text-sutil text-[14px] mt-10">No hay preguntas abiertas.</p>
-              ) : (
-                preguntasAsignatura.map((p, index) => (
-                  <FilaPregunta
-                    key={p.id}
-                    pregunta={p}
-                    bloqueado={mercado.pausado || asig.cerrada} 
-                    sinTokens={(mercado.saldo || 0) < 1}
-                    ocultarBorde={index === preguntasAsignatura.length - 1}
-                    onApostar={(lado) => intentarApostar(p.id, lado)}
-                    onRetirar={() => retirarPregunta(p.id)}
-                  />
-                ))
-              )}
-
-              {/* Botón Proponer Pregunta */}
-              {!asig.cerrada && hayAsignaturasAbiertas && (
-                <div className="mb-12 mt-8 flex justify-center">
+        {/* HEADER PRINCIPAL (SALDO + TABS) FUERA DEL SCROLL HORIZONTAL */}
+        <div className="mx-auto w-full max-w-[520px]">
+          {!mercado.pausado && (
+            <div className="mt-10 mb-4 flex flex-col items-center justify-center w-full">
+              <div className="relative z-10 flex w-full items-center justify-center">
+                <div className="flex flex-1 justify-end pr-1.5">
+                  <SaldoAnimado valor={mercado.saldo || 0} />
+                </div>
+                <div className="flex flex-1 justify-start pl-1.5">
                   <button
-                    onClick={() => setModalAbierto(true)}
-                    style={fuenteApple}
-                    className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
+                    style={{ width: "47px", height: "47px" }}
+                    className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 5v14"></path>
-                      <path d="M5 12h14"></path>
-                    </svg>
-                    Proponer pregunta
+                    <Moneda className="!h-full !w-full" />
                   </button>
                 </div>
-              )}
+              </div>
+              <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
             </div>
-          );
-        })}
-      </div>
+          )}
+          
+          <Asignaturas 
+            asignaturas={asignaturasOrdenadas}
+            asigId={asigId} 
+            setAsigActiva={scrollToAsig}
+            preguntas={preguntas} 
+            saldo={mercado.saldo || 0}
+          />
+        </div>
+
+        {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
+        <div 
+          ref={scrollContainerRef}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onWheel={detenerAnimacion}
+          className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        >
+          {asignaturasOrdenadas.map((asig) => {
+            const idsOrden = ordenSnapshot[asig.id] || [];
+            
+            // Reconstruimos las preguntas usando el orden de sus IDs "congeladas"
+            const preguntasAsignatura = idsOrden
+              .map((id) => preguntas.find((p) => p.id === id))
+              .filter(
+                (p): p is Pregunta =>
+                  !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada
+              );
+
+            return (
+              <div 
+                key={asig.id} 
+                data-id={asig.id} 
+                className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
+              >
+                {asig.fechaExamen && (
+                  <CountdownExamen
+                    fechaExamen={asig.fechaExamen}
+                    asignaturaId={asig.id}
+                    onEditar={mercado.editarFechaExamenPublica}
+                  />
+                )}
+
+                {preguntasAsignatura.length === 0 ? (
+                  <p className="text-center text-sutil text-[14px] mt-10">No hay preguntas abiertas.</p>
+                ) : (
+                  preguntasAsignatura.map((p, index) => (
+                    <FilaPregunta
+                      key={p.id}
+                      pregunta={p}
+                      bloqueado={mercado.pausado || asig.cerrada} 
+                      sinTokens={(mercado.saldo || 0) < 1}
+                      ocultarBorde={index === preguntasAsignatura.length - 1}
+                      onApostar={(lado) => intentarApostar(p.id, lado)}
+                      onRetirar={() => retirarPregunta(p.id)}
+                    />
+                  ))
+                )}
+
+                {!asig.cerrada && hayAsignaturasAbiertas && (
+                  <div className="mb-12 mt-8 flex justify-center">
+                    <button
+                      onClick={() => setModalAbierto(true)}
+                      style={fuenteApple}
+                      className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14"></path>
+                        <path d="M5 12h14"></path>
+                      </svg>
+                      Proponer pregunta
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div> {/* Fin del envoltorio que baja */}
 
       {modalAbierto && (
         <PantallaNuevaPregunta

@@ -243,6 +243,13 @@ export function useMercado(usuario: Usuario | null) {
   }, [cargarDatos]);
 
   // --------------------------------------------------------
+  // RECARGA MANUAL (Usada por el Pull To Refresh)
+  // --------------------------------------------------------
+  const recargar = useCallback(async () => {
+    await cargarDatos();
+  }, [cargarDatos]);
+
+  // --------------------------------------------------------
   // ESTADOS COMPUTADOS Y FILTRADOS POR CLASE
   // --------------------------------------------------------
   const esAdmin = !!usuario?.esAdmin;
@@ -613,8 +620,6 @@ const elegirClase = useCallback(async (claseId: string) => {
 
   return useMemo(
     () => ({
-      // Garantizamos que perfilCargado sólo se exponga como 'true' cuando los datos
-      // cargados coincidan con el usuario autenticado actual.
       perfilCargado: perfilCargado && idCargado === (usuario ? usuario.id : null),
       saldo,
       pausado,
@@ -654,6 +659,7 @@ const elegirClase = useCallback(async (claseId: string) => {
       guardarNombre,
       usarHash,
       mutar,
+      recargar, // <--- FUNCIÓN EXPORTADA PARA EL PULL TO REFRESH
     }),
     [
       perfilCargado,
@@ -695,6 +701,7 @@ const elegirClase = useCallback(async (claseId: string) => {
       guardarNombre,
       usarHash,
       mutar,
+      recargar, // <--- DEPENDENCIA
     ]
   );
 }
