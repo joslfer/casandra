@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList, Lock, RefreshCw } from "lucide-react";
+import { Settings, ClipboardList, Lock, Loader2 } from "lucide-react";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import {
@@ -231,7 +231,6 @@ function FilaPregunta({
     if (cooldown || bloqueado) return;
     setCooldown(true);
     onApostar(lado);
-    // Le damos un tiempo para que la animación termine limpia y el backend responda
     setTimeout(() => setCooldown(false), 400);
   };
 
@@ -532,7 +531,7 @@ function SaldoAnimado({ valor }: { valor: number }) {
 }
 
 // ============================================================================
-// MARKET PAGE CON PULL TO REFRESH NATIVO Y ORDEN CONGELADO CORREGIDO
+// MARKET PAGE CON PULL TO REFRESH NATIVO - ESTILO PÍLDORA CON TEXTO
 // ============================================================================
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
@@ -555,9 +554,7 @@ export function MarketPage() {
   const touchStartTime = useRef(0);
   const startAsigId = useRef<string>("");
 
-  // -----------------------------------------------------
-  // ESTADOS PULL TO REFRESH FLUIDOS
-  // -----------------------------------------------------
+  // ESTADOS PULL TO REFRESH
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -567,13 +564,11 @@ export function MarketPage() {
   const pullStartX = useRef(0);
   const isVerticalSwipe = useRef<boolean | null>(null);
 
-  const MAX_PULL_DISTANCE = 160;
   const REFRESH_THRESHOLD = 75;
   const SPINNER_OFFSET = 55;
-  const SPRING_CONFIG = "0.4s cubic-bezier(0.3, 0.7, 0, 1)"; // Animación elástica nativa
+  const SPRING_CONFIG = "0.4s cubic-bezier(0.3, 0.7, 0, 1)";
 
   const handleMainTouchStart = (e: React.TouchEvent) => {
-    // Tolerancia de 10px por el scroll inercial de iOS
     if (window.scrollY <= 10 && !isRefreshing) {
       pullStartY.current = e.touches[0].clientY;
       pullStartX.current = e.touches[0].clientX;
@@ -590,12 +585,10 @@ export function MarketPage() {
     const diffY = currentY - pullStartY.current;
     const diffX = currentX - pullStartX.current;
 
-    // Detectar si la intención es mover lateral (slider) o vertical (refresh)
     if (isVerticalSwipe.current === null && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
       isVerticalSwipe.current = Math.abs(diffY) > Math.abs(diffX);
     }
 
-    // Si detectamos que está haciendo swipe lateral en el slider, cancelamos el pull
     if (isVerticalSwipe.current === false) {
       setIsPulling(false);
       setPullDistance(0);
@@ -603,11 +596,9 @@ export function MarketPage() {
     }
 
     if (diffY > 0 && window.scrollY <= 10) {
-      // Física Rubber-band (goma): 1:1 al inicio, más resistencia cuanto más se baja
       const distance = diffY * (1 - Math.min(diffY / 600, 0.75));
       setPullDistance(distance);
     } else if (diffY < 0) {
-      // Si se arrepiente y sube el dedo
       setPullDistance(0);
       setIsPulling(false);
     }
@@ -630,7 +621,6 @@ export function MarketPage() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } finally {
-        // AQUÍ SE HA AÑADIDO EL FIX DEL SCROLL
         window.scrollTo({ top: 0, behavior: 'instant' });
         setIsRefreshing(false);
         setPullDistance(0);
@@ -678,22 +668,17 @@ export function MarketPage() {
     });
   }, [asignaturasOrdenadas, preguntas]);
 
-  // Bloqueo del Swipe to go back en iOS
   useEffect(() => {
     const bloquearSwipeIOS = (e: TouchEvent) => {
-      if (e.touches[0].clientX < 25) {
-        e.preventDefault();
-      }
+      if (e.touches[0].clientX < 25) e.preventDefault();
     };
     document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
     return () => document.removeEventListener("touchstart", bloquearSwipeIOS);
   }, []);
 
   useEffect(() => {
-    // Se mantiene fijo para evitar conflictos con el scroll nativo. No quitar ni limpiar dinámicamente.
     document.body.style.overscrollBehaviorY = 'none';
     document.documentElement.style.overscrollBehaviorY = 'none';
-
     return () => {
       document.body.style.overscrollBehaviorY = '';
       document.documentElement.style.overscrollBehaviorY = '';
@@ -777,10 +762,7 @@ export function MarketPage() {
       const containerRect = container.getBoundingClientRect();
       const slideRect = slide.getBoundingClientRect();
       container.scrollLeft += slideRect.left - containerRect.left;
-
-      requestAnimationFrame(() => {
-        isProgrammaticScroll.current = false;
-      });
+      requestAnimationFrame(() => { isProgrammaticScroll.current = false; });
     }
   };
 
@@ -822,9 +804,7 @@ export function MarketPage() {
           animRef.current = null;
           container.style.overflowX = ''; 
           container.style.scrollSnapType = ''; 
-          setTimeout(() => {
-            isProgrammaticScroll.current = false;
-          }, 10);
+          setTimeout(() => { isProgrammaticScroll.current = false; }, 10);
         }
       };
 
@@ -858,6 +838,10 @@ export function MarketPage() {
     mercado.retirar(id);
   };
 
+  // Variables para la animación de la píldora
+  const pullProgress = Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1);
+  const isPullReady = pullDistance >= REFRESH_THRESHOLD;
+
   return (
     <div
       ref={mainContainerRef}
@@ -878,17 +862,16 @@ export function MarketPage() {
         *::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* HEADER TOP-BAR (Fijo para que no baje al tirar) */}
-      <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
+      {/* HEADER TOP-BAR */}
+      <header className="relative z-30 bg-lienzo" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5 border-b border-linea">
           <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
-
           <div className="flex items-center gap-2">
             {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
-            <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100" aria-label="Apuestas resueltas">
+            <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
               <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
             </Link>
-            <Link to="/profile" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100" aria-label="Perfil">
+            <Link to="/profile" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
               <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
             </Link>
           </div>
@@ -898,28 +881,33 @@ export function MarketPage() {
       {/* ZONA AISLADA PARA EL PULL TO REFRESH */}
       <div className="relative w-full">
         
-        {/* INDICADOR PULL TO REFRESH */}
+        {/* INDICADOR PULL TO REFRESH (PÍLDORA CON TEXTO) */}
         <div 
-          className="absolute top-0 left-0 w-full flex justify-center items-center pointer-events-none z-10"
+          className="absolute left-0 top-0 z-10 flex w-full justify-center pointer-events-none items-center"
           style={{
             height: `${pullDistance}px`,
             transition: isPulling ? 'none' : `height ${SPRING_CONFIG}`
           }}
         >
           <div
-            className="flex items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5"
+            className="flex items-center justify-center rounded-full bg-ink px-4 shadow-sm"
             style={{
-              width: "40px",
-              height: "40px",
-              opacity: Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1),
-              transform: `scale(${Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1)})`,
+              height: "36px",
+              opacity: pullProgress,
+              transform: `scale(${pullProgress})`,
               transition: isPulling ? 'none' : `all ${SPRING_CONFIG}`
             }}
           >
-            <RefreshCw 
-              className={`h-5 w-5 text-sutil ${isRefreshing ? 'animate-spin' : ''}`} 
-              style={isRefreshing ? {} : { transform: `rotate(${pullDistance * 3}deg)` }}
-            />
+            {isRefreshing ? (
+              <div className="flex items-center gap-2 text-white">
+                <Loader2 className="h-4 w-4 animate-spin text-white/80" />
+                <span className="text-[13px] font-medium tracking-wide">Actualizando...</span>
+              </div>
+            ) : (
+              <span className="text-[13px] font-medium tracking-wide text-white">
+                {isPullReady ? "Suelta para actualizar" : "Sigue tirando..."}
+              </span>
+            )}
           </div>
         </div>
 
@@ -930,10 +918,10 @@ export function MarketPage() {
             transition: isPulling ? 'none' : `transform ${SPRING_CONFIG}`
           }}
         >
-          {/* HEADER PRINCIPAL (SALDO + TABS) */}
+          {/* HEADER PRINCIPAL (SALDO) */}
           <div className="mx-auto w-full max-w-[520px]">
             {!mercado.pausado && (
-              <div className="mt-10 mb-4 flex flex-col items-center justify-center w-full">
+              <div className="mt-8 mb-4 flex flex-col items-center justify-center w-full">
                 <div className="relative z-10 flex w-full items-center justify-center">
                   <div className="flex flex-1 justify-end pr-1.5">
                     <SaldoAnimado valor={mercado.saldo || 0} />
@@ -970,26 +958,14 @@ export function MarketPage() {
           >
             {asignaturasOrdenadas.map((asig) => {
               const idsOrden = ordenSnapshot[asig.id] || [];
-
               const preguntasAsignatura = idsOrden
                 .map((id) => preguntas.find((p) => p.id === id))
-                .filter(
-                  (p): p is Pregunta =>
-                    !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada
-                );
+                .filter((p): p is Pregunta => !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada);
 
               return (
-                <div 
-                  key={asig.id} 
-                  data-id={asig.id} 
-                  className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
-                >
+                <div key={asig.id} data-id={asig.id} className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col">
                   {asig.fechaExamen && (
-                    <CountdownExamen
-                      fechaExamen={asig.fechaExamen}
-                      asignaturaId={asig.id}
-                      onEditar={mercado.editarFechaExamenPublica}
-                    />
+                    <CountdownExamen fechaExamen={asig.fechaExamen} asignaturaId={asig.id} onEditar={mercado.editarFechaExamenPublica} />
                   )}
 
                   {preguntasAsignatura.length === 0 ? (
@@ -1010,11 +986,7 @@ export function MarketPage() {
 
                   {!asig.cerrada && hayAsignaturasAbiertas && (
                     <div className="mb-12 mt-8 flex justify-center">
-                      <button
-                        onClick={() => setModalAbierto(true)}
-                        style={fuenteApple}
-                        className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
-                      >
+                      <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M12 5v14"></path>
                           <path d="M5 12h14"></path>
