@@ -10,8 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type Lado = "si" | "no";
 
+export interface Clase {
+  id: string;
+  nombre: string;
+}
+
 export interface Asignatura {
   id: string;
+  claseId: string;
   nombre: string;
   cerrada: boolean;
   fechaExamen: number | null;
@@ -33,6 +39,7 @@ export interface Pregunta {
 
 export interface Apuesta {
   id: string;
+  usuarioId: string;
   usuario: string;
   tokens: number;
   cuando: number;
@@ -53,6 +60,7 @@ export interface Usuario {
 
 export interface Alumno {
   id: string;
+  claseId: string | null;
   nombre: string;
   saldo: number;
   pausado: boolean;
@@ -109,42 +117,48 @@ export function nombreVisible(a: Alumno): string {
 }
 
 export function useMercado(usuario: Usuario | null) {
+  const [clases, setClases] = useState<Clase[]>([]);
   const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [apuestas, setApuestas] = useState<Apuesta[]>([]);
   const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
+  const [apostadoAbierto, setApostadoAbierto] = useState<Record<string, number>>({});
+  
+  // Variables para controlar el parpadeo
+  const [perfilCargado, setPerfilCargado] = useState(false);
+  const [idCargado, setIdCargado] = useState<string | null>(null);
 
   // --------------------------------------------------------
   // CARGA DE DATOS DESDE SUPABASE
   // --------------------------------------------------------
   const cargarDatos = useCallback(async () => {
-    // 1. Descargamos tablas públicas
-    const [resAsig, resPerf, resPreg, resApu] = await Promise.all([
+    const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas] = await Promise.all([
+      supabase.from("clases").select("*").order("nombre"),
       supabase.from("asignaturas").select("*"),
       supabase.from("perfiles").select("*"),
       supabase.from("preguntas").select("*").order("creada_en", { ascending: false }),
-      supabase.from("apuestas").select("*, perfiles(nombre, usa_hash, hash)").order("cuando", { ascending: false }).limit(30)
+      supabase.from("apuestas").select("*, perfiles(nombre, usa_hash, hash)").order("cuando", { ascending: false }).limit(60),
+      supabase
+        .from("apuestas")
+        .select("usuario_id, tokens, preguntas!inner(resultado, archivada)")
+        .is("preguntas.resultado", null)
+        .eq("preguntas.archivada", false)
     ]);
 
-    // CHIVATOS DE ERRORES:
-    if (resAsig.error) console.error("Error Asignaturas:", resAsig.error);
-    if (resPerf.error) console.error("Error Perfiles:", resPerf.error);
-    if (resPreg.error) console.error("Error Preguntas:", resPreg.error);
-    if (resApu.error) console.error("Error Apuestas:", resApu.error);
-
-    // 2. Extraemos MIS apuestas para calcular misSi y misNo
     let misApuestas: any[] = [];
     if (usuario) {
-      const { data, error } = await supabase.from("apuestas").select("*").eq("usuario_id", usuario.id);
-      if (error) console.error("Error Mis Apuestas:", error);
+      const { data } = await supabase.from("apuestas").select("*").eq("usuario_id", usuario.id);
       if (data) misApuestas = data;
     }
+
+    if (resClases.data) setClases(resClases.data.map((c: any) => ({ id: c.id, nombre: c.nombre })));
 
     if (resAsig.data)
       setAsignaturas(
         resAsig.data.map((a: any) => ({
           id: a.id,
+          claseId: a.clase_id,
           nombre: a.nombre,
           cerrada: a.cerrada,
           fechaExamen: a.fecha_examen ? new Date(a.fecha_examen).getTime() : null
@@ -154,6 +168,7 @@ export function useMercado(usuario: Usuario | null) {
     if (resPerf.data) {
       const alums = resPerf.data.map((p: any) => ({
         id: p.id,
+        claseId: p.clase_id || null,
         nombre: p.nombre || "",
         saldo: Number(p.saldo),
         pausado: p.pausado,
@@ -174,12 +189,21 @@ export function useMercado(usuario: Usuario | null) {
         if (p) nombre = p.usa_hash ? `#${p.hash}` : p.nombre || "Anónimo";
         return {
           id: a.id,
+          usuarioId: a.usuario_id,
           usuario: nombre,
           tokens: Number(a.tokens),
           cuando: new Date(a.cuando).getTime()
         };
       });
       setApuestas(apFormateadas);
+    }
+
+    if (resApuAbiertas.data) {
+      const acumulado: Record<string, number> = {};
+      for (const a of resApuAbiertas.data as any[]) {
+        acumulado[a.usuario_id] = (acumulado[a.usuario_id] || 0) + Number(a.tokens);
+      }
+      setApostadoAbierto(acumulado);
     }
 
     if (resPreg.data) {
@@ -208,32 +232,45 @@ export function useMercado(usuario: Usuario | null) {
       });
       setPreguntas(pregs);
     }
+
+    // Sellamos la carga de datos con el ID del usuario que la provocó para evitar parpadeos
+    setIdCargado(usuario ? usuario.id : null);
+    setPerfilCargado(true);
   }, [usuario]);
 
-  // Suscripción básica y carga inicial
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
 
   // --------------------------------------------------------
-  // ESTADOS COMPUTADOS
+  // ESTADOS COMPUTADOS Y FILTRADOS POR CLASE
   // --------------------------------------------------------
+  const esAdmin = !!usuario?.esAdmin;
   const saldo = miPerfil ? miPerfil.saldo : 0;
   const pausado = miPerfil ? miPerfil.pausado : false;
+  const miClaseId = miPerfil?.claseId;
 
   const perfil = miPerfil
-    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash }
-    : { nombre: "", usaHash: false, hash: "" };
+    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash, claseId: miPerfil.claseId }
+    : { nombre: "", usaHash: false, hash: "", claseId: null };
 
   const miNombre = perfil.usaHash ? `#${perfil.hash}` : perfil.nombre || usuario?.nombre || "Tú";
 
-  const leerAsignaturas = useCallback((): Asignatura[] => asignaturas, [asignaturas]);
-  const leerAlumnos = useCallback((): Alumno[] => alumnos, [alumnos]);
+  const leerClases = useCallback((): Clase[] => clases, [clases]);
 
-  // Actividad agrupada para evitar spam visual de clics consecutivos
+  const leerAsignaturas = useCallback((todasAdmin = false): Asignatura[] => {
+    return asignaturas.filter(a => (todasAdmin && esAdmin) ? true : a.claseId === miClaseId);
+  }, [asignaturas, miClaseId, esAdmin]);
+
+  const leerAlumnos = useCallback((todasAdmin = false): Alumno[] => {
+    return alumnos.filter(a => (todasAdmin && esAdmin) ? true : a.claseId === miClaseId);
+  }, [alumnos, miClaseId, esAdmin]);
+
   const leerApuestas = useCallback((): Apuesta[] => {
+    const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
     const agrupadas: Apuesta[] = [];
     for (const a of apuestas) {
+      if (!alumnosClase.has(a.usuarioId)) continue; 
       const ultima = agrupadas[agrupadas.length - 1];
       if (ultima && ultima.usuario === a.usuario) {
         ultima.tokens += a.tokens;
@@ -242,23 +279,26 @@ export function useMercado(usuario: Usuario | null) {
       }
     }
     return agrupadas.slice(0, 15);
-  }, [apuestas]);
+  }, [apuestas, alumnos, miClaseId]);
 
-  // Ranking ordenado por saldo de mayor a menor
   const leerRanking = useCallback(() => {
     return [...alumnos]
-      .sort((a, b) => b.saldo - a.saldo)
+      .filter(a => a.claseId === miClaseId)
       .map((a) => ({
         usuario: a.usaHash ? `#${a.hash}` : (a.nombre || "Anónimo"),
-        tokens: Math.round(a.saldo)
+        tokens: Math.round(a.saldo + (apostadoAbierto[a.id] || 0))
       }))
+      .sort((a, b) => b.tokens - a.tokens)
       .slice(0, 10);
-  }, [alumnos]);
+  }, [alumnos, apostadoAbierto, miClaseId]);
 
   const leerPreguntas = useCallback(
-    (opts?: { asignaturaId?: string; estado?: "abiertas" | "resueltas" | "archivadas" | "todas" }) => {
+    (opts?: { asignaturaId?: string; estado?: "abiertas" | "resueltas" | "archivadas" | "todas", todasAdmin?: boolean }) => {
       const estado = opts?.estado ?? "todas";
+      const asigPermitidas = new Set(asignaturas.filter(a => (opts?.todasAdmin && esAdmin) ? true : a.claseId === miClaseId).map(a => a.id));
+
       return preguntas
+        .filter((p) => asigPermitidas.has(p.asignaturaId))
         .filter((p) => (opts?.asignaturaId ? p.asignaturaId === opts.asignaturaId : true))
         .filter((p) => {
           if (estado === "abiertas") return p.resultado === null && !p.archivada;
@@ -268,15 +308,16 @@ export function useMercado(usuario: Usuario | null) {
         })
         .sort((a, b) => probabilidad(b) - probabilidad(a));
     },
-    [preguntas]
+    [preguntas, asignaturas, miClaseId, esAdmin]
   );
 
   const resumen = useCallback(() => {
     let ganar = 0;
     let perder = 0;
     const nombres: string[] = [];
-    for (const p of preguntas) {
-      if (p.resultado !== null || (!p.misSi && !p.misNo)) continue;
+    const preguntasVisibles = leerPreguntas({ estado: "abiertas" });
+    for (const p of preguntasVisibles) {
+      if ((!p.misSi && !p.misNo)) continue;
       if (p.misSi > 0) {
         ganar += premio(p.misSi, "si", p.poolSi, p.poolNo) - p.misSi;
         perder += p.misSi;
@@ -288,21 +329,42 @@ export function useMercado(usuario: Usuario | null) {
       nombres.push(nombreCorto(p.titulo));
     }
     return { ganar: Math.round(ganar), perder: Math.round(perder), nombres };
-  }, [preguntas]);
+  }, [leerPreguntas]);
 
   // --------------------------------------------------------
   // ACCIONES DEL USUARIO (CONECTADAS A LA DB)
   // --------------------------------------------------------
+  
+const elegirClase = useCallback(async (claseId: string) => {
+    if (!usuario) return;
+    
+    // Saber si es un cambio de clase real o si es la primera vez
+    const esCambio = miPerfil?.claseId && miPerfil.claseId !== claseId;
+
+    // Llamamos a la función inteligente de Supabase
+    const { error } = await supabase.rpc("cambiar_clase_y_resetear", {
+      p_usuario_id: usuario.id,
+      p_nueva_clase_id: claseId
+    });
+
+    if (error) {
+      alert("Error de Supabase: " + error.message);
+      return;
+    }
+
+    // Si efectivamente se ha cambiado, forzamos que el saldo local se ponga a 0 al instante
+    const nuevoSaldo = esCambio ? 0 : (miPerfil?.saldo || 0);
+
+    setMiPerfil(prev => prev ? { ...prev, claseId, saldo: nuevoSaldo } : prev);
+    await cargarDatos();
+  }, [usuario, miPerfil, cargarDatos]);
 
   const apostar = useCallback(async (id: string, lado: Lado, tokens = 1) => {
     if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
-
-    // No se puede apostar en preguntas de una asignatura/examen cerrado
     const pregunta = preguntas.find((p) => p.id === id);
     const asignatura = pregunta ? asignaturas.find((a) => a.id === pregunta.asignaturaId) : undefined;
     if (asignatura?.cerrada) return false;
 
-    // Actualización optimista de la UI para que se sienta instantánea
     setPreguntas((prev) => prev.map((p) => {
       if (p.id !== id) return p;
       return {
@@ -315,10 +377,8 @@ export function useMercado(usuario: Usuario | null) {
     }));
     setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo - tokens } : prev));
 
-    // Llamada segura a la DB
     const { error } = await supabase.rpc("apostar", { p_pregunta_id: id, p_lado: lado, p_tokens: tokens });
     if (error) console.error("Error al apostar:", error);
-
     await cargarDatos();
     return !error;
   }, [saldo, pausado, cargarDatos, preguntas, asignaturas]);
@@ -328,7 +388,6 @@ export function useMercado(usuario: Usuario | null) {
     const p = preguntas.find((p) => p.id === id);
     const devolucion = p ? p.misSi + p.misNo : 0;
 
-    // Actualización optimista
     setPreguntas((prev) => prev.map((p) => {
       if (p.id !== id) return p;
       return {
@@ -341,10 +400,8 @@ export function useMercado(usuario: Usuario | null) {
     }));
     setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + devolucion } : prev));
 
-    // Llamada segura a la DB
     const { error } = await supabase.rpc("retirar_todo", { p_pregunta_id: id });
     if (error) console.error("Error al retirar:", error);
-
     await cargarDatos();
     return devolucion;
   }, [pausado, preguntas, cargarDatos]);
@@ -352,7 +409,6 @@ export function useMercado(usuario: Usuario | null) {
   const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
     const t = titulo.trim();
     if (!t || pausado || !asignaturaId) return null;
-
     const { data, error } = await supabase.from("preguntas").insert({
       titulo: t,
       asignatura_id: asignaturaId,
@@ -364,17 +420,11 @@ export function useMercado(usuario: Usuario | null) {
     return data as unknown as Pregunta;
   }, [pausado, cargarDatos]);
 
-  const simular = useCallback(() => {
-    console.log("Simular deshabilitado. La app ya está conectada al backend real.");
-  }, []);
+  const simular = useCallback(() => { console.log("Simular deshabilitado."); }, []);
 
   const mutar = useCallback((id: string, fn: (p: Pregunta) => Pregunta) => {
     setPreguntas((prev) => prev.map((p) => (p.id === id ? fn(p) : p)));
   }, []);
-
-  // --------------------------------------------------------
-  // PERFIL
-  // --------------------------------------------------------
 
   const guardarNombre = useCallback(async (nombre: string) => {
     if (!usuario) return;
@@ -394,7 +444,6 @@ export function useMercado(usuario: Usuario | null) {
   // --------------------------------------------------------
   // ADMIN
   // --------------------------------------------------------
-  const esAdmin = !!usuario?.esAdmin;
 
   const resolver = useCallback(async (id: string, entro: boolean) => {
     if (!esAdmin) return false;
@@ -404,22 +453,15 @@ export function useMercado(usuario: Usuario | null) {
     return !error;
   }, [esAdmin, cargarDatos]);
 
-  // Detalle de apuestas de una pregunta concreta, agrupado por usuario+lado.
-  // Usado por el modal de resolución en AdminPage para mostrar a quién van
-  // los tokens antes de confirmar.
   const leerApuestasDePregunta = useCallback(async (preguntaId: string): Promise<ApuestaDetalle[]> => {
     const { data, error } = await supabase
       .from("apuestas")
       .select("usuario_id, lado, tokens, perfiles(nombre, usa_hash, hash)")
       .eq("pregunta_id", preguntaId);
 
-    if (error) {
-      console.error("Error al leer apuestas de la pregunta:", error);
-      return [];
-    }
+    if (error) { console.error("Error al leer apuestas:", error); return []; }
     if (!data) return [];
 
-    // Agrupamos por usuario+lado por si tiene varias apuestas en el mismo lado
     const agrupado = new Map<string, ApuestaDetalle>();
     for (const a of data as any[]) {
       const p = a.perfiles;
@@ -454,10 +496,6 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
-  // Elimina una pregunta. Si aún estaba abierta (sin resolver), el RPC
-  // reembolsa primero los tokens apostados a cada usuario antes de borrar
-  // la pregunta y sus apuestas (que caen en cascada). Si ya estaba resuelta,
-  // no reembolsa nada porque los tokens ya se repartieron en resolver_pregunta.
   const eliminarPregunta = useCallback(async (id: string) => {
     if (!esAdmin) return false;
     const { error } = await supabase.rpc("eliminar_pregunta", { p_pregunta_id: id });
@@ -480,9 +518,16 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
-  const crearAsignatura = useCallback(async (nombre: string) => {
-    if (!esAdmin || !nombre.trim()) return false;
-    await supabase.from("asignaturas").insert({ nombre: nombre.trim() });
+  const crearAsignatura = useCallback(async (nombre: string, claseId: string) => {
+    if (!esAdmin || !nombre.trim() || !claseId) return false;
+    await supabase.from("asignaturas").insert({ nombre: nombre.trim(), clase_id: claseId });
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
+
+  const cambiarClaseAsignatura = useCallback(async (id: string, claseId: string) => {
+    if (!esAdmin) return false;
+    await supabase.from("asignaturas").update({ clase_id: claseId }).eq("id", id);
     await cargarDatos();
     return true;
   }, [esAdmin, cargarDatos]);
@@ -501,8 +546,6 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
-  // Pausa/reabre un examen (=asignatura) entero: bloquea apostar() en
-  // todas sus preguntas sin tener que tocar cada una individualmente.
   const pausarExamen = useCallback(async (asignaturaId: string, valor: boolean) => {
     if (!esAdmin) return false;
     const { error } = await supabase.from("asignaturas").update({ cerrada: valor }).eq("id", asignaturaId);
@@ -511,8 +554,6 @@ export function useMercado(usuario: Usuario | null) {
     return !error;
   }, [esAdmin, cargarDatos]);
 
-  // Fija (o quita, pasando null) la fecha/hora del examen de una asignatura.
-  // Se usa para mostrar el countdown en MarketPage.
   const editarFechaExamen = useCallback(async (asignaturaId: string, fecha: Date | null) => {
     if (!esAdmin) return false;
     const { error } = await supabase
@@ -524,10 +565,6 @@ export function useMercado(usuario: Usuario | null) {
     return !error;
   }, [esAdmin, cargarDatos]);
 
-  // Igual que la anterior pero SIN restricción de admin: cualquier usuario
-  // logueado puede corregir la fecha desde el popup del countdown en
-  // MarketPage. Pasa por una RPC que solo puede tocar fecha_examen (no
-  // puede renombrar, cerrar ni borrar la asignatura).
   const editarFechaExamenPublica = useCallback(async (asignaturaId: string, fecha: Date | null) => {
     if (!usuario) return false;
     const { error } = await supabase.rpc("actualizar_fecha_examen", {
@@ -555,18 +592,43 @@ export function useMercado(usuario: Usuario | null) {
     return !error;
   }, [esAdmin, cargarDatos]);
 
+  const adminCambiarClaseAlumno = useCallback(async (alumnoId: string, claseId: string) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase.from("perfiles").update({ clase_id: claseId }).eq("id", alumnoId);
+    if (error) console.error("Error al cambiar clase del alumno:", error);
+    await cargarDatos();
+    return !error;
+  }, [esAdmin, cargarDatos]);
+
+  const adminRetirarApuestas = useCallback(async (alumnoId: string) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase.rpc("admin_retirar_apuestas", { p_alumno_id: alumnoId });
+    if (error) {
+      console.error("Error al retirar apuestas:", error);
+      alert("Error: " + error.message);
+    }
+    await cargarDatos();
+    return !error;
+  }, [esAdmin, cargarDatos]);
+
   return useMemo(
     () => ({
+      // Garantizamos que perfilCargado sólo se exponga como 'true' cuando los datos
+      // cargados coincidan con el usuario autenticado actual.
+      perfilCargado: perfilCargado && idCargado === (usuario ? usuario.id : null),
       saldo,
       pausado,
       perfil,
       miNombre,
+      leerClases,
+      elegirClase,
       leerPreguntas,
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
       leerApuestasDePregunta,
       leerRanking,
+      apostadoAbierto,
       resumen,
       apostar,
       retirar,
@@ -579,11 +641,14 @@ export function useMercado(usuario: Usuario | null) {
       moverPregunta,
       editarTitulo,
       crearAsignatura,
+      cambiarClaseAsignatura,
       eliminarAsignatura,
       renombrarAsignatura,
       pausarExamen,
       editarFechaExamen,
       editarFechaExamenPublica,
+      adminCambiarClaseAlumno,
+      adminRetirarApuestas,
       darTokens,
       pausarAlumno,
       guardarNombre,
@@ -591,16 +656,22 @@ export function useMercado(usuario: Usuario | null) {
       mutar,
     }),
     [
+      perfilCargado,
+      idCargado,
+      usuario?.id,
       saldo,
       pausado,
       perfil,
       miNombre,
+      leerClases,
+      elegirClase,
       leerPreguntas,
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
       leerApuestasDePregunta,
       leerRanking,
+      apostadoAbierto,
       resumen,
       apostar,
       retirar,
@@ -613,6 +684,7 @@ export function useMercado(usuario: Usuario | null) {
       moverPregunta,
       editarTitulo,
       crearAsignatura,
+      cambiarClaseAsignatura,
       eliminarAsignatura,
       renombrarAsignatura,
       pausarExamen,

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { haceTexto, useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
+import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -76,6 +77,14 @@ function PaginaRanking() {
 
   if (!usuario) {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
+  }
+
+  if (!mercado.perfilCargado) {
+    return <div className="min-h-screen bg-lienzo" />;
+  }
+
+  if (!mercado.perfil.claseId) {
+    return <PantallaSeleccionClase clases={mercado.leerClases()} onElegir={mercado.elegirClase} />;
   }
 
   const listaCombinada = rankingFijo.map((r) => {

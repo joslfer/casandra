@@ -110,6 +110,37 @@ export function ProfilePage() {
               />
             </button>
           </div>
+
+          {/* Selector de Clase */}
+          <div className="flex flex-col border-t border-linea p-4">
+            <label className="text-[14px] font-medium text-sutil">
+              Grado / Clase
+            </label>
+            <div className="relative mt-2">
+              <select
+                value={mercado.perfil.claseId || ""}
+                onChange={(e) => mercado.elegirClase(e.target.value)}
+                className="w-full appearance-none rounded-lg border border-borde bg-black/5 px-3 py-2.5 pr-10 text-[16px] font-medium text-ink outline-none transition-colors focus:border-ink/30 focus:bg-white active:bg-black/5"
+              >
+                <option value="" disabled>Selecciona tu clase...</option>
+                {mercado.leerClases().map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+              {/* Icono de flecha para el select (ya que ocultamos la flecha por defecto del SO con appearance-none) */}
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sutil/60">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6"></path>
+                </svg>
+              </div>
+            </div>
+            <p className="mt-2 text-[12px] text-sutil">
+              Cambiar de clase ocultará tus asignaturas actuales y mostrará las nuevas.
+            </p>
+          </div>
+
         </section>
 
         <p className="mt-4 px-2 text-[13px] text-sutil">
