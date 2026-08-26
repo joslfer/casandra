@@ -59,6 +59,25 @@ function PaginaRanking() {
   const actividadActual = mercado.leerApuestas(); 
   const miNombre = mercado.miNombre;
 
+  // -----------------------------------------------------
+  // BLOQUEO DEL SWIPE-TO-GO-BACK DE IOS
+  // -----------------------------------------------------
+  useEffect(() => {
+    const bloquearSwipeIOS = (e: TouchEvent) => {
+      // Si el toque empieza en los primeros 25 píxeles del borde izquierdo
+      if (e.touches[0].clientX < 25) {
+        e.preventDefault();
+      }
+    };
+    
+    // Necesitamos { passive: false } para que preventDefault() funcione
+    document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
+    
+    return () => {
+      document.removeEventListener("touchstart", bloquearSwipeIOS);
+    };
+  }, []);
+
   useEffect(() => {
     if (rankingFijo.length === 0 && rankingActual.length > 0) {
       setRankingFijo(rankingActual);
@@ -136,11 +155,6 @@ function PaginaRanking() {
             >
               
               <div className="flex min-w-0 items-center gap-4">
-                {/* 
-                  Aquí está la corrección: 
-                  - Cambiado w-9 por w-11 para dar más espacio.
-                  - Añadido pr-1 (padding right) para extender el degradado más allá de la curva del número.
-                */}
                 <span className={`w-11 shrink-0 pr-1 font-mono text-[39px] font-bold leading-none tracking-tighter text-right ${
                   i === 0 ? "bg-gradient-to-b from-amber-400 to-amber-600 bg-clip-text text-transparent" :
                   i === 1 ? "bg-gradient-to-b from-amber-300 to-amber-500 bg-clip-text text-transparent" :
@@ -170,6 +184,17 @@ function PaginaRanking() {
             <p className="py-8 text-center text-[15px] text-sutil">Cargando...</p>
           )}
         </ul>
+
+        {/* NUEVA SECCIÓN: RECOMPENSAS */}
+        <div className="mt-14 border-t border-linea pt-10">
+          <h2 className="text-[28px] font-bold tracking-tight text-ink">
+            Recompensas
+          </h2>
+          {/* Aquí he puesto texto normal (17px) y color normal (text-ink) */}
+          <p className="mt-3 text-[17px] leading-relaxed text-ink">
+          En el futuro quiero meter recompensas aquí. Si tienes alguna idea proponla.
+          </p>
+        </div>
 
       </main>
     </div>

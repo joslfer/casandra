@@ -20,6 +20,25 @@ export function ProfilePage() {
     }
   }, [mercado.perfil?.nombre]);
 
+  // -----------------------------------------------------
+  // BLOQUEO DEL SWIPE-TO-GO-BACK DE IOS
+  // -----------------------------------------------------
+  useEffect(() => {
+    const bloquearSwipeIOS = (e: TouchEvent) => {
+      // Si el toque empieza en los primeros 25 píxeles del borde izquierdo
+      if (e.touches[0].clientX < 25) {
+        e.preventDefault();
+      }
+    };
+    
+    // Necesitamos { passive: false } para que preventDefault() funcione
+    document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
+    
+    return () => {
+      document.removeEventListener("touchstart", bloquearSwipeIOS);
+    };
+  }, []);
+
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
   }
@@ -129,7 +148,7 @@ export function ProfilePage() {
                   </option>
                 ))}
               </select>
-              {/* Icono de flecha para el select (ya que ocultamos la flecha por defecto del SO con appearance-none) */}
+              {/* Icono de flecha para el select */}
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sutil/60">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 9l6 6 6-6"></path>
