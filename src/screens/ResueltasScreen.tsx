@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { probabilidad, useMercado } from "@/hooks/useMercado";
 
@@ -21,6 +22,25 @@ export function ResueltasScreen() {
   const { usuario, cargando } = useSesion();
   const mercado = useMercado(usuario);
 
+  // -----------------------------------------------------
+  // BLOQUEO DEL SWIPE-TO-GO-BACK DE IOS
+  // -----------------------------------------------------
+  useEffect(() => {
+    const bloquearSwipeIOS = (e: TouchEvent) => {
+      // Si el toque empieza en los primeros 25 píxeles del borde izquierdo
+      if (e.touches[0].clientX < 25) {
+        e.preventDefault();
+      }
+    };
+    
+    // Necesitamos { passive: false } para que preventDefault() funcione
+    document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
+    
+    return () => {
+      document.removeEventListener("touchstart", bloquearSwipeIOS);
+    };
+  }, []);
+
   if (cargando) {
     return <div className="min-h-screen bg-lienzo" />;
   }
@@ -36,18 +56,19 @@ export function ResueltasScreen() {
     const preguntasAsig = resueltasUsuario
       .filter((p) => p.asignaturaId === asig.id)
       .sort((a, b) => {
-        const fechaA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const fechaB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        // Usamos creadaEn porque así se llama en useMercado (y ya es numérico)
+        const fechaA = a.creadaEn || 0;
+        const fechaB = b.creadaEn || 0;
         return fechaB - fechaA;
       });
     return { asignatura: asig, preguntas: preguntasAsig };
   }).filter((g) => g.preguntas.length > 0);
 
   return (
-    <div className="min-h-screen bg-lienzo pb-28" style={fuenteApple}>
+    <div className="min-h-screen bg-lienzo pb-28 touch-pan-y overscroll-x-none" style={fuenteApple}>
       <header className="fixed inset-x-0 top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[520px] items-center justify-between px-5">
-          <Link to="/" className="text-[15px] font-semibold tracking-tight text-ink hover:opacity-70">
+          <Link to="/" className="text-[15px] font-semibold tracking-tight text-ink hover:opacity-70 touch-manipulation">
             ← Volver al mercado
           </Link>
           <span className="text-[15px] font-semibold tracking-tight">Comprueba</span>
@@ -57,7 +78,7 @@ export function ResueltasScreen() {
       <main className="mx-auto max-w-[520px] px-5 pt-[calc(5rem+env(safe-area-inset-top))]">
         {resueltasUsuario.length === 0 ? (
           <div className="mt-20 text-center">
-            <p className="text-[14px] text-sutil">Cuando se resuelva una apuesta, apareceerá aquí para que puedas comprobar que todo está correcto.</p>
+            <p className="text-[14px] text-sutil">Cuando se resuelva una apuesta, aparecerá aquí para que puedas comprobar que todo está correcto.</p>
           </div>
         ) : (
           <div className="space-y-10">

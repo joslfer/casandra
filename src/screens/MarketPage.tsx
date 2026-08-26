@@ -543,7 +543,7 @@ export function MarketPage() {
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
-  
+
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
   const animRef = useRef<number | null>(null);
@@ -556,20 +556,28 @@ export function MarketPage() {
   const startAsigId = useRef<string>("");
 
   // -----------------------------------------------------
-  // ESTADOS PULL TO REFRESH
+  // ESTADOS PULL TO REFRESH FLUIDOS
   // -----------------------------------------------------
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const mainContainerRef = useRef<HTMLDivElement>(null);
-  const pullStartY = useRef(0);
   
-  const MAX_PULL_DISTANCE = 80;
-  const REFRESH_THRESHOLD = 60;
+  const pullStartY = useRef(0);
+  const pullStartX = useRef(0);
+  const isVerticalSwipe = useRef<boolean | null>(null);
+
+  const MAX_PULL_DISTANCE = 160;
+  const REFRESH_THRESHOLD = 75;
+  const SPINNER_OFFSET = 55;
+  const SPRING_CONFIG = "0.4s cubic-bezier(0.3, 0.7, 0, 1)"; // Animación elástica nativa
 
   const handleMainTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
+    // Tolerancia de 10px por el scroll inercial de iOS
+    if (window.scrollY <= 10 && !isRefreshing) {
       pullStartY.current = e.touches[0].clientY;
+      pullStartX.current = e.touches[0].clientX;
+      isVerticalSwipe.current = null;
       setIsPulling(true);
     }
   };
@@ -578,38 +586,52 @@ export function MarketPage() {
     if (!isPulling || isRefreshing) return;
 
     const currentY = e.touches[0].clientY;
-    const diff = currentY - pullStartY.current;
+    const currentX = e.touches[0].clientX;
+    const diffY = currentY - pullStartY.current;
+    const diffX = currentX - pullStartX.current;
 
-    if (diff > 0) {
-      const distance = Math.min(MAX_PULL_DISTANCE, Math.log(diff + 1) * 15);
+    // Detectar si la intención es mover lateral (slider) o vertical (refresh)
+    if (isVerticalSwipe.current === null && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
+      isVerticalSwipe.current = Math.abs(diffY) > Math.abs(diffX);
+    }
+
+    // Si detectamos que está haciendo swipe lateral en el slider, cancelamos el pull
+    if (isVerticalSwipe.current === false) {
+      setIsPulling(false);
+      setPullDistance(0);
+      return;
+    }
+
+    if (diffY > 0 && window.scrollY <= 10) {
+      // Física Rubber-band (goma): 1:1 al inicio, más resistencia cuanto más se baja
+      const distance = diffY * (1 - Math.min(diffY / 600, 0.75));
       setPullDistance(distance);
-      
-      if (document.body.style.overscrollBehaviorY !== 'none') {
-        document.body.style.overscrollBehaviorY = 'none';
-      }
+    } else if (diffY < 0) {
+      // Si se arrepiente y sube el dedo
+      setPullDistance(0);
+      setIsPulling(false);
     }
   };
 
   const handleMainTouchEnd = async () => {
     if (!isPulling) return;
-    
     setIsPulling(false);
-    document.body.style.overscrollBehaviorY = '';
 
-    if (pullDistance > REFRESH_THRESHOLD && !isRefreshing) {
+    if (pullDistance >= REFRESH_THRESHOLD && !isRefreshing) {
       haptic();
       setIsRefreshing(true);
-      setPullDistance(50); 
+      setPullDistance(SPINNER_OFFSET); 
 
       try {
         if (typeof mercado.recargar === 'function') {
           await mercado.recargar();
-          // Vaciamos el orden para que todo se recoloque como si acabáramos de entrar
           setOrdenSnapshot({});
         } else {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } finally {
+        // AQUÍ SE HA AÑADIDO EL FIX DEL SCROLL
+        window.scrollTo({ top: 0, behavior: 'instant' });
         setIsRefreshing(false);
         setPullDistance(0);
       }
@@ -636,10 +658,6 @@ export function MarketPage() {
   const [asigActiva, setAsigActiva] = useState<string>("");
   const asigId = asigActiva || (asignaturasOrdenadas[0]?.id || "");
 
-  // ─────────────────────────────────────────────────────────────
-  // ORDEN CONGELADO: Ahora SOLO se actualiza si cambias de asig
-  // o si haces un refresh manual. NUNCA al cambiar las probabilidades.
-  // ─────────────────────────────────────────────────────────────
   const [ordenSnapshot, setOrdenSnapshot] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -648,17 +666,14 @@ export function MarketPage() {
       let huboCambios = false;
 
       asignaturasOrdenadas.forEach((a) => {
-        // Solo generamos orden inicial si la asignatura NO tiene orden guardado
         if (!nuevoOrden[a.id]) {
           nuevoOrden[a.id] = preguntas
             .filter((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
-            // IMPORTANTE: Aquí SÍ nos guiamos por la probabilidad inicial para construirlo la primera vez
             .sort((p1, p2) => probabilidad(p2) - probabilidad(p1))
             .map((p) => p.id);
           huboCambios = true;
         }
       });
-
       return huboCambios ? nuevoOrden : prev;
     });
   }, [asignaturasOrdenadas, preguntas]);
@@ -672,6 +687,17 @@ export function MarketPage() {
     };
     document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
     return () => document.removeEventListener("touchstart", bloquearSwipeIOS);
+  }, []);
+
+  useEffect(() => {
+    // Se mantiene fijo para evitar conflictos con el scroll nativo. No quitar ni limpiar dinámicamente.
+    document.body.style.overscrollBehaviorY = 'none';
+    document.documentElement.style.overscrollBehaviorY = 'none';
+
+    return () => {
+      document.body.style.overscrollBehaviorY = '';
+      document.documentElement.style.overscrollBehaviorY = '';
+    };
   }, []);
 
   const detenerAnimacion = () => {
@@ -716,7 +742,7 @@ export function MarketPage() {
           const containerRect = container.getBoundingClientRect();
           const containerCenter = containerRect.left + containerRect.width / 2;
           let minDistance = Infinity;
-          
+
           asignaturasOrdenadas.forEach((asig, i) => {
             const slide = container.querySelector(`[data-id="${asig.id}"]`);
             if (slide) {
@@ -748,7 +774,6 @@ export function MarketPage() {
     const slide = container.querySelector(`[data-id="${id}"]`);
     if (slide) {
       isProgrammaticScroll.current = true;
-
       const containerRect = container.getBoundingClientRect();
       const slideRect = slide.getBoundingClientRect();
       container.scrollLeft += slideRect.left - containerRect.left;
@@ -762,15 +787,15 @@ export function MarketPage() {
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id); 
-    
+
     const container = scrollContainerRef.current;
     if (!container) return;
-    
+
     const slide = container.querySelector(`[data-id="${id}"]`);
     if (slide) {
       detenerAnimacion();
       isProgrammaticScroll.current = true;
-      
+
       container.style.scrollSnapType = 'none';
       container.style.overflowX = 'hidden'; 
 
@@ -779,18 +804,18 @@ export function MarketPage() {
       const startLeft = container.scrollLeft;
       const targetLeft = startLeft + (slideRect.left - containerRect.left);
       const distance = targetLeft - startLeft;
-      
+
       let startTime: number | null = null;
       const duration = 60; 
-      
+
       const animarScroll = (currentTime: number) => {
         if (startTime === null) startTime = currentTime;
         const timeElapsed = currentTime - startTime;
         const progress = Math.min(timeElapsed / duration, 1);
-        
+
         const ease = 1 - Math.pow(1 - progress, 3);
         container.scrollLeft = startLeft + distance * ease;
-        
+
         if (progress < 1) {
           animRef.current = requestAnimationFrame(animarScroll);
         } else {
@@ -802,26 +827,15 @@ export function MarketPage() {
           }, 10);
         }
       };
-      
+
       animRef.current = requestAnimationFrame(animarScroll);
     }
   };
 
-  if (cargando) {
-    return <div className="min-h-screen bg-lienzo" />;
-  }
-
-  if (!usuario) {
-    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
-  }
-
-  if (!mercado.perfilCargado) {
-    return <div className="min-h-screen bg-lienzo" />;
-  }
-
-  if (!mercado.perfil.claseId) {
-    return <PantallaSeleccionClase clases={mercado.leerClases()} onElegir={mercado.elegirClase} />;
-  }
+  if (cargando) return <div className="min-h-screen bg-lienzo" />;
+  if (!usuario) return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
+  if (!mercado.perfilCargado) return <div className="min-h-screen bg-lienzo" />;
+  if (!mercado.perfil.claseId) return <PantallaSeleccionClase clases={mercado.leerClases()} onElegir={mercado.elegirClase} />;
 
   const asigActivaObj = asignaturas.find((a) => a.id === asigId);
   const asigCerrada = asigActivaObj?.cerrada === true;
@@ -860,34 +874,15 @@ export function MarketPage() {
       }}
     >
       <style>{`
-        * {
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none; /* IE y Edge */
-        }
-        *::-webkit-scrollbar {
-          display: none; /* Chrome, Safari, iOS, Android */
-        }
+        * { scrollbar-width: none; -ms-overflow-style: none; }
+        *::-webkit-scrollbar { display: none; }
       `}</style>
-      
-      {/* INDICADOR PULL TO REFRESH */}
-      <div 
-        className="absolute top-0 left-0 w-full flex justify-center items-center pointer-events-none z-10"
-        style={{
-          height: `${pullDistance}px`,
-          opacity: pullDistance / REFRESH_THRESHOLD,
-          transition: isPulling ? 'none' : 'height 0.3s ease-out, opacity 0.3s ease-out'
-        }}
-      >
-        <RefreshCw 
-          className={`h-5 w-5 text-sutil ${isRefreshing ? 'animate-spin' : ''}`} 
-          style={{ transform: `rotate(${pullDistance * 3}deg)` }}
-        />
-      </div>
 
+      {/* HEADER TOP-BAR (Fijo para que no baje al tirar) */}
       <header style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
-          
+
           <div className="flex items-center gap-2">
             {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
             <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100" aria-label="Apuestas resueltas">
@@ -900,112 +895,140 @@ export function MarketPage() {
         </div>
       </header>
 
-      {/* ENVOLTORIO PRINCIPAL QUE BAJA AL TIRAR */}
-      <div 
-        style={{
-          transform: `translateY(${pullDistance}px)`,
-          transition: isPulling ? 'none' : 'transform 0.3s ease-out'
-        }}
-      >
-        {/* HEADER PRINCIPAL (SALDO + TABS) FUERA DEL SCROLL HORIZONTAL */}
-        <div className="mx-auto w-full max-w-[520px]">
-          {!mercado.pausado && (
-            <div className="mt-10 mb-4 flex flex-col items-center justify-center w-full">
-              <div className="relative z-10 flex w-full items-center justify-center">
-                <div className="flex flex-1 justify-end pr-1.5">
-                  <SaldoAnimado valor={mercado.saldo || 0} />
-                </div>
-                <div className="flex flex-1 justify-start pl-1.5">
-                  <button
-                    style={{ width: "47px", height: "47px" }}
-                    className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
-                  >
-                    <Moneda className="!h-full !w-full" />
-                  </button>
-                </div>
-              </div>
-              <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
-            </div>
-          )}
-          
-          <Asignaturas 
-            asignaturas={asignaturasOrdenadas}
-            asigId={asigId} 
-            setAsigActiva={scrollToAsig}
-            preguntas={preguntas} 
-            saldo={mercado.saldo || 0}
-          />
+      {/* ZONA AISLADA PARA EL PULL TO REFRESH */}
+      <div className="relative w-full">
+        
+        {/* INDICADOR PULL TO REFRESH */}
+        <div 
+          className="absolute top-0 left-0 w-full flex justify-center items-center pointer-events-none z-10"
+          style={{
+            height: `${pullDistance}px`,
+            transition: isPulling ? 'none' : `height ${SPRING_CONFIG}`
+          }}
+        >
+          <div
+            className="flex items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5"
+            style={{
+              width: "40px",
+              height: "40px",
+              opacity: Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1),
+              transform: `scale(${Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1)})`,
+              transition: isPulling ? 'none' : `all ${SPRING_CONFIG}`
+            }}
+          >
+            <RefreshCw 
+              className={`h-5 w-5 text-sutil ${isRefreshing ? 'animate-spin' : ''}`} 
+              style={isRefreshing ? {} : { transform: `rotate(${pullDistance * 3}deg)` }}
+            />
+          </div>
         </div>
 
-        {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
+        {/* ENVOLTORIO PRINCIPAL QUE BAJA AL TIRAR */}
         <div 
-          ref={scrollContainerRef}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onWheel={detenerAnimacion}
-          className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isPulling ? 'none' : `transform ${SPRING_CONFIG}`
+          }}
         >
-          {asignaturasOrdenadas.map((asig) => {
-            const idsOrden = ordenSnapshot[asig.id] || [];
-            
-            // Reconstruimos las preguntas usando el orden de sus IDs "congeladas"
-            const preguntasAsignatura = idsOrden
-              .map((id) => preguntas.find((p) => p.id === id))
-              .filter(
-                (p): p is Pregunta =>
-                  !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada
-              );
-
-            return (
-              <div 
-                key={asig.id} 
-                data-id={asig.id} 
-                className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
-              >
-                {asig.fechaExamen && (
-                  <CountdownExamen
-                    fechaExamen={asig.fechaExamen}
-                    asignaturaId={asig.id}
-                    onEditar={mercado.editarFechaExamenPublica}
-                  />
-                )}
-
-                {preguntasAsignatura.length === 0 ? (
-                  <p className="text-center text-sutil text-[14px] mt-10">No hay preguntas abiertas.</p>
-                ) : (
-                  preguntasAsignatura.map((p, index) => (
-                    <FilaPregunta
-                      key={p.id}
-                      pregunta={p}
-                      bloqueado={mercado.pausado || asig.cerrada} 
-                      sinTokens={(mercado.saldo || 0) < 1}
-                      ocultarBorde={index === preguntasAsignatura.length - 1}
-                      onApostar={(lado) => intentarApostar(p.id, lado)}
-                      onRetirar={() => retirarPregunta(p.id)}
-                    />
-                  ))
-                )}
-
-                {!asig.cerrada && hayAsignaturasAbiertas && (
-                  <div className="mb-12 mt-8 flex justify-center">
+          {/* HEADER PRINCIPAL (SALDO + TABS) */}
+          <div className="mx-auto w-full max-w-[520px]">
+            {!mercado.pausado && (
+              <div className="mt-10 mb-4 flex flex-col items-center justify-center w-full">
+                <div className="relative z-10 flex w-full items-center justify-center">
+                  <div className="flex flex-1 justify-end pr-1.5">
+                    <SaldoAnimado valor={mercado.saldo || 0} />
+                  </div>
+                  <div className="flex flex-1 justify-start pl-1.5">
                     <button
-                      onClick={() => setModalAbierto(true)}
-                      style={fuenteApple}
-                      className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
+                      style={{ width: "47px", height: "47px" }}
+                      className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 5v14"></path>
-                        <path d="M5 12h14"></path>
-                      </svg>
-                      Proponer pregunta
+                      <Moneda className="!h-full !w-full" />
                     </button>
                   </div>
-                )}
+                </div>
+                <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
               </div>
-            );
-          })}
+            )}
+
+            <Asignaturas 
+              asignaturas={asignaturasOrdenadas}
+              asigId={asigId} 
+              setAsigActiva={scrollToAsig}
+              preguntas={preguntas} 
+              saldo={mercado.saldo || 0}
+            />
+          </div>
+
+          {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
+          <div 
+            ref={scrollContainerRef}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onWheel={detenerAnimacion}
+            className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          >
+            {asignaturasOrdenadas.map((asig) => {
+              const idsOrden = ordenSnapshot[asig.id] || [];
+
+              const preguntasAsignatura = idsOrden
+                .map((id) => preguntas.find((p) => p.id === id))
+                .filter(
+                  (p): p is Pregunta =>
+                    !!p && p.asignaturaId === asig.id && p.resultado === null && !p.archivada
+                );
+
+              return (
+                <div 
+                  key={asig.id} 
+                  data-id={asig.id} 
+                  className="snap-slide w-full shrink-0 snap-start px-5 flex flex-col"
+                >
+                  {asig.fechaExamen && (
+                    <CountdownExamen
+                      fechaExamen={asig.fechaExamen}
+                      asignaturaId={asig.id}
+                      onEditar={mercado.editarFechaExamenPublica}
+                    />
+                  )}
+
+                  {preguntasAsignatura.length === 0 ? (
+                    <p className="text-center text-sutil text-[14px] mt-10">No hay preguntas abiertas.</p>
+                  ) : (
+                    preguntasAsignatura.map((p, index) => (
+                      <FilaPregunta
+                        key={p.id}
+                        pregunta={p}
+                        bloqueado={mercado.pausado || asig.cerrada} 
+                        sinTokens={(mercado.saldo || 0) < 1}
+                        ocultarBorde={index === preguntasAsignatura.length - 1}
+                        onApostar={(lado) => intentarApostar(p.id, lado)}
+                        onRetirar={() => retirarPregunta(p.id)}
+                      />
+                    ))
+                  )}
+
+                  {!asig.cerrada && hayAsignaturasAbiertas && (
+                    <div className="mb-12 mt-8 flex justify-center">
+                      <button
+                        onClick={() => setModalAbierto(true)}
+                        style={fuenteApple}
+                        className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 5v14"></path>
+                          <path d="M5 12h14"></path>
+                        </svg>
+                        Proponer pregunta
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div> {/* Fin del envoltorio que baja */}
+      </div>
 
       {modalAbierto && (
         <PantallaNuevaPregunta
