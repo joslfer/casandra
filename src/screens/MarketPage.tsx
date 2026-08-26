@@ -864,7 +864,7 @@ export function MarketPage() {
 
       {/* HEADER TOP-BAR */}
       <header className="relative z-30 bg-lienzo" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5 border-b border-linea">
+        <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
           <div className="flex items-center gap-2">
             {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
@@ -1007,7 +1007,30 @@ export function MarketPage() {
           asignaturas={asignaturas.filter(a => !a.cerrada)}
           asigInicial={asigCerrada ? "" : asigId}
           onCerrar={() => setModalAbierto(false)}
-          onCrear={async (t, id) => { await mercado.crearPregunta(t, id); }}
+          onCrear={async (t, id) => { 
+            await mercado.crearPregunta(t, id);
+            
+            // Opcional: aseguramos la recarga desde base de datos
+            if (typeof mercado.recargar === 'function') {
+              await mercado.recargar();
+            }
+            
+            // Forzamos que se vuelva a calcular el orden y aparezca la pregunta
+            setOrdenSnapshot({});
+            
+            // Si has creado la pregunta en una asignatura distinta a la actual, nos movemos allí
+            if (id !== asigId) {
+              scrollToAsig(id);
+            }
+            
+            // Damos un pequeño respiro a React para que pinte la nueva pregunta y hacemos scroll abajo
+            setTimeout(() => {
+              window.scrollTo({
+                top: document.documentElement.scrollHeight,
+                behavior: "smooth"
+              });
+            }, 300);
+          }}
         />
       )}
 
