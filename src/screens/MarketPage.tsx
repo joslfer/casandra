@@ -4,6 +4,7 @@ import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
 import { Settings, ClipboardList, Lock } from "lucide-react";
 import { PantallaLogin } from "@/components/PantallaLogin";
+import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import {
   probabilidad,
   useMercado,
@@ -427,6 +428,7 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
   }
 
   const diferencia = elDeArriba.tokens - yo.tokens;
+  const esEmpate = diferencia === 0;
   const faltan = diferencia >= 0 ? diferencia + 1 : 1; 
   const TAMANO_LETRA = "text-[16px]";
 
@@ -435,10 +437,20 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
       <Link to="/ranking" className={`group relative flex max-w-full items-center ${TAMANO_LETRA} text-ink/90 transition-colors hover:text-ink`}>
         <div className="absolute inset-0 -z-10 scale-125 rounded-full bg-amber-400/30 blur-xl" aria-hidden="true" />
         <div className="flex min-w-0 shrink items-center overflow-hidden whitespace-nowrap gap-1.5">
-          <span className="shrink-0">Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>, te faltan</span>
-          <span className="shrink-0 inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-3.5 w-3.5" /></span>
-          <span className="shrink-0">hasta</span>
-          <strong className="truncate font-medium text-ink">{elDeArriba?.usuario}</strong>
+          <span className="shrink-0">Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>,</span>
+          {esEmpate ? (
+            <>
+              <span className="shrink-0">empatado con</span>
+              <strong className="truncate font-medium text-ink">{elDeArriba?.usuario}</strong>
+            </>
+          ) : (
+            <>
+              <span className="shrink-0">te faltan</span>
+              <span className="shrink-0 inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-3.5 w-3.5" /></span>
+              <span className="shrink-0">hasta</span>
+              <strong className="truncate font-medium text-ink">{elDeArriba?.usuario}</strong>
+            </>
+          )}
         </div>
         <span className="ml-1.5 shrink-0 opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100">→</span>
       </Link>
@@ -735,6 +747,14 @@ export function MarketPage() {
 
   if (!usuario) {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
+  }
+
+  if (!mercado.perfilCargado) {
+    return <div className="min-h-screen bg-lienzo" />;
+  }
+
+  if (!mercado.perfil.claseId) {
+    return <PantallaSeleccionClase clases={mercado.leerClases()} onElegir={mercado.elegirClase} />;
   }
 
   const asigActivaObj = asignaturas.find((a) => a.id === asigId);
