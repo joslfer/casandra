@@ -77,15 +77,15 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
             
             {/* PÁRRAFO 1 */}
             <p>
-                Consulta qué preguntas pueden caer según la opinión agregada de todo el mundo.
+              Consulta qué va a caer en el próximo examen según la opinión agregada de muchas personas.
             </p>
-            
-            {/* PÁRRAFO 2 */}
             <p>
               Si tienes algo que añadir, apuesta tokens simbólicos como este {" "}
               <span className="inline-block h-[14px] w-[14px] rounded-full bg-moneda align-[-1px] shadow-sm relative z-10" />
               . (ficticios)
             </p>
+
+  
 
             {/* PÁRRAFO 3 */}
             <p>
@@ -100,7 +100,7 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
             onClick={handleLogin}
             className="mt-12 w-full touch-manipulation rounded-xl bg-ink py-4 text-[16px] font-medium text-white shadow-sm transition-transform active:scale-[0.98] relative z-10"
           >
-            Entrar con Google · @usal.es
+            Inicia sesión con @usal.es
           </button>
 
           {/* ========================================== */}
