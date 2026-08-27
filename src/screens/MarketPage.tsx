@@ -289,7 +289,7 @@ function FilaPregunta({
           className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
           <span>NO</span>
-          {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[15px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
+          {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
         </button>
         <button
           data-apuesta
@@ -299,7 +299,7 @@ function FilaPregunta({
           className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
           <span>SÍ</span>
-          {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[15px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
+          {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
         </button>
       </div>
 
