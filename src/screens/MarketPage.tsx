@@ -670,6 +670,39 @@ export function MarketPage() {
     });
   }, [asignaturasOrdenadas, preguntas]);
 
+  // =========================================================================
+  // FIX: Ajustar dinámicamente la altura del contenedor horizontal
+  // para que no sobre espacio abajo en las asignaturas con pocas preguntas
+  // =========================================================================
+  const [alturaContenedor, setAlturaContenedor] = useState<number | 'auto'>('auto');
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const activeSlide = container.querySelector(`[data-id="${asigId}"]`) as HTMLElement;
+    if (!activeSlide) return;
+
+    const updateHeight = () => {
+      const height = activeSlide.getBoundingClientRect().height;
+      if (height > 0) {
+        setAlturaContenedor(height);
+      }
+    };
+
+    updateHeight(); // Llamada inicial
+
+    // Por si cambia de tamaño internamente (ej. aparece un botón, o teclado)
+    let observer: ResizeObserver | null = null;
+    if (typeof window !== "undefined" && "ResizeObserver" in window) {
+      observer = new ResizeObserver(updateHeight);
+      observer.observe(activeSlide);
+    }
+
+    return () => {
+      if (observer) observer.disconnect();
+    };
+  }, [asigId, ordenSnapshot]);
+
   useEffect(() => {
     const bloquearSwipeIOS = (e: TouchEvent) => {
       if (e.touches[0].clientX < 25) e.preventDefault();
@@ -848,9 +881,8 @@ export function MarketPage() {
       onTouchStart={handleMainTouchStart}
       onTouchMove={handleMainTouchMove}
       onTouchEnd={handleMainTouchEnd}
-      // REDUCIDO pb-28 a pb-10
-      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-10 select-none relative"
-      style={fuenteApple}
+      className="min-h-screen w-full overflow-x-hidden bg-lienzo select-none relative"
+      style={{ ...fuenteApple, paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
       onClickCapture={(event) => {
         const target = event.target as Element;
         if (target.id === "haptic-checkbox" || target.id === "haptic-label") return;
@@ -945,12 +977,14 @@ export function MarketPage() {
           </div>
 
           {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
+          {/* FIX IMPORTANTE: Controlamos la altura del contenedor y cortamos lo que sobra por abajo (overflow-y-hidden y items-start) */}
           <div 
             ref={scrollContainerRef}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             onWheel={detenerAnimacion}
-            className="flex w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            style={{ height: alturaContenedor === 'auto' ? 'auto' : `${alturaContenedor}px` }}
+            className="flex items-start w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-[height] duration-300 ease-out"
           >
             {asignaturasOrdenadas.map((asig) => {
               const idsOrden = ordenSnapshot[asig.id] || [];
@@ -965,7 +999,7 @@ export function MarketPage() {
                   )}
 
                   {preguntasAsignatura.length === 0 ? (
-                    <p className="text-center text-sutil text-[14px] mt-10">No hay preguntas abiertas.</p>
+                    <p className="text-center text-sutil text-[14px] mt-10 mb-4">No hay preguntas abiertas.</p>
                   ) : (
                     preguntasAsignatura.map((p, index) => (
                       <FilaPregunta
@@ -980,8 +1014,9 @@ export function MarketPage() {
                     ))
                   )}
 
+                  {/* EL BOTÓN TAL Y COMO ESTABA ORIGINALMENTE EN TU CÓDIGO */}
                   {!asig.cerrada && hayAsignaturasAbiertas && (
-                    <div className="mb-6 mt-8 flex justify-center"> {/* REDUCIDO mb-12 a mb-6 */}
+                    <div className="mt-4 flex justify-center">
                       <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M12 5v14"></path>
