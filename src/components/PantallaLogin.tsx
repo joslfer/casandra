@@ -21,11 +21,54 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-lienzo" style={fuenteApple}>
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 overflow-y-auto">
-        <div className="w-full max-w-[340px] flex flex-col">
+    <div className="flex min-h-screen flex-col bg-lienzo overflow-hidden relative" style={fuenteApple}>
+      
+      {/* CSS inyectado para la animación */}
+      <style>{`
+        .loader-casandra {
+          width: 28px;
+          aspect-ratio: 1;
+          position: relative;
+          /* Velocidad lenta de 6 segundos */
+          animation: giro-casandra 6s linear infinite;
+        }
+        .loader-casandra::before,
+        .loader-casandra::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          /* Color amarillo plano y sólido */
+          background-color: #eab308;
+          /* Rebote sincronizado con la velocidad lenta */
+          animation: salto-casandra 1.5s cubic-bezier(.5,-500,.5,500) infinite;
+        }
+        .loader-casandra::after {
+          /* Delay ajustado a la mitad de la vibración para alternar */
+          animation-delay: -0.45s;
+        }
+        @keyframes giro-casandra { 
+          100% { transform: rotate(360deg) } 
+        }
+        @keyframes salto-casandra { 
+          100% { transform: translate(0.5px) } 
+        }
+      `}</style>
+
+      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 relative z-10">
+        
+        <div className="w-full max-w-[340px] flex flex-col relative pt-4">
           
-          <h1 className="text-[32px] font-bold tracking-tight text-ink text-left">Casandra</h1>
+          {/* ========================================== */}
+          {/* ANIMACIÓN DE LOGO (Centrada y más arriba)    */}
+          {/* ========================================== */}
+          <div className="mb-16 mt-2 flex w-full justify-center">
+            {/* Las bolas amarillas planas */}
+            <div className="loader-casandra opacity-90"></div>
+          </div>
+          {/* ========================================== */}
+
+          <h1 className="text-[32px] font-bold tracking-tight text-ink text-left">Casandra, mercado de predicción de preguntas de examen. </h1>
           
           {/* ========================================== */}
           {/*           ZONA DE TEXTOS (PÁRRAFOS)          */}
@@ -40,7 +83,7 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
             {/* PÁRRAFO 2 */}
             <p>
               Si tienes algo que añadir, apuesta tokens simbólicos como este {" "}
-              <span className="inline-block h-[14px] w-[14px] rounded-full bg-moneda align-[-1px] shadow-sm" />
+              <span className="inline-block h-[14px] w-[14px] rounded-full bg-moneda align-[-1px] shadow-sm relative z-10" />
               . (ficticios)
             </p>
 
@@ -55,7 +98,7 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
 
           <button
             onClick={handleLogin}
-            className="mt-12 w-full touch-manipulation rounded-xl bg-ink py-4 text-[16px] font-medium text-white shadow-sm transition-transform active:scale-[0.98]"
+            className="mt-12 w-full touch-manipulation rounded-xl bg-ink py-4 text-[16px] font-medium text-white shadow-sm transition-transform active:scale-[0.98] relative z-10"
           >
             Entrar con Google · @usal.es
           </button>
@@ -63,15 +106,15 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
           {/* ========================================== */}
           {/*           POLÍTICA DE PRIVACIDAD             */}
           {/* ========================================== */}
-          <p className="mt-4 text-center text-[12px] leading-relaxed text-sutil">
+          <p className="mt-4 text-center text-[12px] leading-relaxed text-sutil relative z-10">
             Al entrar con Google, aceptas la{" "}
-        <Link to="/privacidad" className="underline hover:text-ink">
+            <Link to="/privacidad" className="underline hover:text-ink">
               Política de privacidad
-        </Link>
+            </Link>
             .
           </p>
 
-          {error && <p className="mt-4 text-[16px] text-rojo text-center">{error}</p>}
+          {error && <p className="mt-4 text-[16px] text-rojo text-center relative z-10">{error}</p>}
 
         </div>
       </main>
