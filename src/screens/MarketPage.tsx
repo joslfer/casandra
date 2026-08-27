@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
 import { Settings, ClipboardList, Lock, Loader2 } from "lucide-react";
@@ -111,8 +112,8 @@ function CountdownExamen({
         fecha informativa, puedes corregirla si está mal
       </button>
 
-      {mostrarInfo && (
-        <div onClick={cerrarPopup} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+      {mostrarInfo && createPortal(
+        <div onClick={cerrarPopup} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
           <div
             onClick={(e) => e.stopPropagation()}
             style={fuenteApple}
@@ -155,7 +156,8 @@ function CountdownExamen({
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </article>
   );
@@ -531,7 +533,7 @@ function SaldoAnimado({ valor }: { valor: number }) {
 }
 
 // ============================================================================
-// MARKET PAGE CON PULL TO REFRESH NATIVO - ESTILO PÍLDORA CON TEXTO
+// MARKET PAGE CON PULL TO REFRESH NATIVO - ESTILO SPINNER CIRCULAR
 // ============================================================================
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
@@ -838,9 +840,7 @@ export function MarketPage() {
     mercado.retirar(id);
   };
 
-  // Variables para la animación de la píldora
   const pullProgress = Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1);
-  const isPullReady = pullDistance >= REFRESH_THRESHOLD;
 
   return (
     <div
@@ -848,7 +848,8 @@ export function MarketPage() {
       onTouchStart={handleMainTouchStart}
       onTouchMove={handleMainTouchMove}
       onTouchEnd={handleMainTouchEnd}
-      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-28 select-none relative"
+      // REDUCIDO pb-28 a pb-10
+      className="min-h-screen w-full overflow-x-hidden bg-lienzo pb-10 select-none relative"
       style={fuenteApple}
       onClickCapture={(event) => {
         const target = event.target as Element;
@@ -881,7 +882,7 @@ export function MarketPage() {
       {/* ZONA AISLADA PARA EL PULL TO REFRESH */}
       <div className="relative w-full">
         
-        {/* INDICADOR PULL TO REFRESH (PÍLDORA CON TEXTO) */}
+        {/* INDICADOR PULL TO REFRESH (SPINNER CIRCULAR TIPO NATIVO) */}
         <div 
           className="absolute left-0 top-0 z-10 flex w-full justify-center pointer-events-none items-center"
           style={{
@@ -890,24 +891,19 @@ export function MarketPage() {
           }}
         >
           <div
-            className="flex items-center justify-center rounded-full bg-ink px-4 shadow-sm"
+            className="flex items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-borde text-ink"
             style={{
-              height: "36px",
+              width: "42px",
+              height: "42px",
               opacity: pullProgress,
               transform: `scale(${pullProgress})`,
               transition: isPulling ? 'none' : `all ${SPRING_CONFIG}`
             }}
           >
-            {isRefreshing ? (
-              <div className="flex items-center gap-2 text-white">
-                <Loader2 className="h-4 w-4 animate-spin text-white/80" />
-                <span className="text-[13px] font-medium tracking-wide">Actualizando...</span>
-              </div>
-            ) : (
-              <span className="text-[13px] font-medium tracking-wide text-white">
-                {isPullReady ? "Suelta para actualizar" : "Sigue tirando..."}
-              </span>
-            )}
+            <Loader2 
+              className={`h-5 w-5 ${isRefreshing ? "animate-spin text-ink" : "text-sutil"}`} 
+              style={!isRefreshing ? { transform: `rotate(${pullDistance * 4}deg)` } : undefined}
+            />
           </div>
         </div>
 
@@ -985,7 +981,7 @@ export function MarketPage() {
                   )}
 
                   {!asig.cerrada && hayAsignaturasAbiertas && (
-                    <div className="mb-12 mt-8 flex justify-center">
+                    <div className="mb-6 mt-8 flex justify-center"> {/* REDUCIDO mb-12 a mb-6 */}
                       <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M12 5v14"></path>
@@ -1010,25 +1006,28 @@ export function MarketPage() {
           onCrear={async (t, id) => { 
             await mercado.crearPregunta(t, id);
             
-            // Opcional: aseguramos la recarga desde base de datos
             if (typeof mercado.recargar === 'function') {
               await mercado.recargar();
             }
             
-            // Forzamos que se vuelva a calcular el orden y aparezca la pregunta
             setOrdenSnapshot({});
             
-            // Si has creado la pregunta en una asignatura distinta a la actual, nos movemos allí
             if (id !== asigId) {
               scrollToAsig(id);
             }
             
-            // Damos un pequeño respiro a React para que pinte la nueva pregunta y hacemos scroll abajo
             setTimeout(() => {
-              window.scrollTo({
-                top: document.documentElement.scrollHeight,
-                behavior: "smooth"
-              });
+              const elementosTitulo = Array.from(document.querySelectorAll('h2'));
+              const tituloNueva = elementosTitulo.find(el => el.textContent === t);
+              
+              if (tituloNueva) {
+                tituloNueva.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else {
+                window.scrollTo({
+                  top: document.documentElement.scrollHeight,
+                  behavior: "smooth"
+                });
+              }
             }, 300);
           }}
         />
