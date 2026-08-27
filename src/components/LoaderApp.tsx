@@ -12,11 +12,11 @@ export function LoaderApp() {
           58%, 100% { transform: rotate(-1turn); }
         }
         .loader2-rojo {
-          animation: anim-l49-1 0.7s infinite linear;
+          animation: anim-l49-1 0.5s infinite linear;
           transform-origin: -100% 50%;
         }
         .loader2-verde {
-          animation: anim-l49-2 0.7s infinite linear;
+          animation: anim-l49-2 0.5s infinite linear;
           animation-delay: -0.35s;
           transform-origin: 200% 50%;
         }
