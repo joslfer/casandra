@@ -73,18 +73,17 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
           {/* ========================================== */}
           {/*           ZONA DE TEXTOS (PÁRRAFOS)          */}
           {/* ========================================== */}
-          <div className="mt-5 space-y-4 text-[16px] leading-relaxed text-ink/80 text-left">
+          <div className="mt-5 space-y-4 text-[18px] leading-relaxed text-ink/80 text-left">
             
             {/* PÁRRAFO 1 */}
             <p>
-              Consulta qué va a caer en el próximo examen según la opinión agregada de muchas personas.
+              Consulta qué caerá según lo que saben muchas personas de clase.
             </p>
             <p>
               Si tienes algo que añadir, apuesta tokens simbólicos como este {" "}
               <span className="inline-block h-[14px] w-[14px] rounded-full bg-moneda align-[-1px] shadow-sm relative z-10" />
               . (ficticios)
             </p>
-
   
 
             {/* PÁRRAFO 3 */}
@@ -100,7 +99,7 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
             onClick={handleLogin}
             className="mt-12 w-full touch-manipulation rounded-xl bg-ink py-4 text-[16px] font-medium text-white shadow-sm transition-transform active:scale-[0.98] relative z-10"
           >
-            Inicia sesión con @usal.es
+            Entra con tu cuenta @usal.es
           </button>
 
           {/* ========================================== */}
