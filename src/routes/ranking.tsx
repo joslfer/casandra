@@ -4,6 +4,7 @@ import { useSesion } from "@/hooks/useSesion";
 import { haceTexto, useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
+import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader reutilizable
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -90,16 +91,26 @@ function PaginaRanking() {
     }
   }, [actividadActual, actividadFija.length]);
 
+  // Si está cargando, mostramos el Loader
   if (cargando) {
-    return <div className="min-h-screen bg-lienzo" />;
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
   }
 
   if (!usuario) {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
+  // Si el perfil no ha cargado aún, mostramos el Loader
   if (!mercado.perfilCargado) {
-    return <div className="min-h-screen bg-lienzo" />;
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
   }
 
   if (!mercado.perfil.claseId) {

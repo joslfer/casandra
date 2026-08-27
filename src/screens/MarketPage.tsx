@@ -6,6 +6,7 @@ import { useSesion } from "@/hooks/useSesion";
 import { Settings, ClipboardList, Lock, Loader2 } from "lucide-react";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
+import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu nuevo loader
 import {
   probabilidad,
   useMercado,
@@ -847,10 +848,35 @@ export function MarketPage() {
     }
   };
 
-  if (cargando) return <div className="min-h-screen bg-lienzo" />;
-  if (!usuario) return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
-  if (!mercado.perfilCargado) return <div className="min-h-screen bg-lienzo" />;
-  if (!mercado.perfil.claseId) return <PantallaSeleccionClase clases={mercado.leerClases()} onElegir={mercado.elegirClase} />;
+  // -----------------------------------------------------
+  // AÑADIDO EL COMPONENTE LOADERAPP AQUÍ
+  // -----------------------------------------------------
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
+  }
+
+  if (!usuario) {
+    return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
+  }
+
+  // -----------------------------------------------------
+  // AÑADIDO EL COMPONENTE LOADERAPP AQUÍ TAMBIÉN
+  // -----------------------------------------------------
+  if (!mercado.perfilCargado) {
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
+  }
+
+  if (!mercado.perfil.claseId) {
+    return <PantallaSeleccionClase clases={mercado.leerClases()} onElegir={mercado.elegirClase} />;
+  }
 
   const asigActivaObj = asignaturas.find((a) => a.id === asigId);
   const asigCerrada = asigActivaObj?.cerrada === true;
