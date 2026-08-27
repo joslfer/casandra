@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
-import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader
+import { LoaderApp } from "@/components/LoaderApp";
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -87,7 +87,7 @@ export function ProfilePage() {
       <main className="mx-auto max-w-[520px] px-5 pt-[calc(4.5rem+env(safe-area-inset-top))]">
         <h1 className="mb-2 text-[28px] font-bold tracking-tight text-ink">Perfil</h1>
         
-        <div className="mb-6 text-[14px] leading-relaxed text-ink">
+        <div className="mb-6 text-[16px] leading-relaxed text-ink">
           <p>
             El objetivo de este mercado es agregar información sumando muchas opiniones distintas. Apuesta pensando por tu cuenta. Cuanto más pensamiento individual mejor.
           </p>
@@ -95,7 +95,7 @@ export function ProfilePage() {
         
         <section className="overflow-hidden rounded-xl border border-borde bg-white shadow-sm">
           
-          {/* Campo Nombre: Ahora con diseño de "caja editable" e icono de lápiz */}
+          {/* Campo Nombre */}
           <div className="flex flex-col border-b border-linea p-4">
             <label className="text-[14px] font-medium text-sutil">
               Nombre (recomendado)
@@ -171,7 +171,7 @@ export function ProfilePage() {
             </div>
             <p className="mt-2 text-[12px] text-sutil">
               Cambiar de clase ocultará tus asignaturas actuales y mostrará las nuevas.
-            </p>
+            </p> 
           </div>
 
         </section>
@@ -188,15 +188,23 @@ export function ProfilePage() {
           Cerrar sesión
         </button>
 
-        {/* Aviso de borrado de datos */}
-        <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-borde bg-black/5 p-4">
-          <svg className="mt-0.5 h-[18px] w-[18px] shrink-0 text-sutil" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 16v-4"></path>
-            <path d="M12 8h.01"></path>
-          </svg>
-          <p className="text-[13px] leading-relaxed text-sutil">
-            Para eliminar los datos, consultarme.
+        {/* Aviso de borrado de datos: Ahora en gris y menos agresivo */}
+        <p className="mt-3 text-center text-[12px] text-sutil">
+          Para eliminar tus datos, consúltame.
+        </p>
+
+        {/* Sección para texto libre y enlace */}
+        <div className="mt-12 text-center">
+          <p className="text-[16px] font-medium leading-relaxed text-ink">
+            Hecho por José en 2026.{" "}
+            <a 
+              href="https://joslfer.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="font-semibold underline decoration-ink/30 underline-offset-4 transition-colors hover:text-ink/70"
+            >
+              joslfer.com
+            </a>
           </p>
         </div>
 
