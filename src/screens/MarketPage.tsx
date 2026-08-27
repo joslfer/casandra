@@ -581,10 +581,13 @@ export function MarketPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScroll = useRef(false);
 
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const touchStartTime = useRef(0);
-  const startAsigId = useRef<string>("");
+  // --- SWIPE MANUAL CON EL DEDO: DESACTIVADO ---
+  // Refs que usaban los handlers de swipe táctil entre asignaturas.
+  // Se mantienen comentados por si se quiere reactivar el swipe en el futuro.
+  // const touchStartX = useRef(0);
+  // const touchStartY = useRef(0);
+  // const touchStartTime = useRef(0);
+  // const startAsigId = useRef<string>("");
 
   // ESTADOS PULL TO REFRESH
   const [isPulling, setIsPulling] = useState(false);
@@ -757,75 +760,84 @@ export function MarketPage() {
     }
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-    touchStartTime.current = Date.now();
-    startAsigId.current = asigActiva;
-    detenerAnimacion(); 
-  };
+  // --- SWIPE MANUAL CON EL DEDO: DESACTIVADO ---
+  // Estos handlers gestionaban el arrastre táctil sobre el carrusel de
+  // preguntas para cambiar de asignatura. Se dejan comentados (no
+  // eliminados) por si se quiere reactivar el swipe manual más adelante.
+  // El cambio de asignatura ahora solo ocurre a través de las tags
+  // (ver <Asignaturas /> y scrollToAsig, que mantiene la animación).
+  //
+  // const handleTouchStart = (e: React.TouchEvent) => {
+  //   touchStartX.current = e.touches[0].clientX;
+  //   touchStartY.current = e.touches[0].clientY;
+  //   touchStartTime.current = Date.now();
+  //   startAsigId.current = asigActiva;
+  //   detenerAnimacion();
+  // };
+  //
+  // const handleTouchEnd = (e: React.TouchEvent) => {
+  //   const touchEndX = e.changedTouches[0].clientX;
+  //   const touchEndY = e.changedTouches[0].clientY;
+  //   const deltaX = touchStartX.current - touchEndX;
+  //   const deltaY = touchStartY.current - touchEndY;
+  //   const timeElapsed = Date.now() - touchStartTime.current;
+  //
+  //   if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
+  //     const startIndex = asignaturasOrdenadas.findIndex(a => a.id === startAsigId.current);
+  //     let targetIndex = startIndex;
+  //     const velocity = deltaX / timeElapsed;
+  //
+  //     if (deltaX > 30 || velocity > 0.4) {
+  //       targetIndex = Math.min(startIndex + 1, asignaturasOrdenadas.length - 1);
+  //     } else if (deltaX < -30 || velocity < -0.4) {
+  //       targetIndex = Math.max(startIndex - 1, 0);
+  //     } else {
+  //       const container = scrollContainerRef.current;
+  //       if (container) {
+  //         const containerRect = container.getBoundingClientRect();
+  //         const containerCenter = containerRect.left + containerRect.width / 2;
+  //         let minDistance = Infinity;
+  //
+  //         asignaturasOrdenadas.forEach((asig, i) => {
+  //           const slide = container.querySelector(`[data-id="${asig.id}"]`);
+  //           if (slide) {
+  //             const slideRect = slide.getBoundingClientRect();
+  //             const slideCenter = slideRect.left + slideRect.width / 2;
+  //             const dist = Math.abs(slideCenter - containerCenter);
+  //             if (dist < minDistance) {
+  //               minDistance = dist;
+  //               targetIndex = i;
+  //             }
+  //           }
+  //         });
+  //       }
+  //     }
+  //
+  //     if (asignaturasOrdenadas[targetIndex]) {
+  //       scrollToAsigInstantaneo(asignaturasOrdenadas[targetIndex].id);
+  //     }
+  //   }
+  // };
+  //
+  // const scrollToAsigInstantaneo = (id: string) => {
+  //   haptic();
+  //   setAsigActiva(id);
+  //
+  //   const container = scrollContainerRef.current;
+  //   if (!container) return;
+  //
+  //   const slide = container.querySelector(`[data-id="${id}"]`);
+  //   if (slide) {
+  //     isProgrammaticScroll.current = true;
+  //     const containerRect = container.getBoundingClientRect();
+  //     const slideRect = slide.getBoundingClientRect();
+  //     container.scrollLeft += slideRect.left - containerRect.left;
+  //     requestAnimationFrame(() => { isProgrammaticScroll.current = false; });
+  //   }
+  // };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaX = touchStartX.current - touchEndX;
-    const deltaY = touchStartY.current - touchEndY;
-    const timeElapsed = Date.now() - touchStartTime.current;
-
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
-      const startIndex = asignaturasOrdenadas.findIndex(a => a.id === startAsigId.current);
-      let targetIndex = startIndex;
-      const velocity = deltaX / timeElapsed; 
-
-      if (deltaX > 30 || velocity > 0.4) {
-        targetIndex = Math.min(startIndex + 1, asignaturasOrdenadas.length - 1); 
-      } else if (deltaX < -30 || velocity < -0.4) {
-        targetIndex = Math.max(startIndex - 1, 0); 
-      } else {
-        const container = scrollContainerRef.current;
-        if (container) {
-          const containerRect = container.getBoundingClientRect();
-          const containerCenter = containerRect.left + containerRect.width / 2;
-          let minDistance = Infinity;
-
-          asignaturasOrdenadas.forEach((asig, i) => {
-            const slide = container.querySelector(`[data-id="${asig.id}"]`);
-            if (slide) {
-              const slideRect = slide.getBoundingClientRect();
-              const slideCenter = slideRect.left + slideRect.width / 2;
-              const dist = Math.abs(slideCenter - containerCenter);
-              if (dist < minDistance) {
-                minDistance = dist;
-                targetIndex = i;
-              }
-            }
-          });
-        }
-      }
-
-      if (asignaturasOrdenadas[targetIndex]) {
-        scrollToAsigInstantaneo(asignaturasOrdenadas[targetIndex].id);
-      }
-    }
-  };
-
-  const scrollToAsigInstantaneo = (id: string) => {
-    haptic();
-    setAsigActiva(id);
-
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const slide = container.querySelector(`[data-id="${id}"]`);
-    if (slide) {
-      isProgrammaticScroll.current = true;
-      const containerRect = container.getBoundingClientRect();
-      const slideRect = slide.getBoundingClientRect();
-      container.scrollLeft += slideRect.left - containerRect.left;
-      requestAnimationFrame(() => { isProgrammaticScroll.current = false; });
-    }
-  };
-
+  // scrollToAsig: usado por las TAGS para cambiar de asignatura.
+  // Mantiene la animación de swipe izquierda/derecha — sigue activo.
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id); 
@@ -1024,13 +1036,20 @@ export function MarketPage() {
           </div>
 
           {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
+          {/*
+            Swipe manual con el dedo DESACTIVADO: se ha quitado
+            onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+            (código comentado más arriba) y se ha cambiado
+            overflow-x-auto -> overflow-x-hidden para que el navegador
+            tampoco permita arrastrar el carrusel de forma nativa.
+            El cambio de asignatura sigue funcionando (con su animación)
+            únicamente a través de scrollToAsig, disparado por las tags.
+          */}
           <div 
             ref={scrollContainerRef}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
             onWheel={detenerAnimacion}
             style={{ height: alturaContenedor === 'auto' ? 'auto' : `${alturaContenedor}px` }}
-            className="flex items-start w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-[height] duration-300 ease-out"
+            className="flex items-start w-full overflow-x-hidden overflow-y-hidden snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-[height] duration-300 ease-out"
           >
             {asignaturasOrdenadas.map((asig) => {
               const idsOrden = ordenSnapshot[asig.id] || [];
