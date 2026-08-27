@@ -5,6 +5,7 @@ import { useHaptic } from "@/hooks/useHaptic";
 import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
+import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -46,8 +47,13 @@ export function AdminPage() {
     return () => { cancelado = true; };
   }, [modalResolucion?.pregunta.id]);
 
+  // Si está cargando la sesión o el perfil, mostramos el LoaderApp
   if (cargando || !mercado.perfilCargado) {
-    return <div className="min-h-screen bg-lienzo" />;
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
   }
 
   if (!usuario) {

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
 import { useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
+import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -40,11 +41,24 @@ export function ProfilePage() {
   }, []);
 
   if (cargando) {
-    return <div className="min-h-screen bg-lienzo" />;
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
   }
 
   if (!usuario) {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
+  }
+
+  // Si el perfil no ha cargado aún, también mostramos el loader
+  if (!mercado.perfilCargado) {
+    return (
+      <div className="min-h-screen bg-lienzo flex items-center justify-center">
+        <LoaderApp />
+      </div>
+    );
   }
 
   // Función que guarda de verdad solo cuando salimos del input (onBlur)
@@ -70,7 +84,7 @@ export function ProfilePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5 pt-24">
+      <main className="mx-auto max-w-[520px] px-5 pt-[calc(4.5rem+env(safe-area-inset-top))]">
         <h1 className="mb-2 text-[28px] font-bold tracking-tight text-ink">Perfil</h1>
         
         <div className="mb-6 text-[14px] leading-relaxed text-ink">
