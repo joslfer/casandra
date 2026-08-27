@@ -3,16 +3,45 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList, Lock, Loader2 } from "lucide-react";
+import { Settings, ClipboardList, Lock } from "lucide-react"; // Quitamos Loader2
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
-import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu nuevo loader
+import { LoaderApp } from "@/components/LoaderApp"; 
 import {
   probabilidad,
   useMercado,
   type Lado,
   type Pregunta,
 } from "@/hooks/useMercado";
+
+// ============================================================================
+// SPINNER ESTILO NATIVO IOS (12 barritas)
+// ============================================================================
+function IosSpinner({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {Array.from({ length: 12 }).map((_, i) => (
+        <rect
+          key={i}
+          x="11"
+          y="2.5"
+          width="2.2"
+          height="5.5"
+          rx="1.1"
+          fill="currentColor"
+          // Gradiente de opacidad para dar el efecto de cola
+          opacity={0.3 + (0.7 * i) / 11}
+          transform={`rotate(${i * 30} 12 12)`}
+        />
+      ))}
+    </svg>
+  );
+}
 
 function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
@@ -671,10 +700,6 @@ export function MarketPage() {
     });
   }, [asignaturasOrdenadas, preguntas]);
 
-  // =========================================================================
-  // FIX: Ajustar dinámicamente la altura del contenedor horizontal
-  // para que no sobre espacio abajo en las asignaturas con pocas preguntas
-  // =========================================================================
   const [alturaContenedor, setAlturaContenedor] = useState<number | 'auto'>('auto');
 
   useEffect(() => {
@@ -690,9 +715,8 @@ export function MarketPage() {
       }
     };
 
-    updateHeight(); // Llamada inicial
+    updateHeight();
 
-    // Por si cambia de tamaño internamente (ej. aparece un botón, o teclado)
     let observer: ResizeObserver | null = null;
     if (typeof window !== "undefined" && "ResizeObserver" in window) {
       observer = new ResizeObserver(updateHeight);
@@ -848,9 +872,6 @@ export function MarketPage() {
     }
   };
 
-  // -----------------------------------------------------
-  // AÑADIDO EL COMPONENTE LOADERAPP AQUÍ
-  // -----------------------------------------------------
   if (cargando) {
     return (
       <div className="min-h-screen bg-lienzo flex items-center justify-center">
@@ -863,9 +884,6 @@ export function MarketPage() {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
-  // -----------------------------------------------------
-  // AÑADIDO EL COMPONENTE LOADERAPP AQUÍ TAMBIÉN
-  // -----------------------------------------------------
   if (!mercado.perfilCargado) {
     return (
       <div className="min-h-screen bg-lienzo flex items-center justify-center">
@@ -940,7 +958,7 @@ export function MarketPage() {
       {/* ZONA AISLADA PARA EL PULL TO REFRESH */}
       <div className="relative w-full">
         
-        {/* INDICADOR PULL TO REFRESH (SPINNER CIRCULAR TIPO NATIVO) */}
+        {/* INDICADOR PULL TO REFRESH NATIVO IOS (SIN FONDO BLANCO CIRCULAR) */}
         <div 
           className="absolute left-0 top-0 z-10 flex w-full justify-center pointer-events-none items-center"
           style={{
@@ -949,18 +967,21 @@ export function MarketPage() {
           }}
         >
           <div
-            className="flex items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-borde text-ink"
+            className="flex items-center justify-center text-sutil"
             style={{
               width: "42px",
               height: "42px",
               opacity: pullProgress,
-              transform: `scale(${pullProgress})`,
               transition: isPulling ? 'none' : `all ${SPRING_CONFIG}`
             }}
           >
-            <Loader2 
-              className={`h-5 w-5 ${isRefreshing ? "animate-spin text-ink" : "text-sutil"}`} 
-              style={!isRefreshing ? { transform: `rotate(${pullDistance * 4}deg)` } : undefined}
+            {/* Si está refrescando se anima con "steps(12)" para dar los saltitos clásicos del spinner de iOS */}
+            <IosSpinner 
+              className="h-7 w-7" 
+              style={!isRefreshing 
+                ? { transform: `rotate(${pullDistance * 3}deg)` } 
+                : { animation: "spin 1s steps(12, end) infinite" }
+              }
             />
           </div>
         </div>
@@ -1003,7 +1024,6 @@ export function MarketPage() {
           </div>
 
           {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
-          {/* FIX IMPORTANTE: Controlamos la altura del contenedor y cortamos lo que sobra por abajo (overflow-y-hidden y items-start) */}
           <div 
             ref={scrollContainerRef}
             onTouchStart={handleTouchStart}
@@ -1040,7 +1060,6 @@ export function MarketPage() {
                     ))
                   )}
 
-                  {/* EL BOTÓN TAL Y COMO ESTABA ORIGINALMENTE EN TU CÓDIGO */}
                   {!asig.cerrada && hayAsignaturasAbiertas && (
                     <div className="mt-4 flex justify-center">
                       <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
