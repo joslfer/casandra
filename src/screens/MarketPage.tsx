@@ -431,9 +431,7 @@ function PantallaNuevaPregunta({
 }
 
 function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
-  const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
-
-  if (rankingFijo.length === 0 || miIndice === -1) {
+  if (rankingFijo.length === 0) {
     return (
       <div className="mt-4 flex w-full justify-center px-4">
         <Link to="/ranking" className="text-[17px] text-ink/90 transition-colors hover:text-ink text-left">
@@ -443,23 +441,56 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
     );
   }
 
-  const yo = rankingFijo[miIndice];
-  const elDeArriba = rankingFijo[miIndice - 1];
+  // Buscamos el índice exacto del usuario en la lista ordenada del ranking (que ya incluye el desempate alfabético)
+  const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
+
+  if (miIndice === -1) {
+    return (
+      <div className="mt-4 flex w-full justify-center px-4">
+        <Link to="/ranking" className="text-[17px] text-ink/90 transition-colors hover:text-ink text-left">
+          ver clasificación global →
+        </Link>
+      </div>
+    );
+  }
+
+  // La posición real en la lista es exactamente su índice + 1 (coincidiendo 100% con el ranking)
   const miPosicion = miIndice + 1;
-  const esEmpate = elDeArriba?.tokens - yo?.tokens === 0;
-  const faltan = elDeArriba?.tokens - yo?.tokens >= 0 ? (elDeArriba?.tokens - yo?.tokens) + 1 : 1; 
+  const yo = rankingFijo[miIndice];
+
+  // Comprobamos si hay empate exacto de tokens con algún otro usuario de la lista
+  const empatadosConmigo = rankingFijo.filter(r => r.tokens === yo.tokens && r.usuario !== miNombre);
+  const esEmpate = empatadosConmigo.length > 0;
+  const compañeroEmpate = empatadosConmigo[0];
+
+  // Jugadores estrictamente por encima para calcular la diferencia de tokens
+  const personasEncima = rankingFijo.filter(r => r.tokens > yo.tokens);
+  const maxScoreEncima = personasEncima.length > 0 ? Math.max(...personasEncima.map(r => r.tokens)) : null;
+  const grupoEncima = maxScoreEncima !== null ? personasEncima.filter(r => r.tokens === maxScoreEncima) : [];
+  const elDeArriba = grupoEncima[0];
+  
+  const faltan = maxScoreEncima !== null ? (maxScoreEncima - yo.tokens) + 1 : 1;
+  const todosCero = rankingFijo.every(r => r.tokens === 0);
 
   return (
     <div className="mt-5 flex w-full justify-center px-4">
       <Link to="/ranking" className="group relative inline-block max-w-[340px] text-left transition-colors">
         <div className="text-[17px] text-ink/90 leading-snug break-words group-hover:text-ink transition-colors">
-          Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>
-          {miIndice === 0 ? (
-            <>. ¡Gracias por tu precisión!</>
-          ) : esEmpate ? (
-            <>, empatado con <strong className="font-medium text-ink">{elDeArriba?.usuario}</strong></>
+          {todosCero ? (
+            <>Nadie ha sumado tokens todavía</>
           ) : (
-            <>, a <span className="inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-[14px] w-[14px] -mt-0.5" /></span> de <strong className="font-medium text-ink">{elDeArriba?.usuario}</strong></>
+            <>
+              Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>
+              {miPosicion === 1 && !esEmpate ? (
+                <>. ¡Gracias por tu precisión!</>
+              ) : miPosicion === 1 && esEmpate ? (
+                <>, empatado en el primer puesto con <strong className="font-medium text-ink">{compañeroEmpate?.usuario}</strong></>
+              ) : esEmpate ? (
+                <>, empatado con <strong className="font-medium text-ink">{compañeroEmpate?.usuario}</strong></>
+              ) : (
+                <>, a <span className="inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-[14px] w-[14px] -mt-0.5" /></span> de <strong className="font-medium text-ink">{elDeArriba?.usuario}</strong></>
+              )}
+            </>
           )}
           <br />
           <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80 transition-colors">
@@ -996,14 +1027,35 @@ export function MarketPage() {
                   )}
 
                   {!asig.cerrada && hayAsignaturasAbiertas && (
-                    <div className="mt-4 flex justify-center">
-                      <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 5v14"></path>
-                          <path d="M5 12h14"></path>
-                        </svg>
-                        Proponer pregunta
-                      </button>
+                    <div className="mt-4 flex flex-col items-center justify-center w-full">
+                      <div className="mb-12">
+                        <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 5v14"></path>
+                            <path d="M5 12h14"></path>
+                          </svg>
+                          Proponer pregunta
+                        </button>
+                      </div>
+
+                      {/* ARTÍCULO INFERIOR CON ANCHO COMPLETO, HEADING Y SEPARACIÓN */}
+                      <article className="w-full text-left mb-28">
+                        <h2 className="mb-3 text-[24px] font-bold tracking-tight text-ink">No entiendes cómo funciona? Lee esto.</h2>
+                        <div className="space-y-4 text-[16px] leading-relaxed text-ink">
+                          <p>
+                            Imagina que Fulanito cree que va a caer una pregunta en el examen porque ha estado muy atento en clase. Apuesta 1 token al SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces apuestan 1 token cada uno al NO. 
+                          </p>
+                          <p>
+                          Cuando llega el día del examen, Fulanito tiene razón y cae esa pregunta. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
+                          </p>
+                          <p>
+                          El mercado recompensa al que aporta información verdadera. Obviamente no será infalible pero será la aproximación más fiable a la verdad, porque agrega sabiduría dispersa.
+                          </p>
+                          <p>
+                            Puedes usarlo para estudiar o simplemente por diversión.
+                          </p>
+                        </div>
+                      </article>
                     </div>
                   )}
                 </div>
