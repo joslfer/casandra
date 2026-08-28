@@ -1052,7 +1052,7 @@ export function MarketPage() {
                           Cuando llega el día del examen, Fulanito tiene razón. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
                           </p>
                           <p>
-                          El mercado recompensa al que aporta información verdadera. Estas probabilidades más fiables que cualquier persona porque juntan información dispersa.
+                          El mercado recompensa al que aporta información verdadera. Casandra es simplemente una máquina que agrega conocimiento colectivo y produce un porcentaje %.
                           </p>
                           <p>
                             Puedes usarlo para consultar la opinión de tu clase. En un futuro sería muy divertido meter premios.
