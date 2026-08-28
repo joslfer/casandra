@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ModRouteImport } from './routes/mod'
 import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RankingRouteImport } from './routes/ranking'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModRoute = ModRouteImport.update({
+  id: '/mod',
+  path: '/mod',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacidadRoute = PrivacidadRouteImport.update({
@@ -50,6 +56,7 @@ const ResueltasRoute = ResueltasRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/mod': typeof ModRoute
   '/privacidad': typeof PrivacidadRoute
   '/profile': typeof ProfileRoute
   '/ranking': typeof RankingRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/mod': typeof ModRoute
   '/privacidad': typeof PrivacidadRoute
   '/profile': typeof ProfileRoute
   '/ranking': typeof RankingRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/mod': typeof ModRoute
   '/privacidad': typeof PrivacidadRoute
   '/profile': typeof ProfileRoute
   '/ranking': typeof RankingRoute
@@ -75,13 +84,27 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/admin' | '/privacidad' | '/profile' | '/ranking' | '/resueltas'
+    | '/'
+    | '/admin'
+    | '/mod'
+    | '/privacidad'
+    | '/profile'
+    | '/ranking'
+    | '/resueltas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/privacidad' | '/profile' | '/ranking' | '/resueltas'
+  to:
+    | '/'
+    | '/admin'
+    | '/mod'
+    | '/privacidad'
+    | '/profile'
+    | '/ranking'
+    | '/resueltas'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/mod'
     | '/privacidad'
     | '/profile'
     | '/ranking'
@@ -91,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  ModRoute: typeof ModRoute
   PrivacidadRoute: typeof PrivacidadRoute
   ProfileRoute: typeof ProfileRoute
   RankingRoute: typeof RankingRoute
@@ -111,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mod': {
+      id: '/mod'
+      path: '/mod'
+      fullPath: '/mod'
+      preLoaderRoute: typeof ModRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacidad': {
@@ -147,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  ModRoute: ModRoute,
   PrivacidadRoute: PrivacidadRoute,
   ProfileRoute: ProfileRoute,
   RankingRoute: RankingRoute,
