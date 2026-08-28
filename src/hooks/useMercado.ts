@@ -289,7 +289,12 @@ export function useMercado(usuario: Usuario | null) {
         usuario: a.usaHash ? `#${a.hash}` : (a.nombre || "Anónimo"),
         tokens: Math.round(a.saldo + (apostadoAbierto[a.id] || 0))
       }))
-      .sort((a, b) => b.tokens - a.tokens)
+      .sort((a, b) => {
+        if (b.tokens !== a.tokens) {
+          return b.tokens - a.tokens;
+        }
+        return a.usuario.localeCompare(b.usuario, 'es', { sensitivity: 'base' });
+      })
       .slice(0, 10);
   }, [alumnos, apostadoAbierto, miClaseId]);
 
@@ -525,7 +530,7 @@ export function useMercado(usuario: Usuario | null) {
 
   const cambiarClaseAsignatura = useCallback(async (id: string, claseId: string) => {
     if (!tienePermisoExamenes) return false;
-    if (!esAdmin && esMod) return false; // Los mods no pueden cambiar de curso el examen
+    if (!esAdmin && esMod) return false;
     await supabase.from("asignaturas").update({ clase_id: claseId }).eq("id", id);
     await cargarDatos();
     return true;
