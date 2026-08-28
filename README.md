@@ -1,2 +1,2 @@
 # casandra
-Prediction market for exam questions. 
+Prediction market for exam questions.
