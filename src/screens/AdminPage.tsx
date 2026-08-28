@@ -5,12 +5,13 @@ import { useHaptic } from "@/hooks/useHaptic";
 import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
-import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader
+import { LoaderApp } from "@/components/LoaderApp";
 
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
 type VistaAdmin = "preguntas" | "archivado" | "usuarios" | "asignaturas";
+const FILTRO_TODAS = "todas" as const;
 
 function aValorInputLocal(ts: number): string {
   const d = new Date(ts);
@@ -24,8 +25,10 @@ export function AdminPage() {
   const haptic = useHaptic();
   
   const [vistaAdmin, setVistaAdmin] = useState<VistaAdmin>("preguntas");
+  const [claseFiltroId, setClaseFiltroId] = useState<string>(FILTRO_TODAS);
   const [nuevaAsig, setNuevaAsig] = useState("");
   const [nuevaAsigClase, setNuevaAsigClase] = useState("");
+  const [nuevaClase, setNuevaClase] = useState("");
   const [modalResolucion, setModalResolucion] = useState<{ pregunta: Pregunta; resultado: boolean } | null>(null);
 
   const [detalleApuestas, setDetalleApuestas] = useState<ApuestaDetalle[]>([]);
@@ -47,7 +50,10 @@ export function AdminPage() {
     return () => { cancelado = true; };
   }, [modalResolucion?.pregunta.id]);
 
-  // Si está cargando la sesión o el perfil, mostramos el LoaderApp
+  useEffect(() => {
+    if (claseFiltroId !== FILTRO_TODAS) setNuevaAsigClase(claseFiltroId);
+  }, [claseFiltroId]);
+
   if (cargando || !mercado.perfilCargado) {
     return (
       <div className="min-h-screen bg-lienzo flex items-center justify-center">
@@ -60,7 +66,11 @@ export function AdminPage() {
     return <PantallaLogin entrarConGoogle={entrarConGoogle} />;
   }
 
-  if (!usuario.esAdmin) {
+  const esAdmin = !!usuario.esAdmin;
+  const esMod = !!(mercado.perfil as any).mod;
+  const tieneAccesoAdmin = esAdmin || esMod;
+
+  if (!tieneAccesoAdmin) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-lienzo px-6 text-center" style={fuenteApple}>
         <h1 className="text-2xl font-semibold tracking-tight">Sin permisos</h1>
@@ -80,6 +90,9 @@ export function AdminPage() {
 
   const asignaturas = [...mercado.leerAsignaturas(true)].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
   const clases = [...mercado.leerClases()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  const clasesFiltradas = claseFiltroId === FILTRO_TODAS ? clases : clases.filter((c) => c.id === claseFiltroId);
+  const viendoTodas = claseFiltroId === FILTRO_TODAS;
+  const claseIdDeAsignatura = (asignaturaId: string) => asignaturas.find((a) => a.id === asignaturaId)?.claseId;
 
   const confirmarResolucion = async () => {
     if (!modalResolucion) return;
@@ -95,439 +108,322 @@ export function AdminPage() {
           <Link to="/" className="text-[15px] font-semibold tracking-tight text-ink touch-manipulation">
             ← Mercado
           </Link>
+          <span className={`${mono} text-sutil`}>{esAdmin ? "Panel Admin" : "Panel Moderador"}</span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[520px] px-5 pt-[calc(3.5rem+env(safe-area-inset-top))]">
-        <section className="pt-6">
-          <div className="flex gap-4 border-b border-linea pb-2.5 overflow-x-auto scrollbar-hide">
-            {(["preguntas", "archivado", "usuarios", "asignaturas"] as VistaAdmin[]).map((v) => (
+      <main className="mx-auto max-w-[520px] px-5 pt-[calc(4rem+env(safe-area-inset-top))]">
+        <div className="mb-4 flex gap-1.5 overflow-x-auto scrollbar-hide pb-2 border-b border-linea">
+          <button
+            onClick={() => { haptic(); setClaseFiltroId(FILTRO_TODAS); }}
+            className={`shrink-0 touch-manipulation rounded-full px-3 py-1 text-[12px] font-medium transition-colors ${
+              viendoTodas ? "bg-ink text-white" : "bg-black/5 text-ink hover:bg-black/10"
+            }`}
+          >
+            Todos
+          </button>
+          {clases.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => { haptic(); setClaseFiltroId(c.id); }}
+              className={`shrink-0 touch-manipulation rounded-full px-3 py-1 text-[12px] font-medium transition-colors ${
+                claseFiltroId === c.id ? "bg-ink text-white" : "bg-black/5 text-ink hover:bg-black/10"
+              }`}
+            >
+              {c.nombre}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-6 border-b border-linea pb-2 mb-6 overflow-x-auto scrollbar-hide">
+          {(["preguntas", "archivado", "usuarios", "asignaturas"] as VistaAdmin[]).map((v) => {
+            // Si es moderador, ocultamos las pestañas de preguntas y archivado/usuarios si solo quieres que gestione exámenes, o las dejamos visibles según convenga. Aquí permitimos ver asignaturas siempre.
+            if (!esAdmin && (v === "preguntas" || v === "archivado" || v === "usuarios")) return null;
+            return (
               <button
                 key={v}
                 onClick={() => { haptic(); setVistaAdmin(v); }}
-                className={`${mono} touch-manipulation whitespace-nowrap ${vistaAdmin === v ? "text-ink font-semibold" : "text-sutil"}`}
+                className={`${mono} touch-manipulation whitespace-nowrap pb-1 border-b-2 transition-all ${
+                  vistaAdmin === v ? "border-ink text-ink font-semibold" : "border-transparent text-sutil hover:text-ink"
+                }`}
               >
-                {v}
+                {v === "asignaturas" ? "Cursos y Exámenes" : v}
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
-          {vistaAdmin === "preguntas" && (() => {
-            const preguntasActivas = [...mercado.leerPreguntas({ estado: "todas", todasAdmin: true })]
-              .filter((p) => !p.archivada)
-              .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { sensitivity: 'base' }));
+        {/* VISTA: PREGUNTAS (Solo Admin) */}
+        {vistaAdmin === "preguntas" && esAdmin && (() => {
+          const preguntasActivas = [...mercado.leerPreguntas({ estado: "todas", todasAdmin: true })]
+            .filter((p) => !p.archivada)
+            .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { sensitivity: 'base' }));
 
-            // Encontramos asignaturas y preguntas huérfanas
-            const asigSinClase = asignaturas.filter(a => !clases.some(c => c.id === a.claseId));
-            const huerfanas = preguntasActivas.filter(p => !asignaturas.some(a => a.id === p.asignaturaId));
+          const asigSinClase = asignaturas.filter(a => !clases.some(c => c.id === a.claseId));
+          const huerfanas = preguntasActivas.filter(p => !asignaturas.some(a => a.id === p.asignaturaId));
 
-            return (
-              <div className="space-y-10 pt-4">
-                {/* 1. Agrupación por Clases (Grados/Carreras) */}
-                {clases.map((clase) => {
-                  const asignaturasClase = asignaturas.filter(a => a.claseId === clase.id);
-                  const asigIds = asignaturasClase.map(a => a.id);
-                  const preguntasClase = preguntasActivas.filter(p => asigIds.includes(p.asignaturaId));
+          return (
+            <div className="space-y-8">
+              {clasesFiltradas.map((clase) => {
+                const asignaturasClase = asignaturas.filter(a => a.claseId === clase.id);
+                const asigIds = asignaturasClase.map(a => a.id);
+                const preguntasClase = preguntasActivas.filter(p => asigIds.includes(p.asignaturaId));
 
-                  if (preguntasClase.length === 0) return null; 
+                if (preguntasClase.length === 0) return null; 
 
-                  return (
-                    <div key={clase.id} className="relative">
-                      {/* HEADER CARRERA */}
-                      <h2 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-3 backdrop-blur border-b border-linea text-[18px] font-bold tracking-tight text-ink shadow-sm">
-                        {clase.nombre}
-                      </h2>
-                      
-                      <div className="flex flex-col gap-6">
-                        {asignaturasClase.map((asignatura) => {
-                          const preguntasAsignatura = preguntasClase.filter(p => p.asignaturaId === asignatura.id);
-                          if (preguntasAsignatura.length === 0) return null;
+                return (
+                  <div key={clase.id} className="space-y-4">
+                    <h2 className="text-[16px] font-bold tracking-tight text-ink border-l-2 border-ink pl-3 py-0.5">
+                      {clase.nombre}
+                    </h2>
+                    
+                    <div className="space-y-6 pl-2">
+                      {asignaturasClase.map((asignatura) => {
+                        const preguntasAsignatura = preguntasClase.filter(p => p.asignaturaId === asignatura.id);
+                        if (preguntasAsignatura.length === 0) return null;
 
-                          return (
-                            <div key={asignatura.id} className="mt-4">
-                              {/* HEADER ASIGNATURA */}
-                              <h3 className="mb-2 border-b border-linea/50 pb-2 font-mono text-[13px] font-bold uppercase tracking-wider text-sutil">
-                                {asignatura.nombre}
-                              </h3>
-                              <div>
-                                {preguntasAsignatura.map((p) => (
-                                  <div key={p.id} className="border-b border-linea py-5 last:border-0 pl-1">
-                                    <div className="flex items-start justify-between gap-4">
-                                      <h2 className="text-[14px] leading-snug font-medium text-ink">{p.titulo}</h2>
-                                      <span className="font-mono text-[18px] tabular-nums text-sutil shrink-0">{probabilidad(p)}%</span>
-                                    </div>
-                                    <p className="mt-1 font-mono text-[11px] text-sutil">
-                                      vol {volumen(p)} · {p.resultado === null ? "abierta" : p.resultado ? "entró" : "no entró"}
-                                    </p>
+                        return (
+                          <div key={asignatura.id} className="space-y-2">
+                            <h3 className="font-mono text-[12px] font-bold uppercase tracking-wider text-sutil">
+                              {asignatura.nombre}
+                            </h3>
+                            <div className="space-y-3">
+                              {preguntasAsignatura.map((p) => (
+                                <div key={p.id} className="rounded-xl border border-borde bg-white p-4 shadow-xs space-y-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <h4 className="text-[14px] leading-snug font-medium text-ink">{p.titulo}</h4>
+                                    <span className="font-mono text-[16px] tabular-nums text-sutil shrink-0">{probabilidad(p)}%</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px] font-mono text-sutil">
+                                    <span>vol {volumen(p)} · {p.resultado === null ? "abierta" : p.resultado ? "entró" : "no entró"}</span>
                                     <select
                                       value={p.asignaturaId}
                                       onChange={(e) => mercado.moverPregunta(p.id, e.target.value)}
-                                      style={{ fontSize: "16px" }}
-                                      className="mt-3 w-full rounded-lg border border-borde bg-white px-2 py-2 text-[16px] text-ink outline-none"
+                                      className="rounded border border-borde bg-lienzo px-2 py-1 text-[12px] text-ink outline-none"
                                     >
                                       {asignaturas.map((a) => (
                                         <option key={a.id} value={a.id}>{a.nombre}</option>
                                       ))}
                                     </select>
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                      {p.resultado === null ? (
-                                        <>
-                                          <button onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: true }); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-verde hover:text-verde active:bg-black/5">Entró</button>
-                                          <button onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: false }); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-rojo hover:text-rojo active:bg-black/5">No entró</button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <button onClick={() => { haptic(); mercado.desresolver(p.id); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5">Desresolver</button>
-                                          <button onClick={() => { haptic(); mercado.archivar(p.id, true); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5">Archivar</button>
-                                        </>
-                                      )}
-                                      <button onClick={() => { haptic(); const t = window.prompt("Nuevo título", p.titulo); if (t) mercado.editarTitulo(p.id, t); }} className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] active:bg-black/5">Editar</button>
-                                      <button onClick={() => { haptic(); if (window.confirm(`¿Seguro que quieres eliminar la pregunta "${p.titulo}"?`)) { mercado.eliminarPregunta(p.id); } }} className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] text-rojo active:bg-rojo/10">Eliminar</button>
-                                    </div>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* 2. Asignaturas sin Clase pero con preguntas */}
-                {(() => {
-                  const asigIds = asigSinClase.map(a => a.id);
-                  const preguntasSinClase = preguntasActivas.filter(p => asigIds.includes(p.asignaturaId));
-
-                  if (preguntasSinClase.length === 0) return null;
-
-                  return (
-                    <div className="relative mt-8">
-                      <h2 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-3 backdrop-blur border-b border-linea text-[18px] font-bold tracking-tight text-rojo shadow-sm">
-                        Asignaturas sin Carrera
-                      </h2>
-                      <div className="flex flex-col gap-6">
-                        {asigSinClase.map(asignatura => {
-                           const preguntasAsignatura = preguntasSinClase.filter(p => p.asignaturaId === asignatura.id);
-                           if(preguntasAsignatura.length === 0) return null;
-                           return (
-                              <div key={asignatura.id} className="mt-4">
-                                <h3 className="mb-2 font-mono text-[13px] font-bold uppercase tracking-wider text-rojo/70 border-b border-rojo/20 pb-2">
-                                  {asignatura.nombre}
-                                </h3>
-                                <div>
-                                  {preguntasAsignatura.map((p) => (
-                                    <div key={p.id} className="border-b border-linea py-5 last:border-0 pl-1">
-                                      <div className="flex items-start justify-between gap-4">
-                                        <h2 className="text-[14px] leading-snug font-medium text-ink">{p.titulo}</h2>
-                                        <span className="font-mono text-[18px] tabular-nums text-sutil shrink-0">{probabilidad(p)}%</span>
-                                      </div>
-                                      <p className="mt-1 font-mono text-[11px] text-sutil">
-                                        vol {volumen(p)} · {p.resultado === null ? "abierta" : p.resultado ? "entró" : "no entró"}
-                                      </p>
-                                      <select
-                                        value={p.asignaturaId}
-                                        onChange={(e) => mercado.moverPregunta(p.id, e.target.value)}
-                                        style={{ fontSize: "16px" }}
-                                        className="mt-3 w-full rounded-lg border border-borde bg-white px-2 py-2 text-[16px] text-ink outline-none"
-                                      >
-                                        {asignaturas.map((a) => (
-                                          <option key={a.id} value={a.id}>{a.nombre}</option>
-                                        ))}
-                                      </select>
-                                      <div className="mt-3 flex flex-wrap gap-2">
-                                        {p.resultado === null ? (
-                                          <>
-                                            <button onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: true }); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-verde hover:text-verde active:bg-black/5">Entró</button>
-                                            <button onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: false }); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-rojo hover:text-rojo active:bg-black/5">No entró</button>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <button onClick={() => { haptic(); mercado.desresolver(p.id); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5">Desresolver</button>
-                                            <button onClick={() => { haptic(); mercado.archivar(p.id, true); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] transition-colors hover:border-ink active:bg-black/5">Archivar</button>
-                                          </>
-                                        )}
-                                        <button onClick={() => { haptic(); const t = window.prompt("Nuevo título", p.titulo); if (t) mercado.editarTitulo(p.id, t); }} className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] active:bg-black/5">Editar</button>
-                                        <button onClick={() => { haptic(); if (window.confirm(`¿Seguro que quieres eliminar la pregunta "${p.titulo}"?`)) { mercado.eliminarPregunta(p.id); } }} className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] text-rojo active:bg-rojo/10">Eliminar</button>
-                                      </div>
-                                    </div>
-                                  ))}
+                                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-linea">
+                                    {p.resultado === null ? (
+                                      <>
+                                        <button onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: true }); }} className="flex-1 touch-manipulation rounded-lg bg-black/5 py-1.5 text-[12px] font-medium transition-colors hover:bg-verde/10 hover:text-verde">Entró</button>
+                                        <button onClick={() => { haptic(); setModalResolucion({ pregunta: p, resultado: false }); }} className="flex-1 touch-manipulation rounded-lg bg-black/5 py-1.5 text-[12px] font-medium transition-colors hover:bg-rojo/10 hover:text-rojo">No entró</button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => { haptic(); mercado.desresolver(p.id); }} className="flex-1 touch-manipulation rounded-lg bg-black/5 py-1.5 text-[12px]">Desresolver</button>
+                                        <button onClick={() => { haptic(); mercado.archivar(p.id, true); }} className="flex-1 touch-manipulation rounded-lg bg-black/5 py-1.5 text-[12px]">Archivar</button>
+                                      </>
+                                    )}
+                                    <button onClick={() => { haptic(); const t = window.prompt("Nuevo título", p.titulo); if (t) mercado.editarTitulo(p.id, t); }} className="touch-manipulation rounded-lg bg-black/5 px-3 py-1.5 text-[12px]">Editar</button>
+                                    <button onClick={() => { haptic(); if (window.confirm(`¿Eliminar pregunta?`)) { mercado.eliminarPregunta(p.id); } }} className="touch-manipulation rounded-lg bg-rojo/10 px-3 py-1.5 text-[12px] text-rojo">Eliminar</button>
+                                  </div>
                                 </div>
-                              </div>
-                           )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                {/* 3. Preguntas totalmente Huérfanas */}
-                {huerfanas.length > 0 && (
-                  <div className="relative mt-8">
-                    <h2 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-3 backdrop-blur border-b border-linea text-[18px] font-bold tracking-tight text-rojo shadow-sm">
-                      Preguntas Huérfanas
-                    </h2>
-                    <div>
-                      {huerfanas.map((p) => (
-                        <div key={p.id} className="border-b border-linea py-5 last:border-0 pl-1 text-rojo">
-                          <p className="text-[13px]">Mueve "{p.titulo}" a una asignatura válida.</p>
-                          <select value={p.asignaturaId || ""} onChange={(e) => mercado.moverPregunta(p.id, e.target.value)} style={{ fontSize: "16px" }} className="mt-3 w-full rounded-lg border border-rojo bg-white px-2 py-2 text-[16px] text-ink outline-none">
-                            <option value="" disabled>Selecciona asignatura...</option>
-                            {asignaturas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                          </select>
-                        </div>
-                      ))}
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                )}
+                );
+              })}
 
-              </div>
-            );
-          })()}
-
-          {vistaAdmin === "archivado" && (
-            <div className="pt-4">
-              {[...mercado.leerPreguntas({ estado: "archivadas", todasAdmin: true })]
-                .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { sensitivity: 'base' }))
-                .map((p) => (
-                <div key={p.id} className="border-b border-linea py-4">
-                  <h2 className="text-[14px] leading-snug text-sutil">{p.titulo}</h2>
-                  <div className="mt-3 flex gap-2">
-                    <button onClick={() => { haptic(); mercado.archivar(p.id, false); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] active:bg-black/5">Desarchivar</button>
-                    <button onClick={() => { haptic(); mercado.desresolver(p.id); }} className="flex-1 touch-manipulation rounded-lg border border-borde bg-white py-2 text-[13px] active:bg-black/5">Desresolver</button>
-                    <button onClick={() => { haptic(); if (window.confirm(`¿Seguro que quieres eliminar permanentemente "${p.titulo}"?`)) { mercado.eliminarPregunta(p.id); } }} className="touch-manipulation rounded-lg border border-borde bg-white px-3 py-2 text-[13px] text-rojo active:bg-rojo/10">Eliminar</button>
-                  </div>
+              {viendoTodas && huerfanas.length > 0 && (
+                <div className="rounded-xl border border-rojo/30 bg-rojo/5 p-4 space-y-2">
+                  <h2 className="text-[14px] font-bold text-rojo">Preguntas Huérfanas ({huerfanas.length})</h2>
+                  {huerfanas.map((p) => (
+                    <div key={p.id} className="text-[13px] text-rojo flex items-center justify-between">
+                      <span className="truncate pr-2">{p.titulo}</span>
+                      <select value={p.asignaturaId || ""} onChange={(e) => mercado.moverPregunta(p.id, e.target.value)} className="rounded border border-rojo bg-white px-2 py-1 text-[12px] text-ink">
+                        <option value="" disabled>Mover a...</option>
+                        {asignaturas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                      </select>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
+          );
+        })()}
 
-          {vistaAdmin === "usuarios" && (
-            <div className="pt-4">
-              {[...mercado.leerAlumnos(true)]
-                .sort((a, b) => nombreVisible(a).localeCompare(nombreVisible(b), 'es', { sensitivity: 'base' }))
-                .map((a) => {
-                  const apostado = mercado.apostadoAbierto[a.id] || 0;
-                  const total = Math.round(a.saldo + apostado);
-                  return (
-                    <div key={a.id} className="flex flex-col gap-3 border-b border-linea py-4">
-                      {/* Fila 1: Info y botones de tokens */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] font-medium text-ink">{nombreVisible(a)}</p>
-                          <p className="font-mono text-[11px] text-sutil">
-                            {total} tokens
-                            {apostado > 0 && ` (${Math.round(a.saldo)} libres + ${Math.round(apostado)} apostados)`}
-                            {a.pausado && " · pausado"}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button onClick={() => { haptic(); mercado.darTokens(a.id, -20); }} className="h-8 px-2 touch-manipulation rounded-lg border border-borde bg-white text-[11px] font-mono text-rojo active:bg-black/5">−20</button>
-                          <button onClick={() => { haptic(); mercado.darTokens(a.id, -1); }} className="h-8 w-8 touch-manipulation rounded-lg border border-borde bg-white text-[14px] active:bg-black/5">−</button>
-                          <button onClick={() => { haptic(); mercado.darTokens(a.id, 1); }} className="h-8 w-8 touch-manipulation rounded-lg border border-borde bg-white text-[14px] active:bg-black/5">+</button>
-                        </div>
+        {/* VISTA: ARCHIVADO (Solo Admin) */}
+        {vistaAdmin === "archivado" && esAdmin && (
+          <div className="space-y-3">
+            {[...mercado.leerPreguntas({ estado: "archivadas", todasAdmin: true })]
+              .filter((p) => viendoTodas || claseIdDeAsignatura(p.asignaturaId) === claseFiltroId)
+              .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { sensitivity: 'base' }))
+              .map((p) => (
+              <div key={p.id} className="rounded-xl border border-borde bg-white p-4 space-y-3">
+                <h2 className="text-[14px] font-medium text-sutil">{p.titulo}</h2>
+                <div className="flex gap-2">
+                  <button onClick={() => { haptic(); mercado.archivar(p.id, false); }} className="flex-1 rounded-lg bg-black/5 py-1.5 text-[12px]">Desarchivar</button>
+                  <button onClick={() => { haptic(); mercado.desresolver(p.id); }} className="flex-1 rounded-lg bg-black/5 py-1.5 text-[12px]">Desresolver</button>
+                  <button onClick={() => { haptic(); if (window.confirm(`¿Eliminar?`)) { mercado.eliminarPregunta(p.id); } }} className="rounded-lg bg-rojo/10 px-3 py-1.5 text-[12px] text-rojo">Eliminar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* VISTA: USUARIOS (Solo Admin puede gestionar roles mod) */}
+        {vistaAdmin === "usuarios" && esAdmin && (
+          <div className="space-y-3">
+            {[...mercado.leerAlumnos(true)]
+              .filter((a) => viendoTodas || a.claseId === claseFiltroId)
+              .sort((a, b) => nombreVisible(a).localeCompare(nombreVisible(b), 'es', { sensitivity: 'base' }))
+              .map((a) => {
+                const apostado = mercado.apostadoAbierto[a.id] || 0;
+                const total = Math.round(a.saldo + apostado);
+                return (
+                  <div key={a.id} className="rounded-xl border border-borde bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[14px] font-semibold text-ink">{nombreVisible(a)}</p>
+                        <p className="font-mono text-[11px] text-sutil">
+                          {total} tokens {apostado > 0 && `(${Math.round(a.saldo)} libres)`} {a.pausado && "· pausado"} {a.mod && "· mod exámenes"}
+                        </p>
                       </div>
-
-                      {/* Fila 2: Select clase, quitar apuestas y pausar */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          value={a.claseId || ""}
-                          onChange={(e) => {
-                            haptic();
-                            mercado.adminCambiarClaseAlumno(a.id, e.target.value);
-                          }}
-                          className="flex-1 min-w-[120px] rounded-lg border border-borde bg-white px-2 py-1.5 text-[12px] text-ink outline-none"
-                        >
-                          <option value="" disabled>Sin clase</option>
-                          {clases.map((c) => (
-                            <option key={c.id} value={c.id}>{c.nombre}</option>
-                          ))}
-                        </select>
-
-                        <button
-                          onClick={() => {
-                            haptic();
-                            if (window.confirm(`¿Devolver todas las apuestas activas a ${nombreVisible(a)}?`)) {
-                              mercado.adminRetirarApuestas(a.id);
-                            }
-                          }}
-                          disabled={apostado === 0}
-                          className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-3 py-1.5 text-[12px] transition-colors hover:text-rojo active:bg-black/5 disabled:opacity-40"
-                        >
-                          Quitar apuestas
-                        </button>
-
-                        <button
-                          onClick={() => { haptic(); mercado.pausarAlumno(a.id, !a.pausado); }}
-                          className={`shrink-0 touch-manipulation rounded-lg border px-3 py-1.5 text-[12px] transition-colors ${
-                            a.pausado ? "border-ink bg-ink text-white" : "border-borde bg-white text-ink hover:border-ink/30"
-                          }`}
-                        >
-                          {a.pausado ? "Reanudar" : "Pausar"}
-                        </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => { haptic(); mercado.darTokens(a.id, -20); }} className="h-7 px-2 rounded border border-borde text-[11px] font-mono text-rojo">−20</button>
+                        <button onClick={() => { haptic(); mercado.darTokens(a.id, -1); }} className="h-7 w-7 rounded border border-borde text-[13px]">−</button>
+                        <button onClick={() => { haptic(); mercado.darTokens(a.id, 1); }} className="h-7 w-7 rounded border border-borde text-[13px]">+</button>
                       </div>
                     </div>
-                  );
-                })}
-            </div>
-          )}
-
-          {vistaAdmin === "asignaturas" && (() => {
-            const huerfanas = asignaturas.filter(a => !a.claseId || !clases.some(c => c.id === a.claseId));
-
-            return (
-              <div className="space-y-6 pt-4">
-                
-                {/* 1. Panel para crear nueva asignatura SIEMPRE ARRIBA */}
-                <div className="rounded-xl border border-borde bg-black/5 p-4 mb-2">
-                  <h3 className="text-[13px] font-semibold text-ink mb-3">Nueva asignatura</h3>
-                  <form onSubmit={async (e) => { 
-                    e.preventDefault(); 
-                    if (!nuevaAsig.trim() || !nuevaAsigClase) return; 
-                    try { 
-                      haptic(); 
-                      await mercado.crearAsignatura(nuevaAsig, nuevaAsigClase); 
-                      setNuevaAsig(""); 
-                      setNuevaAsigClase("");
-                    } catch (error) { console.error("Error:", error); } 
-                  }} className="flex flex-col sm:flex-row gap-3">
-                    <input 
-                      value={nuevaAsig} 
-                      onChange={(e) => setNuevaAsig(e.target.value)} 
-                      placeholder="Nombre..." 
-                      style={{ fontSize: "16px" }} 
-                      className="min-w-0 flex-1 rounded-lg border border-borde bg-white px-3 py-2 text-[15px] text-ink outline-none placeholder:text-sutil focus:border-ink/30" 
-                    />
-                    <div className="flex gap-2">
-                      <select 
-                        value={nuevaAsigClase} 
-                        onChange={(e) => setNuevaAsigClase(e.target.value)} 
-                        style={{ fontSize: "16px" }} 
-                        className="flex-1 shrink-0 rounded-lg border border-borde bg-white px-2 py-2 text-[14px] text-ink outline-none"
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-linea">
+                      <select
+                        value={a.claseId || ""}
+                        onChange={(e) => { haptic(); mercado.adminCambiarClaseAlumno(a.id, e.target.value); }}
+                        className="flex-1 min-w-[100px] rounded border border-borde bg-lienzo px-2 py-1 text-[12px]"
                       >
-                        <option value="" disabled>Elegir Grado...</option>
+                        <option value="" disabled>Sin curso</option>
                         {clases.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                       </select>
+
+                      {/* Botón de Permiso Mod */}
                       <button 
-                        type="submit" 
-                        disabled={!nuevaAsig.trim() || !nuevaAsigClase} 
-                        className="shrink-0 touch-manipulation rounded-lg bg-ink px-4 py-2 text-[13px] font-medium text-white transition-opacity active:opacity-70 disabled:opacity-50"
+                        onClick={() => { haptic(); mercado.toggleMod(a.id, !a.mod); }} 
+                        className={`rounded border px-2.5 py-1 text-[12px] ${a.mod ? "bg-verde text-white border-verde" : "bg-white border-borde text-sutil"}`}
                       >
-                        Añadir
+                        {a.mod ? "Mod activo" : "Hacer mod"}
+                      </button>
+
+                      <button onClick={() => { haptic(); if (window.confirm(`¿Devolver apuestas?`)) mercado.adminRetirarApuestas(a.id); }} disabled={apostado === 0} className="rounded border border-borde px-2.5 py-1 text-[12px] disabled:opacity-40">Quitar apuestas</button>
+                      <button onClick={() => { haptic(); mercado.pausarAlumno(a.id, !a.pausado); }} className={`rounded border px-2.5 py-1 text-[12px] ${a.pausado ? "bg-ink text-white border-ink" : "bg-white border-borde"}`}>
+                        {a.pausado ? "Reanudar" : "Pausar"}
                       </button>
                     </div>
-                  </form>
-                </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
 
-                {/* 2. Asignaturas agrupadas por clase */}
-                {clases.map(clase => {
-                  const asignaturasClase = asignaturas.filter(a => a.claseId === clase.id);
-                  if (asignaturasClase.length === 0) return null;
+        {/* VISTA: CURSOS Y EXÁMENES (Accesible por Admin y Mod) */}
+        {vistaAdmin === "asignaturas" && (
+          <div className="space-y-6">
+            {/* PANEL DE CREACIÓN DE CURSOS (Solo Admin puede crear/renombrar/eliminar cursos) */}
+            {esAdmin && (
+              <div className="rounded-2xl border border-borde bg-white p-4 shadow-xs space-y-4">
+                <h3 className="text-[14px] font-bold text-ink">Gestión de Cursos</h3>
+                
+                <form onSubmit={async (e) => { e.preventDefault(); if (!nuevaClase.trim()) return; haptic(); await mercado.crearClase(nuevaClase); setNuevaClase(""); }} className="flex gap-2">
+                  <input value={nuevaClase} onChange={(e) => setNuevaClase(e.target.value)} placeholder="Nuevo curso..." className="flex-1 rounded-lg border border-borde px-3 py-1.5 text-[14px] outline-none" />
+                  <button type="submit" disabled={!nuevaClase.trim()} className="rounded-lg bg-ink px-4 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">Añadir Curso</button>
+                </form>
 
-                  return (
-                    <div key={clase.id} className="relative">
-                      <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[14px] font-bold uppercase tracking-wider text-ink">
-                        {clase.nombre}
-                      </h3>
-                      <div>
-                        {asignaturasClase.map((a) => (
-                          <div key={a.id} className="flex flex-col gap-2 border-b border-linea py-4 last:border-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <input 
-                                value={a.nombre} 
-                                onChange={(e) => mercado.renombrarAsignatura(a.id, e.target.value)} 
-                                style={{ fontSize: "16px" }} 
-                                className={`min-w-[150px] flex-1 bg-transparent text-[16px] font-bold text-ink outline-none focus:border-b focus:border-ink/30 ${a.cerrada ? "opacity-50" : ""}`} 
-                              />
-                              <select 
-                                value={a.claseId || ""} 
-                                onChange={(e) => { haptic(); mercado.cambiarClaseAsignatura(a.id, e.target.value); }} 
-                                className="shrink-0 rounded-lg border border-borde bg-white px-2 py-1.5 text-[12px] text-ink outline-none"
-                              >
-                                <option value="" disabled>Sin Grado</option>
-                                {clases.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                              </select>
-                              <button 
-                                onClick={() => { haptic(); mercado.pausarExamen(a.id, !a.cerrada); }} 
-                                className={`shrink-0 touch-manipulation rounded-lg border px-3 py-1.5 text-[12px] transition-colors ${a.cerrada ? "border-ink bg-ink text-white" : "border-borde bg-white text-ink hover:border-ink/30"}`}
-                              >
-                                {a.cerrada ? "Reabrir" : "Cerrar exam"}
-                              </button>
-                              <button 
-                                onClick={() => { haptic(); if (window.confirm(`¿Seguro que quieres eliminar la asignatura "${a.nombre}"?`)) { mercado.eliminarAsignatura(a.id); } }} 
-                                className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-3 py-1.5 text-[12px] text-rojo active:bg-rojo/10"
-                              >
-                                Eliminar
-                              </button>
-                            </div>
-                            
-                            <div className="flex items-center gap-3 mt-1">
-                              <label className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-sutil">Examen</label>
-                              <input 
-                                type="datetime-local" 
-                                value={a.fechaExamen ? aValorInputLocal(a.fechaExamen) : ""} 
-                                onChange={(e) => { const valor = e.target.value; mercado.editarFechaExamen(a.id, valor ? new Date(valor) : null); }} 
-                                style={{ fontSize: "16px" }} 
-                                className="min-w-0 flex-1 rounded-lg border border-borde bg-white px-2 py-1.5 text-[14px] text-ink outline-none focus:border-ink/40" 
-                              />
-                              {a.fechaExamen && (
-                                <button 
-                                  onClick={() => { haptic(); mercado.editarFechaExamen(a.id, null); }} 
-                                  className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-2.5 py-1.5 text-[12px] text-sutil active:bg-black/5"
-                                >
-                                  Quitar
-                                </button>
-                              )}
-                            </div>
-                            {a.cerrada && <p className="text-[12px] text-sutil font-mono uppercase">Examen cerrado. No se admiten apuestas.</p>}
-                          </div>
-                        ))}
-                      </div>
+                <div className="space-y-2 pt-2 border-t border-linea">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-sutil">Renombrar / Eliminar Cursos</span>
+                  {clases.map((c) => (
+                    <div key={c.id} className="flex items-center gap-2">
+                      <input value={c.nombre} onChange={(e) => mercado.renombrarClase(c.id, e.target.value)} className="flex-1 bg-black/5 rounded-lg px-3 py-1 text-[14px] font-medium outline-none" />
+                      <button onClick={() => { haptic(); if (window.confirm(`¿Eliminar curso ${c.nombre}?`)) mercado.eliminarClase(c.id); }} className="rounded-lg border border-borde px-2.5 py-1 text-[12px] text-rojo">Eliminar</button>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+            )}
 
-                {/* 3. Huérfanas */}
-                {huerfanas.length > 0 && (
-                  <div className="relative mt-8">
-                    <h3 className="sticky top-[3.5rem] z-10 -mx-5 bg-lienzo/95 px-5 py-2 backdrop-blur border-b border-linea font-mono text-[14px] font-bold uppercase tracking-wider text-rojo">
-                      Sin Grado / Huérfanas
-                    </h3>
-                    <div>
-                      {huerfanas.map((a) => (
-                        <div key={a.id} className="flex flex-col gap-2 border-b border-linea py-4 last:border-0">
-                          <p className="text-[13px] text-rojo">Esta asignatura no tiene clase asignada.</p>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-ink">{a.nombre}</span>
-                            <select 
-                              value={a.claseId || ""} 
-                              onChange={(e) => { haptic(); mercado.cambiarClaseAsignatura(a.id, e.target.value); }} 
-                              className="ml-auto shrink-0 rounded-lg border border-rojo bg-white px-2 py-1.5 text-[12px] text-ink outline-none"
-                            >
-                              <option value="" disabled>Seleccionar clase...</option>
-                              {clases.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                            </select>
+            {/* PANEL DE CREACIÓN DE EXÁMENES (Admin o Mod) */}
+            <div className="rounded-2xl border border-borde bg-white p-4 shadow-xs space-y-3">
+              <h3 className="text-[14px] font-bold text-ink">Crear Examen</h3>
+              <form onSubmit={async (e) => { e.preventDefault(); if (!nuevaAsig.trim() || !nuevaAsigClase) return; haptic(); await mercado.crearAsignatura(nuevaAsig, nuevaAsigClase); setNuevaAsig(""); }} className="flex gap-2">
+                <input value={nuevaAsig} onChange={(e) => setNuevaAsig(e.target.value)} placeholder="Nuevo examen..." className="flex-1 rounded-lg border border-borde px-3 py-1.5 text-[14px] outline-none" />
+                <select value={nuevaAsigClase} onChange={(e) => setNuevaAsigClase(e.target.value)} className="rounded-lg border border-borde px-2 py-1.5 text-[13px]">
+                  <option value="" disabled>Curso...</option>
+                  {clases.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+                <button type="submit" disabled={!nuevaAsig.trim() || !nuevaAsigClase} className="rounded-lg bg-ink px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">Crear Examen</button>
+              </form>
+            </div>
+
+            {/* LISTADO DE EXÁMENES POR CURSO */}
+            {clasesFiltradas.map(clase => {
+              const asignaturasClase = asignaturas.filter(a => a.claseId === clase.id);
+              if (asignaturasClase.length === 0) return null;
+
+              return (
+                <div key={clase.id} className="space-y-3">
+                  <h4 className="font-mono text-[13px] font-bold uppercase tracking-wider text-ink border-b border-linea pb-1">{clase.nombre}</h4>
+                  <div className="space-y-3">
+                    {asignaturasClase.map((a) => (
+                      <div key={a.id} className="rounded-xl border border-borde bg-white p-4 space-y-3">
+                        <input 
+                          value={a.nombre} 
+                          onChange={(e) => mercado.renombrarAsignatura(a.id, e.target.value)} 
+                          className="w-full font-bold text-[15px] bg-transparent outline-none border-b border-linea/60 pb-1" 
+                          placeholder="Nombre del examen..."
+                        />
+                        
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                          <select 
+                            value={a.claseId || ""} 
+                            onChange={(e) => { haptic(); mercado.cambiarClaseAsignatura(a.id, e.target.value); }} 
+                            className="rounded border border-borde bg-lienzo px-2 py-1.5 text-[12px] outline-none"
+                          >
+                            {clases.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                          </select>
+
+                          <div className="flex items-center gap-1.5">
                             <button 
-                                onClick={() => { haptic(); if (window.confirm(`¿Seguro que quieres eliminar la asignatura "${a.nombre}"?`)) { mercado.eliminarAsignatura(a.id); } }} 
-                                className="shrink-0 touch-manipulation rounded-lg border border-borde bg-white px-3 py-1.5 text-[12px] text-rojo active:bg-rojo/10"
-                              >
-                                Eliminar
-                              </button>
+                              onClick={() => { haptic(); mercado.pausarExamen(a.id, !a.cerrada); }} 
+                              className={`rounded px-3 py-1.5 text-[12px] font-medium border ${a.cerrada ? "bg-ink text-white border-ink" : "bg-white border-borde text-ink"}`}
+                            >
+                              {a.cerrada ? "Reabrir" : "Cerrar"}
+                            </button>
+                            <button 
+                              onClick={() => { haptic(); if (window.confirm(`¿Eliminar examen "${a.nombre}"?`)) mercado.eliminarAsignatura(a.id); }} 
+                              className="rounded border border-borde px-3 py-1.5 text-[12px] text-rojo hover:bg-rojo/5"
+                            >
+                              Eliminar
+                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-              </div>
-            );
-          })()}
-        </section>
+                        <div className="flex items-center gap-2 pt-2 border-t border-linea text-[12px]">
+                          <span className="font-mono text-sutil">Fecha:</span>
+                          <input 
+                            type="datetime-local" 
+                            value={a.fechaExamen ? aValorInputLocal(a.fechaExamen) : ""} 
+                            onChange={(e) => { const v = e.target.value; mercado.editarFechaExamen(a.id, v ? new Date(v) : null); }} 
+                            className="flex-1 rounded border border-borde px-2 py-1 outline-none text-[12px]" 
+                          />
+                          {a.fechaExamen && <button onClick={() => mercado.editarFechaExamen(a.id, null)} className="text-sutil underline">Quitar</button>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
 
-      {/* POPUP DE RESOLUCIÓN */}
+      {/* MODAL DE RESOLUCIÓN */}
       {modalResolucion && (() => {
         const p = modalResolucion.pregunta;
         const resultadoSi = modalResolucion.resultado;

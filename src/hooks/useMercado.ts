@@ -66,6 +66,7 @@ export interface Alumno {
   pausado: boolean;
   usaHash: boolean;
   hash: string;
+  mod: boolean;
 }
 
 export function probabilidad(p: Pick<Pregunta, "poolSi" | "poolNo">): number {
@@ -125,13 +126,9 @@ export function useMercado(usuario: Usuario | null) {
   const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
   const [apostadoAbierto, setApostadoAbierto] = useState<Record<string, number>>({});
   
-  // Variables para controlar el parpadeo
   const [perfilCargado, setPerfilCargado] = useState(false);
   const [idCargado, setIdCargado] = useState<string | null>(null);
 
-  // --------------------------------------------------------
-  // CARGA DE DATOS DESDE SUPABASE
-  // --------------------------------------------------------
   const cargarDatos = useCallback(async () => {
     const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas] = await Promise.all([
       supabase.from("clases").select("*").order("nombre"),
@@ -173,7 +170,8 @@ export function useMercado(usuario: Usuario | null) {
         saldo: Number(p.saldo),
         pausado: p.pausado,
         usaHash: p.usa_hash,
-        hash: p.hash || ""
+        hash: p.hash || "",
+        mod: !!p.mod
       }));
       setAlumnos(alums);
       if (usuario) {
@@ -233,7 +231,6 @@ export function useMercado(usuario: Usuario | null) {
       setPreguntas(pregs);
     }
 
-    // Sellamos la carga de datos con el ID del usuario que la provocó para evitar parpadeos
     setIdCargado(usuario ? usuario.id : null);
     setPerfilCargado(true);
   }, [usuario]);
@@ -242,36 +239,33 @@ export function useMercado(usuario: Usuario | null) {
     cargarDatos();
   }, [cargarDatos]);
 
-  // --------------------------------------------------------
-  // RECARGA MANUAL (Usada por el Pull To Refresh)
-  // --------------------------------------------------------
   const recargar = useCallback(async () => {
     await cargarDatos();
   }, [cargarDatos]);
 
-  // --------------------------------------------------------
-  // ESTADOS COMPUTADOS Y FILTRADOS POR CLASE
-  // --------------------------------------------------------
   const esAdmin = !!usuario?.esAdmin;
+  const esMod = !!miPerfil?.mod;
+  const tienePermisoExamenes = esAdmin || esMod;
+
   const saldo = miPerfil ? miPerfil.saldo : 0;
   const pausado = miPerfil ? miPerfil.pausado : false;
   const miClaseId = miPerfil?.claseId;
 
   const perfil = miPerfil
-    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash, claseId: miPerfil.claseId }
-    : { nombre: "", usaHash: false, hash: "", claseId: null };
+    ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash, claseId: miPerfil.claseId, mod: miPerfil.mod }
+    : { nombre: "", usaHash: false, hash: "", claseId: null, mod: false };
 
   const miNombre = perfil.usaHash ? `#${perfil.hash}` : perfil.nombre || usuario?.nombre || "Tú";
 
   const leerClases = useCallback((): Clase[] => clases, [clases]);
 
   const leerAsignaturas = useCallback((todasAdmin = false): Asignatura[] => {
-    return asignaturas.filter(a => (todasAdmin && esAdmin) ? true : a.claseId === miClaseId);
-  }, [asignaturas, miClaseId, esAdmin]);
+    return asignaturas.filter(a => (todasAdmin && tienePermisoExamenes) ? true : a.claseId === miClaseId);
+  }, [asignaturas, miClaseId, tienePermisoExamenes]);
 
   const leerAlumnos = useCallback((todasAdmin = false): Alumno[] => {
-    return alumnos.filter(a => (todasAdmin && esAdmin) ? true : a.claseId === miClaseId);
-  }, [alumnos, miClaseId, esAdmin]);
+    return alumnos.filter(a => (todasAdmin && tienePermisoExamenes) ? true : a.claseId === miClaseId);
+  }, [alumnos, miClaseId, tienePermisoExamenes]);
 
   const leerApuestas = useCallback((): Apuesta[] => {
     const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
@@ -302,7 +296,7 @@ export function useMercado(usuario: Usuario | null) {
   const leerPreguntas = useCallback(
     (opts?: { asignaturaId?: string; estado?: "abiertas" | "resueltas" | "archivadas" | "todas", todasAdmin?: boolean }) => {
       const estado = opts?.estado ?? "todas";
-      const asigPermitidas = new Set(asignaturas.filter(a => (opts?.todasAdmin && esAdmin) ? true : a.claseId === miClaseId).map(a => a.id));
+      const asigPermitidas = new Set(asignaturas.filter(a => (opts?.todasAdmin && tienePermisoExamenes) ? true : a.claseId === miClaseId).map(a => a.id));
 
       return preguntas
         .filter((p) => asigPermitidas.has(p.asignaturaId))
@@ -315,7 +309,7 @@ export function useMercado(usuario: Usuario | null) {
         })
         .sort((a, b) => probabilidad(b) - probabilidad(a));
     },
-    [preguntas, asignaturas, miClaseId, esAdmin]
+    [preguntas, asignaturas, miClaseId, tienePermisoExamenes]
   );
 
   const resumen = useCallback(() => {
@@ -338,17 +332,10 @@ export function useMercado(usuario: Usuario | null) {
     return { ganar: Math.round(ganar), perder: Math.round(perder), nombres };
   }, [leerPreguntas]);
 
-  // --------------------------------------------------------
-  // ACCIONES DEL USUARIO (CONECTADAS A LA DB)
-  // --------------------------------------------------------
-  
-const elegirClase = useCallback(async (claseId: string) => {
-    if (!usuario) return;
-    
-    // Saber si es un cambio de clase real o si es la primera vez
+  const elegirClase = useCallback(async (claseId: string) => {
+    if (!usuario || pausado) return;
     const esCambio = miPerfil?.claseId && miPerfil.claseId !== claseId;
 
-    // Llamamos a la función inteligente de Supabase
     const { error } = await supabase.rpc("cambiar_clase_y_resetear", {
       p_usuario_id: usuario.id,
       p_nueva_clase_id: claseId
@@ -359,12 +346,10 @@ const elegirClase = useCallback(async (claseId: string) => {
       return;
     }
 
-    // Si efectivamente se ha cambiado, forzamos que el saldo local se ponga a 0 al instante
     const nuevoSaldo = esCambio ? 0 : (miPerfil?.saldo || 0);
-
     setMiPerfil(prev => prev ? { ...prev, claseId, saldo: nuevoSaldo } : prev);
     await cargarDatos();
-  }, [usuario, miPerfil, cargarDatos]);
+  }, [usuario, pausado, miPerfil, cargarDatos]);
 
   const apostar = useCallback(async (id: string, lado: Lado, tokens = 1) => {
     if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
@@ -449,7 +434,7 @@ const elegirClase = useCallback(async (claseId: string) => {
   }, [usuario, miPerfil, cargarDatos]);
 
   // --------------------------------------------------------
-  // ADMIN
+  // ADMIN & MOD
   // --------------------------------------------------------
 
   const resolver = useCallback(async (id: string, entro: boolean) => {
@@ -504,12 +489,17 @@ const elegirClase = useCallback(async (claseId: string) => {
   }, [esAdmin, cargarDatos]);
 
   const eliminarPregunta = useCallback(async (id: string) => {
-    if (!esAdmin) return false;
+    if (!esAdmin) {
+      if (!esMod) return false;
+      const preg = preguntas.find(p => p.id === id);
+      const asig = preg ? asignaturas.find(a => a.id === preg.asignaturaId) : null;
+      if (!asig || asig.claseId !== miClaseId) return false;
+    }
     const { error } = await supabase.rpc("eliminar_pregunta", { p_pregunta_id: id });
     if (error) console.error("Error al eliminar pregunta:", error);
     await cargarDatos();
     return !error;
-  }, [esAdmin, cargarDatos]);
+  }, [esAdmin, esMod, preguntas, asignaturas, miClaseId, cargarDatos]);
 
   const moverPregunta = useCallback(async (id: string, asignaturaId: string) => {
     if (!esAdmin) return false;
@@ -526,43 +516,61 @@ const elegirClase = useCallback(async (claseId: string) => {
   }, [esAdmin, cargarDatos]);
 
   const crearAsignatura = useCallback(async (nombre: string, claseId: string) => {
-    if (!esAdmin || !nombre.trim() || !claseId) return false;
+    if (!tienePermisoExamenes || !nombre.trim() || !claseId) return false;
+    if (!esAdmin && esMod && claseId !== miClaseId) return false;
     await supabase.from("asignaturas").insert({ nombre: nombre.trim(), clase_id: claseId });
     await cargarDatos();
     return true;
-  }, [esAdmin, cargarDatos]);
+  }, [tienePermisoExamenes, esAdmin, esMod, miClaseId, cargarDatos]);
 
   const cambiarClaseAsignatura = useCallback(async (id: string, claseId: string) => {
-    if (!esAdmin) return false;
+    if (!tienePermisoExamenes) return false;
+    if (!esAdmin && esMod) return false; // Los mods no pueden cambiar de curso el examen
     await supabase.from("asignaturas").update({ clase_id: claseId }).eq("id", id);
     await cargarDatos();
     return true;
-  }, [esAdmin, cargarDatos]);
+  }, [tienePermisoExamenes, esAdmin, esMod, cargarDatos]);
 
   const eliminarAsignatura = useCallback(async (id: string) => {
-    if (!esAdmin) return false;
+    if (!tienePermisoExamenes) return false;
+    if (!esAdmin && esMod) {
+      const asig = asignaturas.find(a => a.id === id);
+      if (!asig || asig.claseId !== miClaseId) return false;
+    }
     await supabase.from("asignaturas").delete().eq("id", id);
     await cargarDatos();
     return true;
-  }, [esAdmin, cargarDatos]);
+  }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
   const renombrarAsignatura = useCallback(async (id: string, nombre: string) => {
-    if (!esAdmin || !nombre.trim()) return false;
+    if (!tienePermisoExamenes || !nombre.trim()) return false;
+    if (!esAdmin && esMod) {
+      const asig = asignaturas.find(a => a.id === id);
+      if (!asig || asig.claseId !== miClaseId) return false;
+    }
     await supabase.from("asignaturas").update({ nombre: nombre.trim() }).eq("id", id);
     await cargarDatos();
     return true;
-  }, [esAdmin, cargarDatos]);
+  }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
   const pausarExamen = useCallback(async (asignaturaId: string, valor: boolean) => {
-    if (!esAdmin) return false;
+    if (!tienePermisoExamenes) return false;
+    if (!esAdmin && esMod) {
+      const asig = asignaturas.find(a => a.id === asignaturaId);
+      if (!asig || asig.claseId !== miClaseId) return false;
+    }
     const { error } = await supabase.from("asignaturas").update({ cerrada: valor }).eq("id", asignaturaId);
     if (error) console.error("Error al pausar examen:", error);
     await cargarDatos();
     return !error;
-  }, [esAdmin, cargarDatos]);
+  }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
   const editarFechaExamen = useCallback(async (asignaturaId: string, fecha: Date | null) => {
-    if (!esAdmin) return false;
+    if (!tienePermisoExamenes) return false;
+    if (!esAdmin && esMod) {
+      const asig = asignaturas.find(a => a.id === asignaturaId);
+      if (!asig || asig.claseId !== miClaseId) return false;
+    }
     const { error } = await supabase
       .from("asignaturas")
       .update({ fecha_examen: fecha ? fecha.toISOString() : null })
@@ -570,7 +578,7 @@ const elegirClase = useCallback(async (claseId: string) => {
     if (error) console.error("Error al editar fecha de examen:", error);
     await cargarDatos();
     return !error;
-  }, [esAdmin, cargarDatos]);
+  }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
   const editarFechaExamenPublica = useCallback(async (asignaturaId: string, fecha: Date | null) => {
     if (!usuario) return false;
@@ -582,6 +590,30 @@ const elegirClase = useCallback(async (claseId: string) => {
     await cargarDatos();
     return !error;
   }, [usuario, cargarDatos]);
+
+  const crearClase = useCallback(async (nombre: string) => {
+    if (!esAdmin || !nombre.trim()) return false;
+    const { error } = await supabase.from("clases").insert({ nombre: nombre.trim() });
+    if (error) { alert("Error al crear clase: " + error.message); return false; }
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
+
+  const renombrarClase = useCallback(async (claseId: string, nombre: string) => {
+    if (!esAdmin || !nombre.trim()) return false;
+    const { error } = await supabase.from("clases").update({ nombre: nombre.trim() }).eq("id", claseId);
+    if (error) { alert("Error al renombrar clase: " + error.message); return false; }
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
+
+  const eliminarClase = useCallback(async (claseId: string) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase.from("clases").delete().eq("id", claseId);
+    if (error) { alert("Error al eliminar clase: " + error.message); return false; }
+    await cargarDatos();
+    return true;
+  }, [esAdmin, cargarDatos]);
 
   const darTokens = useCallback(async (alumnoId: string, delta: number) => {
     if (!esAdmin) return false;
@@ -610,12 +642,17 @@ const elegirClase = useCallback(async (claseId: string) => {
   const adminRetirarApuestas = useCallback(async (alumnoId: string) => {
     if (!esAdmin) return false;
     const { error } = await supabase.rpc("admin_retirar_apuestas", { p_alumno_id: alumnoId });
-    if (error) {
-      console.error("Error al retirar apuestas:", error);
-      alert("Error: " + error.message);
-    }
+    if (error) alert("Error: " + error.message);
     await cargarDatos();
     return !error;
+  }, [esAdmin, cargarDatos]);
+
+  const toggleMod = useCallback(async (alumnoId: string, valor: boolean) => {
+    if (!esAdmin) return false;
+    const { error } = await supabase.from("perfiles").update({ mod: valor }).eq("id", alumnoId);
+    if (error) { alert("Error al cambiar permisos de moderador: " + error.message); return false; }
+    await cargarDatos();
+    return true;
   }, [esAdmin, cargarDatos]);
 
   return useMemo(
@@ -652,14 +689,18 @@ const elegirClase = useCallback(async (claseId: string) => {
       pausarExamen,
       editarFechaExamen,
       editarFechaExamenPublica,
+      crearClase,
+      renombrarClase,
+      eliminarClase,
       adminCambiarClaseAlumno,
       adminRetirarApuestas,
       darTokens,
       pausarAlumno,
+      toggleMod,
       guardarNombre,
       usarHash,
       mutar,
-      recargar, // <--- FUNCIÓN EXPORTADA PARA EL PULL TO REFRESH
+      recargar,
     }),
     [
       perfilCargado,
@@ -696,12 +737,16 @@ const elegirClase = useCallback(async (claseId: string) => {
       pausarExamen,
       editarFechaExamen,
       editarFechaExamenPublica,
+      crearClase,
+      renombrarClase,
+      eliminarClase,
       darTokens,
       pausarAlumno,
+      toggleMod,
       guardarNombre,
       usarHash,
       mutar,
-      recargar, // <--- DEPENDENCIA
+      recargar,
     ]
   );
 }

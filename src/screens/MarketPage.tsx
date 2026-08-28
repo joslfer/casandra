@@ -410,7 +410,7 @@ function PantallaNuevaPregunta({
           style={{ fontSize: "16px" }}
           className="mt-3 w-full resize-none rounded-md border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50 select-text"
         />
-        <p style={fuenteApple} className="mt-5 text-[13px] font-medium text-sutil">Asignatura</p>
+        <p style={fuenteApple} className="mt-5 text-[13px] font-medium text-sutil">Examen</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {asignaturas.map((a) => (
             <button
@@ -760,84 +760,6 @@ export function MarketPage() {
     }
   };
 
-  // --- SWIPE MANUAL CON EL DEDO: DESACTIVADO ---
-  // Estos handlers gestionaban el arrastre táctil sobre el carrusel de
-  // preguntas para cambiar de asignatura. Se dejan comentados (no
-  // eliminados) por si se quiere reactivar el swipe manual más adelante.
-  // El cambio de asignatura ahora solo ocurre a través de las tags
-  // (ver <Asignaturas /> y scrollToAsig, que mantiene la animación).
-  //
-  // const handleTouchStart = (e: React.TouchEvent) => {
-  //   touchStartX.current = e.touches[0].clientX;
-  //   touchStartY.current = e.touches[0].clientY;
-  //   touchStartTime.current = Date.now();
-  //   startAsigId.current = asigActiva;
-  //   detenerAnimacion();
-  // };
-  //
-  // const handleTouchEnd = (e: React.TouchEvent) => {
-  //   const touchEndX = e.changedTouches[0].clientX;
-  //   const touchEndY = e.changedTouches[0].clientY;
-  //   const deltaX = touchStartX.current - touchEndX;
-  //   const deltaY = touchStartY.current - touchEndY;
-  //   const timeElapsed = Date.now() - touchStartTime.current;
-  //
-  //   if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
-  //     const startIndex = asignaturasOrdenadas.findIndex(a => a.id === startAsigId.current);
-  //     let targetIndex = startIndex;
-  //     const velocity = deltaX / timeElapsed;
-  //
-  //     if (deltaX > 30 || velocity > 0.4) {
-  //       targetIndex = Math.min(startIndex + 1, asignaturasOrdenadas.length - 1);
-  //     } else if (deltaX < -30 || velocity < -0.4) {
-  //       targetIndex = Math.max(startIndex - 1, 0);
-  //     } else {
-  //       const container = scrollContainerRef.current;
-  //       if (container) {
-  //         const containerRect = container.getBoundingClientRect();
-  //         const containerCenter = containerRect.left + containerRect.width / 2;
-  //         let minDistance = Infinity;
-  //
-  //         asignaturasOrdenadas.forEach((asig, i) => {
-  //           const slide = container.querySelector(`[data-id="${asig.id}"]`);
-  //           if (slide) {
-  //             const slideRect = slide.getBoundingClientRect();
-  //             const slideCenter = slideRect.left + slideRect.width / 2;
-  //             const dist = Math.abs(slideCenter - containerCenter);
-  //             if (dist < minDistance) {
-  //               minDistance = dist;
-  //               targetIndex = i;
-  //             }
-  //           }
-  //         });
-  //       }
-  //     }
-  //
-  //     if (asignaturasOrdenadas[targetIndex]) {
-  //       scrollToAsigInstantaneo(asignaturasOrdenadas[targetIndex].id);
-  //     }
-  //   }
-  // };
-  //
-  // const scrollToAsigInstantaneo = (id: string) => {
-  //   haptic();
-  //   setAsigActiva(id);
-  //
-  //   const container = scrollContainerRef.current;
-  //   if (!container) return;
-  //
-  //   const slide = container.querySelector(`[data-id="${id}"]`);
-  //   if (slide) {
-  //     isProgrammaticScroll.current = true;
-  //     const containerRect = container.getBoundingClientRect();
-  //     const slideRect = slide.getBoundingClientRect();
-  //     container.scrollLeft += slideRect.left - containerRect.left;
-  //     requestAnimationFrame(() => { isProgrammaticScroll.current = false; });
-  //   }
-  // };
-
-  // scrollToAsig: usado por las TAGS para cambiar de asignatura.
-  // Mantiene la animación de swipe izquierda/derecha — sigue activo.
   const scrollToAsig = (id: string) => {
     haptic();
     setAsigActiva(id); 
@@ -931,6 +853,9 @@ export function MarketPage() {
 
   const pullProgress = Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1);
 
+  // Verificamos si el usuario actual es moderador
+  const esModerador = !!(mercado.perfil as any)?.mod || !!usuario.esAdmin;
+
   return (
     <div
       ref={mainContainerRef}
@@ -957,6 +882,7 @@ export function MarketPage() {
           <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
           <div className="flex items-center gap-2">
             {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
+            {esModerador && <Link to={"/mod" as never} className={`${mono} mr-2 text-ink font-bold`}>MOD</Link>}
             <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
               <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
             </Link>
@@ -970,7 +896,7 @@ export function MarketPage() {
       {/* ZONA AISLADA PARA EL PULL TO REFRESH */}
       <div className="relative w-full">
         
-        {/* INDICADOR PULL TO REFRESH NATIVO IOS (SIN FONDO BLANCO CIRCULAR) */}
+        {/* INDICADOR PULL TO REFRESH NATIVO IOS */}
         <div 
           className="absolute left-0 top-0 z-10 flex w-full justify-center pointer-events-none items-center"
           style={{
@@ -987,7 +913,6 @@ export function MarketPage() {
               transition: isPulling ? 'none' : `all ${SPRING_CONFIG}`
             }}
           >
-            {/* Si está refrescando se anima con "steps(12)" para dar los saltitos clásicos del spinner de iOS */}
             <IosSpinner 
               className="h-7 w-7" 
               style={!isRefreshing 
@@ -1036,15 +961,6 @@ export function MarketPage() {
           </div>
 
           {/* CONTENEDOR DESLIZABLE HORIZONTAL */}
-          {/*
-            Swipe manual con el dedo DESACTIVADO: se ha quitado
-            onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
-            (código comentado más arriba) y se ha cambiado
-            overflow-x-auto -> overflow-x-hidden para que el navegador
-            tampoco permita arrastrar el carrusel de forma nativa.
-            El cambio de asignatura sigue funcionando (con su animación)
-            únicamente a través de scrollToAsig, disparado por las tags.
-          */}
           <div 
             ref={scrollContainerRef}
             onWheel={detenerAnimacion}
