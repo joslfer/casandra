@@ -1043,17 +1043,22 @@ export function MarketPage() {
                         <h2 className="mb-3 text-[24px] font-bold tracking-tight text-ink">No entiendes cómo funciona? Lee esto.</h2>
                         <div className="space-y-4 text-[16px] leading-relaxed text-ink">
                           <p>
-                            Imagina que Fulanito cree que va a caer una pregunta en el examen porque ha estado muy atento en clase. Apuesta 1 token al SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces apuestan 1 token cada uno al NO. 
+                            Imagina que Fulanito cree que va a caer el ciclo del agua en el examen, porque hace mucho que no cae. Él está muy seguro porque estuvo atento en clase. Apuesta 1 token al SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces apuestan 1 token cada uno al NO. 
                           </p>
                           <p>
-                          Cuando llega el día del examen, Fulanito tiene razón y cae esa pregunta. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
+                            La probabilidad de que caiga es del 33% porque esa es la fracción de los participantes creen que va a entrar (1/3). La opinión del grupo queda guardada en ese número.
                           </p>
                           <p>
-                          El mercado recompensa al que aporta información verdadera. Obviamente no será infalible pero será la aproximación más fiable a la verdad, porque agrega sabiduría dispersa.
+                          Cuando llega el día del examen, Fulanito tiene razón. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
                           </p>
                           <p>
-                            Puedes usarlo para estudiar o simplemente por diversión.
+                          El mercado recompensa al que aporta información verdadera. Obviamente no será infalible pero será la aproximación más fiable, porque agrega muchas opiniones.
                           </p>
+                          <p>
+                            Puedes usarlo para consultar la opinión de tu clase.
+                          </p>
+                        
+                          
                         </div>
                       </article>
                     </div>
