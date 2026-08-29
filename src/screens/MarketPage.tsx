@@ -406,7 +406,7 @@ function PantallaNuevaPregunta({
           disabled={cargando}
           autoFocus
           rows={4}
-          placeholder="¿Qué pregunta quieres proponer?"
+          placeholder="¿Qué pregunta quieres proponer para todos?"
           style={{ fontSize: "16px" }}
           className="mt-3 w-full resize-none rounded-md border border-borde bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40 disabled:opacity-50 select-text"
         />
