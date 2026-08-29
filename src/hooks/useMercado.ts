@@ -5,7 +5,7 @@
  * Se utilizan las funciones RPC de PostgreSQL para garantizar seguridad
  * atómica en las transacciones (apuestas y repartos).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Lado = "si" | "no";
@@ -125,9 +125,24 @@ export function useMercado(usuario: Usuario | null) {
   const [apuestas, setApuestas] = useState<Apuesta[]>([]);
   const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
   const [apostadoAbierto, setApostadoAbierto] = useState<Record<string, number>>({});
-  
+
   const [perfilCargado, setPerfilCargado] = useState(false);
   const [idCargado, setIdCargado] = useState<string | null>(null);
+
+  // Referencias para debouncing de ediciones de texto (evita que el polling /
+  // los refetch pisen lo que el usuario está escribiendo en cada tecla).
+  const debounceClases = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const debounceAsignaturas = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    // Limpieza al desmontar: cancela timers pendientes.
+    const dc = debounceClases.current;
+    const da = debounceAsignaturas.current;
+    return () => {
+      Object.values(dc).forEach(clearTimeout);
+      Object.values(da).forEach(clearTimeout);
+    };
+  }, []);
 
   const cargarDatos = useCallback(async () => {
     const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas] = await Promise.all([
@@ -149,18 +164,40 @@ export function useMercado(usuario: Usuario | null) {
       if (data) misApuestas = data;
     }
 
-    if (resClases.data) setClases(resClases.data.map((c: any) => ({ id: c.id, nombre: c.nombre })));
+    // No pisar clases/asignaturas que el usuario está editando activamente
+    // (hay un debounce pendiente para ese id): se dejará que el propio
+    // debounce actualice el estado cuando confirme contra el servidor.
+    if (resClases.data) {
+      setClases((prev) => {
+        const pendientes = new Set(Object.keys(debounceClases.current));
+        const frescas = resClases.data.map((c: any) => ({ id: c.id, nombre: c.nombre }));
+        if (pendientes.size === 0) return frescas;
+        return frescas.map((c) => {
+          if (!pendientes.has(c.id)) return c;
+          const local = prev.find((p) => p.id === c.id);
+          return local ?? c;
+        });
+      });
+    }
 
-    if (resAsig.data)
-      setAsignaturas(
-        resAsig.data.map((a: any) => ({
+    if (resAsig.data) {
+      setAsignaturas((prev) => {
+        const pendientes = new Set(Object.keys(debounceAsignaturas.current));
+        const frescas = resAsig.data.map((a: any) => ({
           id: a.id,
           claseId: a.clase_id,
           nombre: a.nombre,
           cerrada: a.cerrada,
           fechaExamen: a.fecha_examen ? new Date(a.fecha_examen).getTime() : null
-        }))
-      );
+        }));
+        if (pendientes.size === 0) return frescas;
+        return frescas.map((a) => {
+          if (!pendientes.has(a.id)) return a;
+          const local = prev.find((p) => p.id === a.id);
+          return local ?? a;
+        });
+      });
+    }
 
     if (resPerf.data) {
       const alums = resPerf.data.map((p: any) => ({
@@ -271,7 +308,7 @@ export function useMercado(usuario: Usuario | null) {
     const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
     const agrupadas: Apuesta[] = [];
     for (const a of apuestas) {
-      if (!alumnosClase.has(a.usuarioId)) continue; 
+      if (!alumnosClase.has(a.usuarioId)) continue;
       const ultima = agrupadas[agrupadas.length - 1];
       if (ultima && ultima.usuario === a.usuario) {
         ultima.tokens += a.tokens;
@@ -547,15 +584,36 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
-  const renombrarAsignatura = useCallback(async (id: string, nombre: string) => {
-    if (!tienePermisoExamenes || !nombre.trim()) return false;
+  /**
+   * Renombrar asignatura: actualización optimista inmediata en estado local
+   * + debounce de 600ms antes de escribir en Supabase. Evita que un
+   * cargarDatos() (propio o de otra pestaña) revierta el texto mientras
+   * el usuario sigue escribiendo.
+   */
+  const renombrarAsignatura = useCallback((id: string, nombre: string) => {
+    if (!tienePermisoExamenes) return;
     if (!esAdmin && esMod) {
       const asig = asignaturas.find(a => a.id === id);
-      if (!asig || asig.claseId !== miClaseId) return false;
+      if (!asig || asig.claseId !== miClaseId) return;
     }
-    await supabase.from("asignaturas").update({ nombre: nombre.trim() }).eq("id", id);
-    await cargarDatos();
-    return true;
+
+    // 1. Reflejar el cambio en pantalla al instante.
+    setAsignaturas((prev) => prev.map((a) => (a.id === id ? { ...a, nombre } : a)));
+
+    // 2. Reiniciar el temporizador de guardado para este id.
+    if (debounceAsignaturas.current[id]) clearTimeout(debounceAsignaturas.current[id]);
+
+    debounceAsignaturas.current[id] = setTimeout(async () => {
+      const nombreLimpio = nombre.trim();
+      delete debounceAsignaturas.current[id];
+      if (!nombreLimpio) return;
+      const { error } = await supabase.from("asignaturas").update({ nombre: nombreLimpio }).eq("id", id);
+      if (error) {
+        console.error("Error al renombrar asignatura:", error);
+        alert("Error al renombrar examen: " + error.message);
+        await cargarDatos();
+      }
+    }, 600);
   }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
   const pausarExamen = useCallback(async (asignaturaId: string, valor: boolean) => {
@@ -604,12 +662,34 @@ export function useMercado(usuario: Usuario | null) {
     return true;
   }, [esAdmin, cargarDatos]);
 
-  const renombrarClase = useCallback(async (claseId: string, nombre: string) => {
-    if (!esAdmin || !nombre.trim()) return false;
-    const { error } = await supabase.from("clases").update({ nombre: nombre.trim() }).eq("id", claseId);
-    if (error) { alert("Error al renombrar clase: " + error.message); return false; }
-    await cargarDatos();
-    return true;
+  /**
+   * Renombrar clase: mismo patrón optimista + debounce que renombrarAsignatura.
+   * Antes: cada tecla disparaba update() + cargarDatos() (refetch completo),
+   * y las respuestas fuera de orden pisaban lo que el usuario acababa de
+   * escribir. Ahora el estado local manda mientras hay una edición en curso
+   * (ver el filtro de "pendientes" en cargarDatos) y solo se escribe en la
+   * base de datos 600ms después de la última tecla.
+   */
+  const renombrarClase = useCallback((claseId: string, nombre: string) => {
+    if (!esAdmin) return;
+
+    // 1. Reflejar el cambio en pantalla al instante.
+    setClases((prev) => prev.map((c) => (c.id === claseId ? { ...c, nombre } : c)));
+
+    // 2. Reiniciar el temporizador de guardado para esta clase.
+    if (debounceClases.current[claseId]) clearTimeout(debounceClases.current[claseId]);
+
+    debounceClases.current[claseId] = setTimeout(async () => {
+      const nombreLimpio = nombre.trim();
+      delete debounceClases.current[claseId];
+      if (!nombreLimpio) return;
+      const { error } = await supabase.from("clases").update({ nombre: nombreLimpio }).eq("id", claseId);
+      if (error) {
+        console.error("Error al renombrar clase:", error);
+        alert("Error al renombrar clase: " + error.message);
+        await cargarDatos();
+      }
+    }, 600);
   }, [esAdmin, cargarDatos]);
 
   const eliminarClase = useCallback(async (claseId: string) => {
