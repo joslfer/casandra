@@ -203,9 +203,55 @@ function PaginaRanking() {
           </h2>
           {/* Aquí he puesto texto normal (17px) y color normal (text-ink) */}
           <p className="mt-3 text-[17px] leading-relaxed text-ink">
-          En el futuro quiero meter recompensas aquí. Si tienes alguna idea proponla.
           </p>
         </div>
+
+        {/* ---------------------------------------------------- */}
+        {/* NUEVO ANUNCIO DE REFERIDOS */}
+        {/* ---------------------------------------------------- */}
+        <div className="mt-7 w-full">
+          <div className="w-full rounded-lg border border-dashed border-ink/20 bg-gradient-to-br from-purple-500/[0.04] via-transparent to-purple-500/[0.04] px-4 pt-3 pb-1.5 text-center">
+            <div className="text-[16px] leading-snug text-ink/80">
+              Si usas <strong className="font-semibold text-purple-500">Copyfly</strong> para imprimir fotocopias el 5% del precio de tu pedido hace que los tokens suban de valor.<br />
+              
+              <span className="mt-1 block font-medium bg-gradient-to-r from-purple-500 to-purple-400 bg-clip-text text-transparent">
+                De momento 1 token = 0€
+              </span>
+              
+              <a 
+                href="https://copyfly.es?r=9hb34pUoy3eTpKz5YGFE" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center justify-center gap-1 font-medium text-ink transition-colors active:opacity-70"
+              >
+                <img 
+                  src="../images/copyflylogo.png" 
+                  alt="Logo Copifly" 
+                  className="h-13 w-auto object-contain opacity-90" 
+                />
+                <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80">
+                  copyfly.es?r=9hb34pUoy3eTpKz5YGFE
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
+        {/* ---------------------------------------------------- */}
+        {/* ---------------------------------------------------- */}
+{/* ---------------------------------------------------- */}
+        {/* DISCLAIMER LEGAL DISCRETO */}
+        {/* ---------------------------------------------------- */}
+        <div className="mt-12 mb-8 px-4 text-center text-[13px] leading-relaxed text-sutil/70">
+          <p>
+            Proyecto estudiantil de participación gratuita. Los tokens tienen un valor puramente 
+            simbólico, no constituyen un activo financiero y la equivalencia mostrada no es vinculante. 
+            El reparto proporcional del bote promocional de afiliación se efectuará una vez se alcance 
+            un mínimo de 20€ acumulados y sujeto a la resolución final de la organización. No existen 
+            retiros automáticos en efectivo; la entrega del premio se coordinará de forma personal 
+            con cada ganador.
+          </p>
+        </div>
+        {/* ---------------------------------------------------- */}
 
       </main>
     </div>
