@@ -225,7 +225,7 @@ function PaginaRanking() {
                 className="group inline-flex items-center justify-center gap-1 font-medium text-ink transition-colors active:opacity-70"
               >
                 <img 
-                  src="../images/copyflylogo.png" 
+                  src="/images/copyflylogo.png" 
                   alt="Logo Copifly" 
                   className="h-13 w-auto object-contain opacity-90" 
                 />
