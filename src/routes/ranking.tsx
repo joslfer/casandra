@@ -238,6 +238,7 @@ function PaginaRanking() {
         </div>
         {/* ---------------------------------------------------- */}
         {/* ---------------------------------------------------- */}
+        <br></br>
         <div className="mt-8 px-2 text-[16px] leading-relaxed text-ink/90">
           <p>
             Las recompensas de esta app dependen totalmente de que la gente que participe use los partners. Sigue siendo toalmente gratis para todos los usuarios. Si tienes mejores ideas para financiar premios, adelante.
