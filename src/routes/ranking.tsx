@@ -238,18 +238,23 @@ function PaginaRanking() {
         </div>
         {/* ---------------------------------------------------- */}
         {/* ---------------------------------------------------- */}
+        <div className="mt-8 px-2 text-[16px] leading-relaxed text-ink/90">
+          <p>
+            Las recompensas de esta app dependen totalmente de que la gente que participe use los partners. Sigue siendo toalmente gratis para todos los usuarios. Si tienes mejores ideas para financiar premios, adelante.
+          </p>
+        </div>
 {/* ---------------------------------------------------- */}
         {/* DISCLAIMER LEGAL DISCRETO */}
         {/* ---------------------------------------------------- */}
         <div className="mt-12 mb-8 px-4 text-center text-[13px] leading-relaxed text-sutil/70">
-          <p>
-            Proyecto estudiantil de participación gratuita. Los tokens tienen un valor puramente 
-            simbólico, no constituyen un activo financiero y la equivalencia mostrada no es vinculante. 
-            El reparto proporcional del bote promocional de afiliación se efectuará una vez se alcance 
-            un mínimo de 20€ acumulados y sujeto a la resolución final de la organización. No existen 
-            retiros automáticos en efectivo; la entrega del premio se coordinará de forma personal 
-            con cada ganador.
-          </p>
+        <p>
+          Nota: Esta app es un proyecto estudiantil 100% gratuito. Los tokens son solo puntos 
+          de juego (no dinero real ni activos financieros) y la equivalencia mostrada es una 
+          estimación no vinculante. El bote promocional se repartirá cuando acumulemos el mínimo 
+          de 20€ mediante los enlaces. Al no haber un sistema automático para sacar dinero, 
+          el reparto definitivo se validará al final del juego y coordinaremos la entrega de los 
+          premios personalmente con cada ganador.
+        </p>
         </div>
         {/* ---------------------------------------------------- */}
 
