@@ -5,7 +5,7 @@ import { haceTexto, useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader reutilizable
-
+import logoCopyfly from "@/images/copyflylogo.png";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
 function Moneda({ className = "" }: { className?: string }) {
@@ -224,11 +224,11 @@ function PaginaRanking() {
                 rel="noopener noreferrer"
                 className="group inline-flex items-center justify-center gap-1 font-medium text-ink transition-colors active:opacity-70"
               >
-                <img 
-                  src="/images/copyflylogo.png" 
-                  alt="Logo Copifly" 
-                  className="h-13 w-auto object-contain opacity-90" 
-                />
+              <img 
+                src={logoCopyfly} 
+                alt="Logo Copyfly" 
+                className="h-13 w-auto object-contain opacity-90" 
+              />
                 <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80">
                   copyfly.es?r=9hb34pUoy3eTpKz5YGFE
                 </span>
