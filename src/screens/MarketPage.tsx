@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList, Lock } from "lucide-react"; // Quitamos Loader2
+import { Settings, ClipboardList, Lock } from "lucide-react"; 
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import { LoaderApp } from "@/components/LoaderApp"; 
@@ -34,7 +34,6 @@ function IosSpinner({ className, style }: { className?: string; style?: React.CS
           height="5.5"
           rx="1.1"
           fill="currentColor"
-          // Gradiente de opacidad para dar el efecto de cola
           opacity={0.3 + (0.7 * i) / 11}
           transform={`rotate(${i * 30} 12 12)`}
         />
@@ -50,14 +49,12 @@ function Moneda({ className = "" }: { className?: string }) {
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
-// Convierte un timestamp (ms) al formato que espera <input type="datetime-local">
 function aValorInputLocal(ts: number): string {
   const d = new Date(ts);
   const pad2 = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-// Cuenta atrás días/horas/min/seg hasta `fechaExamen`
 function CountdownExamen({
   fechaExamen,
   asignaturaId,
@@ -441,7 +438,6 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
     );
   }
 
-  // Buscamos el índice exacto del usuario en la lista ordenada del ranking (que ya incluye el desempate alfabético)
   const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
 
   if (miIndice === -1) {
@@ -454,16 +450,13 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
     );
   }
 
-  // La posición real en la lista es exactamente su índice + 1 (coincidiendo 100% con el ranking)
   const miPosicion = miIndice + 1;
   const yo = rankingFijo[miIndice];
 
-  // Comprobamos si hay empate exacto de tokens con algún otro usuario de la lista
   const empatadosConmigo = rankingFijo.filter(r => r.tokens === yo.tokens && r.usuario !== miNombre);
   const esEmpate = empatadosConmigo.length > 0;
   const compañeroEmpate = empatadosConmigo[0];
 
-  // Jugadores estrictamente por encima para calcular la diferencia de tokens
   const personasEncima = rankingFijo.filter(r => r.tokens > yo.tokens);
   const maxScoreEncima = personasEncima.length > 0 ? Math.max(...personasEncima.map(r => r.tokens)) : null;
   const grupoEncima = maxScoreEncima !== null ? personasEncima.filter(r => r.tokens === maxScoreEncima) : [];
@@ -611,14 +604,6 @@ export function MarketPage() {
   const animRef = useRef<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScroll = useRef(false);
-
-  // --- SWIPE MANUAL CON EL DEDO: DESACTIVADO ---
-  // Refs que usaban los handlers de swipe táctil entre asignaturas.
-  // Se mantienen comentados por si se quiere reactivar el swipe en el futuro.
-  // const touchStartX = useRef(0);
-  // const touchStartY = useRef(0);
-  // const touchStartTime = useRef(0);
-  // const startAsigId = useRef<string>("");
 
   // ESTADOS PULL TO REFRESH
   const [isPulling, setIsPulling] = useState(false);
@@ -884,7 +869,6 @@ export function MarketPage() {
 
   const pullProgress = Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1);
 
-  // Verificamos si el usuario actual es moderador
   const esModerador = !!(mercado.perfil as any)?.mod || !!usuario.esAdmin;
 
   return (
@@ -961,7 +945,7 @@ export function MarketPage() {
             transition: isPulling ? 'none' : `transform ${SPRING_CONFIG}`
           }}
         >
-          {/* HEADER PRINCIPAL (SALDO) */}
+          {/* HEADER PRINCIPAL (SALDO Y CLASIFICACIÓN) */}
           <div className="mx-auto w-full max-w-[520px]">
             {!mercado.pausado && (
               <div className="mt-8 mb-4 flex flex-col items-center justify-center w-full">
@@ -978,7 +962,11 @@ export function MarketPage() {
                     </button>
                   </div>
                 </div>
+                
                 <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
+                
+
+
               </div>
             )}
 
@@ -1038,7 +1026,6 @@ export function MarketPage() {
                         </button>
                       </div>
 
-                      {/* ARTÍCULO INFERIOR CON ANCHO COMPLETO, HEADING Y SEPARACIÓN */}
                       <article className="w-full text-left mb-28">
                         <h2 className="mb-3 text-[24px] font-bold tracking-tight text-ink">No entiendes cómo funciona? Lee esto.</h2>
                         <div className="space-y-4 text-[16px] leading-relaxed text-ink">
@@ -1104,7 +1091,6 @@ export function MarketPage() {
         />
       )}
 
-      {/* Hack de iOS */}
       <input type="checkbox" id="haptic-checkbox" ref={(el) => { if (el) el.setAttribute("switch", ""); }} style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} tabIndex={-1} aria-hidden="true" />
       <label htmlFor="haptic-checkbox" id="haptic-label" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} aria-hidden="true"></label>
     </div>
