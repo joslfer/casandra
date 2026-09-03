@@ -8,6 +8,14 @@ import { LoaderApp } from "@/components/LoaderApp"; // <-- Importamos tu loader 
 import logoCopyfly from "@/images/copyflylogo.png";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
+// -----------------------------------------------------
+// FLAG: cambia esta línea para alternar entre la sección
+// de ads/recompensas completa y la frase simple.
+// true  -> muestra ads (Copyfly, disclaimer legal, etc.)
+// false -> muestra solo la frase simple
+// -----------------------------------------------------
+const MOSTRAR_ADS = false;
+
 function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
 }
@@ -206,58 +214,65 @@ function PaginaRanking() {
           </p>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* NUEVO ANUNCIO DE REFERIDOS */}
-        {/* ---------------------------------------------------- */}
-        <div className="mt-7 w-full">
-          <div className="w-full rounded-lg border border-dashed border-ink/20 bg-gradient-to-br from-purple-500/[0.04] via-transparent to-purple-500/[0.04] px-4 pt-3 pb-1.5 text-center">
-            <div className="text-[16px] leading-snug text-ink/80">
-              Si usas <strong className="font-semibold text-purple-500">Copyfly</strong> para imprimir fotocopias el 5% del precio de tu pedido hace que los tokens suban de valor.<br />
-              
-              <span className="mt-1 block font-medium bg-gradient-to-r from-purple-500 to-purple-400 bg-clip-text text-transparent">
-                De momento 1 token = 0€
-              </span>
-              
-              <a 
-                href="https://copyfly.es?r=9hb34pUoy3eTpKz5YGFE" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex items-center justify-center gap-1 font-medium text-ink transition-colors active:opacity-70"
-              >
-              <img 
-                src={logoCopyfly} 
-                alt="Logo Copyfly" 
-                className="h-13 w-auto object-contain opacity-90" 
-              />
-                <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80">
-                  copyfly.es?r=9hb34pUoy3eTpKz5YGFE
-                </span>
-              </a>
+        {MOSTRAR_ADS ? (
+          <>
+            {/* ---------------------------------------------------- */}
+            {/* ANUNCIO DE REFERIDOS */}
+            {/* ---------------------------------------------------- */}
+            <div className="mt-7 w-full">
+              <div className="w-full rounded-lg border border-dashed border-ink/20 bg-gradient-to-br from-purple-500/[0.04] via-transparent to-purple-500/[0.04] px-4 pt-3 pb-1.5 text-center">
+                <div className="text-[16px] leading-snug text-ink/80">
+                  Si usas <strong className="font-semibold text-purple-500">Copyfly</strong> para imprimir fotocopias el 5% del precio de tu pedido hace que los tokens suban de valor.<br />
+                  
+                  <span className="mt-1 block font-medium bg-gradient-to-r from-purple-500 to-purple-400 bg-clip-text text-transparent">
+                    De momento 1 token = 0€
+                  </span>
+                  
+                  <a 
+                    href="https://copyfly.es?r=9hb34pUoy3eTpKz5YGFE" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group inline-flex items-center justify-center gap-1 font-medium text-ink transition-colors active:opacity-70"
+                  >
+                  <img 
+                    src={logoCopyfly} 
+                    alt="Logo Copyfly" 
+                    className="h-13 w-auto object-contain opacity-90" 
+                  />
+                    <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80">
+                      copyfly.es?r=9hb34pUoy3eTpKz5YGFE
+                    </span>
+                  </a>
+                </div>
+              </div>
             </div>
+            {/* ---------------------------------------------------- */}
+            <br></br>
+            <div className="mt-8 px-2 text-[16px] leading-relaxed text-ink/90">
+              <p>
+                Las recompensas de esta app dependen totalmente de que la gente que participe use los partners. Sigue siendo toalmente gratis para todos los usuarios. Si tienes mejores ideas para financiar premios, adelante.
+              </p>
+            </div>
+            {/* ---------------------------------------------------- */}
+            {/* DISCLAIMER LEGAL DISCRETO */}
+            {/* ---------------------------------------------------- */}
+            <div className="mt-12 mb-8 px-4 text-center text-[13px] leading-relaxed text-sutil/70">
+            <p>
+              Nota: Esta app es un proyecto estudiantil 100% gratuito. Los tokens son solo puntos 
+              de juego (no dinero real ni activos financieros) y la equivalencia mostrada es una 
+              estimación no vinculante. El bote promocional se repartirá cuando acumulemos el mínimo 
+              de 20€ mediante los enlaces. Al no haber un sistema automático para sacar dinero, 
+              el reparto definitivo se validará al final del juego y coordinaremos la entrega de los 
+              premios personalmente con cada ganador.
+            </p>
+            </div>
+            {/* ---------------------------------------------------- */}
+          </>
+        ) : (
+          <div className="mt-7 px-2 text-[16px] leading-relaxed text-ink/90">
+            <p>Si tienes ideas para financiar premios, propónlas. Ten en cuenta las consideraciones legales.</p>
           </div>
-        </div>
-        {/* ---------------------------------------------------- */}
-        {/* ---------------------------------------------------- */}
-        <br></br>
-        <div className="mt-8 px-2 text-[16px] leading-relaxed text-ink/90">
-          <p>
-            Las recompensas de esta app dependen totalmente de que la gente que participe use los partners. Sigue siendo toalmente gratis para todos los usuarios. Si tienes mejores ideas para financiar premios, adelante.
-          </p>
-        </div>
-{/* ---------------------------------------------------- */}
-        {/* DISCLAIMER LEGAL DISCRETO */}
-        {/* ---------------------------------------------------- */}
-        <div className="mt-12 mb-8 px-4 text-center text-[13px] leading-relaxed text-sutil/70">
-        <p>
-          Nota: Esta app es un proyecto estudiantil 100% gratuito. Los tokens son solo puntos 
-          de juego (no dinero real ni activos financieros) y la equivalencia mostrada es una 
-          estimación no vinculante. El bote promocional se repartirá cuando acumulemos el mínimo 
-          de 20€ mediante los enlaces. Al no haber un sistema automático para sacar dinero, 
-          el reparto definitivo se validará al final del juego y coordinaremos la entrega de los 
-          premios personalmente con cada ganador.
-        </p>
-        </div>
-        {/* ---------------------------------------------------- */}
+        )}
 
       </main>
     </div>
