@@ -46,6 +46,26 @@ function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
 }
 
+// Icono estilo el de compartir de Apple/iOS (square.and.arrow.up):
+// una caja abierta por arriba con una flecha saliendo hacia arriba.
+function IconoCompartirApple({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 16V4" />
+      <path d="M8 8l4-4 4 4" />
+      <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+    </svg>
+  );
+}
+
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -595,6 +615,7 @@ export function MarketPage() {
   const haptic = useHaptic();
 
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [copiado, setCopiado] = useState(false);
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
@@ -822,6 +843,34 @@ export function MarketPage() {
     }
   };
 
+  // -----------------------------------------------------
+  // COMPARTIR APP: usa el menú nativo de compartir (Web Share API)
+  // y si el navegador no lo soporta, copia el enlace al portapapeles.
+  // -----------------------------------------------------
+  const compartirApp = async () => {
+    haptic();
+    const url = window.location.hostname === "localhost"
+      ? "https://casndra.vercel.app" // <-- pon aquí tu URL real de producción
+      : window.location.origin;
+    const datosCompartir = {
+      title: "Casandra",
+      text: "Prueba Casandra, apuesta tokens sobre qué va a caer en el examen.",
+      url,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(datosCompartir);
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      }
+    } catch (err) {
+      // El usuario canceló el menú de compartir, o no hay soporte: no hacemos nada.
+    }
+  };
+
   if (cargando) {
     return (
       <div className="min-h-screen bg-lienzo flex items-center justify-center">
@@ -1046,6 +1095,15 @@ export function MarketPage() {
                           </p>
                           
                         </div>
+
+                        <button
+                          onClick={compartirApp}
+                          style={fuenteApple}
+                          className="mt-4 flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
+                        >
+                          <IconoCompartirApple className="h-4 w-4" />
+                          {copiado ? "enlace copiado" : "compartir la app"}
+                        </button>
                       </article>
                     </div>
                   )}

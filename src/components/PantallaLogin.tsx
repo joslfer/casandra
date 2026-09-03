@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useHaptic } from "@/hooks/useHaptic";
 import { Link } from "@tanstack/react-router";
 
@@ -12,6 +12,15 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
   const [error, setError] = useState<string | null>(null);
   const haptic = useHaptic();
 
+  // Bloquea el scroll de la página mientras esta pantalla está montada.
+  useEffect(() => {
+    const overflowPrevio = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflowPrevio;
+    };
+  }, []);
+
   const handleLogin = async () => {
     haptic();
     const mensajeError = await entrarConGoogle();
@@ -21,7 +30,10 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-lienzo overflow-hidden relative" style={fuenteApple}>
+    <div
+      className="flex flex-col bg-lienzo overflow-hidden relative"
+      style={{ ...fuenteApple, height: "100dvh" }}
+    >
       
       {/* CSS inyectado para la animación */}
       <style>{`
@@ -55,7 +67,7 @@ export function PantallaLogin({ entrarConGoogle }: PantallaLoginProps) {
         }
       `}</style>
 
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 relative z-10">
+      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 relative z-10 overflow-hidden">
         
         <div className="w-full max-w-[340px] flex flex-col relative pt-4">
           
