@@ -1,7 +1,6 @@
 {
   "name": "Casandra",
   "install": "npm ci",
-  "start": "bash .cursor/sync-env.sh",
   "terminals": [
     {
       "name": "Dev server",
