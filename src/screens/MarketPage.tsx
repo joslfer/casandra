@@ -66,6 +66,15 @@ function IconoCompartirApple({ className = "" }: { className?: string }) {
   );
 }
 
+// Triangulito de toggle estilo Notion
+function IconoTriangulo({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5l8 7-8 7V5z" />
+    </svg>
+  );
+}
+
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
@@ -276,9 +285,24 @@ function FilaPregunta({
 
   const [cooldown, setCooldown] = useState(false);
 
-  const handleApostar = (lado: Lado) => {
+  const juice = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.animate(
+      [
+        { transform: "scale(1)" },
+        { transform: "scale(0.82)", offset: 0.2 },
+        { transform: "scale(1.14)", offset: 0.5 },
+        { transform: "scale(0.97)", offset: 0.75 },
+        { transform: "scale(1)" },
+      ],
+      { duration: 420, easing: "cubic-bezier(0.22, 0.9, 0.32, 1)" }
+    );
+  };
+
+  const handleApostar = (lado: Lado, el: HTMLButtonElement | null) => {
     if (cooldown || bloqueado) return;
     setCooldown(true);
+    juice(el);
     onApostar(lado);
     setTimeout(() => setCooldown(false), 400);
   };
@@ -300,7 +324,7 @@ function FilaPregunta({
       <div className="mt-3 flex gap-2">
         <button
           data-apuesta
-          onClick={() => handleApostar("no")}
+          onClick={(e) => handleApostar("no", e.currentTarget)}
           disabled={visuallyBlocked}
           style={fuenteApple}
           className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
@@ -310,7 +334,7 @@ function FilaPregunta({
         </button>
         <button
           data-apuesta
-          onClick={() => handleApostar("si")}
+          onClick={(e) => handleApostar("si", e.currentTarget)}
           disabled={visuallyBlocked}
           style={fuenteApple}
           className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
@@ -607,6 +631,30 @@ function SaldoAnimado({ valor }: { valor: number }) {
 }
 
 // ============================================================================
+// TOGGLE ESTILO NOTION (triangulito) PARA LA EXPLICACIÓN
+// ============================================================================
+function ToggleInfo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  const [abierto, setAbierto] = useState(false);
+
+  return (
+    <div className="mt-4 w-full text-left">
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        style={fuenteApple}
+        className="flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
+      >
+        <IconoTriangulo
+          className={`h-3 w-3 shrink-0 transition-transform duration-200 ${abierto ? "rotate-90" : ""}`}
+        />
+        {titulo}
+      </button>
+
+      {abierto && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
+
+// ============================================================================
 // MARKET PAGE CON PULL TO REFRESH NATIVO - ESTILO SPINNER CIRCULAR
 // ============================================================================
 export function MarketPage() {
@@ -640,8 +688,13 @@ export function MarketPage() {
   const SPINNER_OFFSET = 55;
   const SPRING_CONFIG = "0.4s cubic-bezier(0.3, 0.7, 0, 1)";
 
+  // NOTA: el scroll real ahora ocurre DENTRO de mainContainerRef (no en el
+  // documento/window). html y body están fijados (position: fixed) vía el
+  // <style> de abajo, así que usamos mainContainerRef.current.scrollTop en
+  // vez de window.scrollY, y .scrollTo() del propio div en vez de window.scrollTo.
   const handleMainTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY <= 10 && !isRefreshing) {
+    const scrollTop = mainContainerRef.current?.scrollTop ?? 0;
+    if (scrollTop <= 10 && !isRefreshing) {
       pullStartY.current = e.touches[0].clientY;
       pullStartX.current = e.touches[0].clientX;
       isVerticalSwipe.current = null;
@@ -667,7 +720,9 @@ export function MarketPage() {
       return;
     }
 
-    if (diffY > 0 && window.scrollY <= 10) {
+    const scrollTop = mainContainerRef.current?.scrollTop ?? 0;
+
+    if (diffY > 0 && scrollTop <= 10) {
       const distance = diffY * (1 - Math.min(diffY / 600, 0.75));
       setPullDistance(distance);
     } else if (diffY < 0) {
@@ -693,7 +748,7 @@ export function MarketPage() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } finally {
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        mainContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
         setIsRefreshing(false);
         setPullDistance(0);
       }
@@ -774,15 +829,6 @@ export function MarketPage() {
     };
     document.addEventListener("touchstart", bloquearSwipeIOS, { passive: false });
     return () => document.removeEventListener("touchstart", bloquearSwipeIOS);
-  }, []);
-
-  useEffect(() => {
-    document.body.style.overscrollBehaviorY = 'none';
-    document.documentElement.style.overscrollBehaviorY = 'none';
-    return () => {
-      document.body.style.overscrollBehaviorY = '';
-      document.documentElement.style.overscrollBehaviorY = '';
-    };
   }, []);
 
   const detenerAnimacion = () => {
@@ -926,8 +972,8 @@ export function MarketPage() {
       onTouchStart={handleMainTouchStart}
       onTouchMove={handleMainTouchMove}
       onTouchEnd={handleMainTouchEnd}
-      className="min-h-screen w-full overflow-x-hidden bg-lienzo select-none relative"
-      style={{ ...fuenteApple, paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
+      className="h-[100dvh] w-full overflow-x-hidden overflow-y-auto overscroll-y-none bg-lienzo select-none relative"
+      style={{ ...fuenteApple, WebkitOverflowScrolling: "touch", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
       onClickCapture={(event) => {
         const target = event.target as Element;
         if (target.id === "haptic-checkbox" || target.id === "haptic-label") return;
@@ -938,6 +984,20 @@ export function MarketPage() {
       <style>{`
         * { scrollbar-width: none; -ms-overflow-style: none; }
         *::-webkit-scrollbar { display: none; }
+
+        /* Evita que el DOCUMENTO (html/body) pueda hacer scroll o rebote.
+           El scroll real vive dentro de este contenedor (mainContainerRef).
+           Esto es lo que quita el difuminado "liquid glass" que iOS aplica
+           arriba cuando detecta rebote elástico a nivel de página en una
+           webapp instalada (standalone). */
+        html, body {
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          overscroll-behavior: none;
+        }
       `}</style>
 
       {/* HEADER TOP-BAR */}
@@ -1076,34 +1136,34 @@ export function MarketPage() {
                       </div>
 
                       <article className="w-full text-left mb-28">
-                        <h2 className="mb-3 text-[24px] font-bold tracking-tight text-ink">No entiendes cómo funciona? Lee esto.</h2>
-                        <div className="space-y-4 text-[16px] leading-relaxed text-ink">
-                          <p>
-                            Imagina que Fulanito cree que va a caer el ciclo del agua en el examen, porque hace mucho que no cae. Él está muy seguro porque estuvo atento en clase. Apuesta 1 token al SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces apuestan 1 token cada uno al NO. 
-                          </p>
-                          <p>
-                            La probabilidad de que caiga es del 33% porque esa es la fracción de los participantes creen que va a entrar (1/3). La opinión del grupo queda guardada en ese número.
-                          </p>
-                          <p>
-                          Cuando llega el día del examen, Fulanito tiene razón. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
-                          </p>
-                          <p>
-                          El mercado recompensa al que aporta información verdadera. Casandra es simplemente una máquina que agrega conocimiento colectivo y produce un porcentaje fiable %.
-                          </p>
-                          <p>
-                          Úsalo para consultar la opinión de tu clase.
-                          </p>
-                          
-                        </div>
-
                         <button
                           onClick={compartirApp}
                           style={fuenteApple}
-                          className="mt-4 flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
+                          className="flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
                         >
                           <IconoCompartirApple className="h-4 w-4" />
                           {copiado ? "enlace copiado" : "compartir la app"}
                         </button>
+
+                        <ToggleInfo titulo="¿No entiendes cómo funciona? Lee esto.">
+                          <div className="space-y-4 text-[16px] leading-relaxed text-ink">
+                            <p>
+                              Imagina que Fulanito cree que va a caer el ciclo del agua en el examen, porque hace mucho que no cae. Él está muy seguro porque estuvo atento en clase. Apuesta 1 token al SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces apuestan 1 token cada uno al NO. 
+                            </p>
+                            <p>
+                              La probabilidad de que caiga es del 33% porque esa es la fracción de los participantes creen que va a entrar (1/3). La opinión del grupo queda guardada en ese número.
+                            </p>
+                            <p>
+                            Cuando llega el día del examen, Fulanito tiene razón. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
+                            </p>
+                            <p>
+                            El mercado recompensa al que aporta información verdadera. Casandra es simplemente una máquina que agrega conocimiento colectivo y produce un porcentaje fiable %.
+                            </p>
+                            <p>
+                            Úsalo para consultar la opinión de tu clase.
+                            </p>
+                          </div>
+                        </ToggleInfo>
                       </article>
                     </div>
                   )}
@@ -1127,24 +1187,8 @@ export function MarketPage() {
             }
             
             setOrdenSnapshot({});
-            
-            if (id !== asigId) {
-              scrollToAsig(id);
-            }
-            
-            setTimeout(() => {
-              const elementosTitulo = Array.from(document.querySelectorAll('h2'));
-              const tituloNueva = elementosTitulo.find(el => el.textContent === t);
-              
-              if (tituloNueva) {
-                tituloNueva.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              } else {
-                window.scrollTo({
-                  top: document.documentElement.scrollHeight,
-                  behavior: "smooth"
-                });
-              }
-            }, 300);
+            // Sin scroll al cerrar el modal: la pregunta se añade, y la
+            // vista se queda exactamente donde estaba.
           }}
         />
       )}
