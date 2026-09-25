@@ -98,6 +98,8 @@ export function hashAleatorio(): string {
   return s;
 }
 
+export const RECOMPENSA_CREAR_PREGUNTA = 1;
+
 export function haceTexto(cuando: number, ahora = Date.now()): string {
   const min = Math.max(1, Math.round((ahora - cuando) / 60000));
   if (min < 60) return `hace ${min} min`;
@@ -440,19 +442,28 @@ export function useMercado(usuario: Usuario | null) {
     return devolucion;
   }, [pausado, preguntas, cargarDatos]);
 
-  const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
-    const t = titulo.trim();
-    if (!t || pausado || !asignaturaId) return null;
-    const { data, error } = await supabase.from("preguntas").insert({
-      titulo: t,
-      asignatura_id: asignaturaId,
-      historial: [50]
-    }).select().single();
+const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
+  const t = titulo.trim();
+  if (!t || pausado || !asignaturaId) return null;
 
-    if (error || !data) return null;
-    await cargarDatos();
-    return data as unknown as Pregunta;
-  }, [pausado, cargarDatos]);
+  const { data, error } = await supabase.rpc("crear_pregunta_con_recompensa", {
+    p_titulo: t,
+    p_asignatura_id: asignaturaId,
+    p_recompensa: RECOMPENSA_CREAR_PREGUNTA
+  });
+
+  if (error || !data) {
+    console.error("Error al crear pregunta:", error);
+    return null;
+  }
+
+  if (RECOMPENSA_CREAR_PREGUNTA > 0) {
+    setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + RECOMPENSA_CREAR_PREGUNTA } : prev));
+  }
+
+  await cargarDatos();
+  return data as unknown as Pregunta;
+}, [pausado, cargarDatos]);
 
   const simular = useCallback(() => { console.log("Simular deshabilitado."); }, []);
 
