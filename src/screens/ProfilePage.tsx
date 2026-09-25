@@ -13,6 +13,7 @@ export function ProfilePage() {
 
   // Estado local para que escribir vaya perfecto sin lag
   const [nombreLocal, setNombreLocal] = useState("");
+  const [estadoGuardado, setEstadoGuardado] = useState<"idle" | "guardando" | "guardado">("idle");
 
   // Sincronizamos el estado local con el real cuando carga la página
   useEffect(() => {
@@ -61,11 +62,13 @@ export function ProfilePage() {
     );
   }
 
-  // Función que guarda de verdad solo cuando salimos del input (onBlur)
-  const guardarSiCambio = () => {
-    if (nombreLocal !== mercado.perfil.nombre) {
-      mercado.guardarNombre(nombreLocal);
-    }
+  // Guarda de verdad solo cuando el usuario pulsa el botón, y comunica el estado
+  const guardarNombre = async () => {
+    if (nombreLocal === mercado.perfil.nombre) return;
+    setEstadoGuardado("guardando");
+    await mercado.guardarNombre(nombreLocal);
+    setEstadoGuardado("guardado");
+    setTimeout(() => setEstadoGuardado("idle"), 1500);
   };
 
   return (
@@ -103,8 +106,7 @@ export function ProfilePage() {
             <div className="relative mt-2">
               <input
                 value={nombreLocal}
-                onChange={(e) => setNombreLocal(e.target.value)}
-                onBlur={guardarSiCambio}
+                onChange={(e) => { setNombreLocal(e.target.value); setEstadoGuardado("idle"); }}
                 disabled={mercado.perfil.usaHash}
                 placeholder={usuario.nombre}
                 className="w-full rounded-lg border border-borde bg-black/5 px-3 py-2 pr-10 text-[22px] font-semibold text-ink outline-none transition-colors placeholder:text-sutil/40 focus:border-ink/30 focus:bg-white disabled:border-transparent disabled:bg-transparent disabled:opacity-40"
@@ -118,6 +120,20 @@ export function ProfilePage() {
                 </div>
               )}
             </div>
+
+            {!mercado.perfil.usaHash && nombreLocal !== mercado.perfil.nombre && (
+              <button
+                onClick={guardarNombre}
+                disabled={estadoGuardado === "guardando"}
+                className="mt-2 flex touch-manipulation items-center justify-center rounded-lg bg-ink px-4 py-2 text-[14px] font-semibold text-white transition-opacity active:opacity-70 disabled:opacity-50"
+              >
+                {estadoGuardado === "guardando" ? "Guardando..." : "Guardar nombre"}
+              </button>
+            )}
+
+            {estadoGuardado === "guardado" && (
+              <p className="mt-2 text-[13px] font-medium text-verde">Guardado ✓</p>
+            )}
           </div>
 
           {/* Switch Modo Anónimo */}
