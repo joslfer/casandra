@@ -92,7 +92,7 @@ export function ProfilePage() {
         
         <div className="mb-6 text-[16px] leading-relaxed text-ink">
           <p>
-            El objetivo de este mercado es agregar información sumando muchas opiniones distintas. Apuesta pensando por tu cuenta. Cuanto más pensamiento individual mejor.
+            El objetivo de este mercado es agregar información sumando muchas opiniones distintas. Piensa por tu cuenta. Cuanto más pensamiento individual mejor.
           </p>
         </div>
         

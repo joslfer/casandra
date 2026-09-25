@@ -356,7 +356,7 @@ function FilaPregunta({
           style={fuenteApple}
           className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink transition-transform duration-150 active:bg-black/5 ${visuallyBlocked ? "opacity-40" : "active:scale-95"}`}
         >
-          Retirar apuesta
+          Retirar predicción
         </button>
       )}
     </article>
@@ -905,7 +905,7 @@ export function MarketPage() {
       : window.location.origin;
     const datosCompartir = {
       title: "Casandra",
-      text: "Prueba Casandra, apuesta tokens sobre qué va a caer en el examen.",
+      text: "Prueba Casandra, consulta la opinión general sobre qué va a caer en el examen y participa.",
       url,
     };
 
@@ -1164,7 +1164,7 @@ export function MarketPage() {
                         <ToggleInfo titulo="¿No entiendes cómo funciona? Lee esto.">
                           <div className="space-y-4 text-[16px] leading-relaxed text-ink">
                             <p>
-                              Imagina que Fulanito cree que va a caer el ciclo del agua en el examen, porque hace mucho que no cae. Él está muy seguro porque estuvo atento en clase. Apuesta 1 token al SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces apuestan 1 token cada uno al NO. 
+                              Imagina que Fulanito cree que va a caer el ciclo del agua en el examen, porque hace mucho que no cae. Él está muy seguro porque estuvo atento en clase. Pone 1 token en el SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces ponen 1 token cada uno al NO. 
                             </p>
                             <p>
                               La probabilidad de que caiga es del 33% porque esa es la fracción de los participantes creen que va a entrar (1/3). La opinión del grupo queda guardada en ese número.
