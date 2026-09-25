@@ -206,9 +206,9 @@ function PaginaRanking() {
 
         {/* NUEVA SECCIÓN: RECOMPENSAS */}
         <div className="mt-14 border-t border-linea pt-10">
-          <h2 className="text-[28px] font-bold tracking-tight text-ink">
-            Recompensas
-          </h2>
+          {/* <h2 className="text-[28px] font-bold tracking-tight text-ink">
+            Sobre esta herramienta
+          </h2>*/}
           {/* Aquí he puesto texto normal (17px) y color normal (text-ink) */}
           <p className="mt-3 text-[17px] leading-relaxed text-ink">
           </p>
@@ -270,7 +270,7 @@ function PaginaRanking() {
           </>
         ) : (
           <div className="mt-7 px-2 text-[16px] leading-relaxed text-ink/90">
-            <p>Si tienes ideas para financiar premios, propónlas. Ten en cuenta las consideraciones legales.</p>
+            <p>Casandra es una simple herramienta de simulación completamente gratis. Los tokens son ficticios y no tienen valor económico. No se ofrecen ni gestionan premios de dinero real. Cualquier acuerdo que los usuarios decidan organizar basándose en estas puntuaciones es ajeno a esta plataforma y recae bajo su propia responsabilidad.</p>
           </div>
         )}
 
