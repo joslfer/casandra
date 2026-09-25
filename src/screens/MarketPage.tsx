@@ -7,12 +7,17 @@ import { Settings, ClipboardList, Lock } from "lucide-react";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import { LoaderApp } from "@/components/LoaderApp"; 
+
 import {
   probabilidad,
   useMercado,
+  RECOMPENSA_CREAR_PREGUNTA,
   type Lado,
   type Pregunta,
 } from "@/hooks/useMercado";
+
+// Activa/desactiva el aviso de recompensa en el botón de proponer pregunta.
+const BOTON_INCENTIVADO = true;
 
 // ============================================================================
 // SPINNER ESTILO NATIVO IOS (12 barritas)
@@ -1125,13 +1130,24 @@ export function MarketPage() {
 
                   {!asig.cerrada && hayAsignaturasAbiertas && (
                     <div className="mt-4 flex flex-col items-center justify-center w-full">
-                      <div className="mb-12">
-                        <button onClick={() => setModalAbierto(true)} style={fuenteApple} className="flex touch-manipulation items-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-transform hover:opacity-90 active:scale-95">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 5v14"></path>
-                            <path d="M5 12h14"></path>
-                          </svg>
-                          Proponer pregunta
+                      <div className="mb-12 flex flex-col items-center gap-2">
+                        <button
+                          onClick={() => setModalAbierto(true)}
+                          style={fuenteApple}
+                          className="flex flex-col touch-manipulation items-center gap-0.5 rounded-2xl bg-ink px-6 py-3 text-white shadow-sm transition-transform hover:opacity-90 active:scale-95"
+                        >
+                          <span className="flex items-center gap-2 text-[14px] font-medium">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 5v14"></path>
+                              <path d="M5 12h14"></path>
+                            </svg>
+                            Proponer pregunta
+                          </span>
+                          {BOTON_INCENTIVADO && RECOMPENSA_CREAR_PREGUNTA > 0 && (
+                            <span className="text-[13px] font-medium text-white/80">
+                              Recibe un estipendio de {RECOMPENSA_CREAR_PREGUNTA} token por colaborar
+                            </span>
+                          )}
                         </button>
                       </div>
 
