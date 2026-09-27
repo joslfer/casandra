@@ -157,7 +157,10 @@ function PaginaRanking() {
           Gente que más acierta
         </h1>
     
-        <p className="mt-1.5 text-[15px] leading-relaxed text-sutil"></p>
+        <p className="mt-1.5 text-[17px] leading-relaxed text-ink">
+
+          Recuerda que también puedes obtener tokens proponiendo preguntas. La lista tiene la fracción de usados / dispobibles.
+        </p>
 
         <ul className="mt-6 text-[17px] text-ink">
           {listaCombinada.map((r: any, i: number) => {
@@ -193,6 +196,9 @@ function PaginaRanking() {
               </div>
 
               <span className="flex shrink-0 items-center gap-1.5 font-mono text-[17px] font-medium tabular-nums">
+                {r.apostado > 0 && (
+                  <span className="text-sutil/60">{r.apostado}/</span>
+                )}
                 {r.tokens} <Moneda className="h-4 w-4 align-[-2px]" />
               </span>
 

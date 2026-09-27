@@ -321,13 +321,19 @@ export function useMercado(usuario: Usuario | null) {
     return agrupadas.slice(0, 15);
   }, [apuestas, alumnos, miClaseId]);
 
-  const leerRanking = useCallback(() => {
+const leerRanking = useCallback(() => {
     return [...alumnos]
       .filter(a => a.claseId === miClaseId)
-      .map((a) => ({
-        usuario: a.usaHash ? `#${a.hash}` : (a.nombre || "Anónimo"),
-        tokens: Math.round(a.saldo + (apostadoAbierto[a.id] || 0))
-      }))
+      .map((a) => {
+        const apostado = Math.round(apostadoAbierto[a.id] || 0);
+        const tokens = Math.round(a.saldo + (apostadoAbierto[a.id] || 0));
+        return {
+          usuario: a.usaHash ? `#${a.hash}` : (a.nombre || "Anónimo"),
+          tokens,
+          apostado,
+          porcentaje: tokens > 0 ? Math.round((apostado / tokens) * 100) : 0
+        };
+      })
       .sort((a, b) => {
         if (b.tokens !== a.tokens) {
           return b.tokens - a.tokens;
