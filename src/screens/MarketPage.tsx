@@ -83,6 +83,21 @@ function IconoTriangulo({ className = "" }: { className?: string }) {
 const mono = "font-mono text-[11px] uppercase tracking-widest";
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
+// Rebote (squash & stretch) para las pestañas de asignatura al pulsarlas.
+function reboteTag(el: HTMLElement | null) {
+  if (!el) return;
+  el.animate(
+    [
+      { transform: "scale(1)" },
+      { transform: "scale(0.88)", offset: 0.25 },
+      { transform: "scale(1.08)", offset: 0.6 },
+      { transform: "scale(0.98)", offset: 0.85 },
+      { transform: "scale(1)" },
+    ],
+    { duration: 340, easing: "cubic-bezier(0.22, 0.9, 0.32, 1)" }
+  );
+}
+
 function aValorInputLocal(ts: number): string {
   const d = new Date(ts);
   const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -267,6 +282,114 @@ function EscalaPuntos({ si, no, misSi, misNo }: { si: number; no: number; misSi:
   );
 }
 
+// ============================================================================
+// NÚMERO RODANTE GENÉRICO
+// Hereda tamaño de fuente y color del padre (todo va en unidades em).
+// Lo usan el saldo (grande) y las probabilidades (pequeño).
+// ============================================================================
+function NumeroRodante({
+  valor,
+  className = "",
+  duracion = 800,
+}: {
+  valor: number;
+  className?: string;
+  duracion?: number;
+}) {
+  const [renderVal, setRenderVal] = useState(valor);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const floatValRef = useRef(valor);
+  const animRef = useRef<number | null>(null);
+
+  const [maxLen, setMaxLen] = useState(() => Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0));
+
+  useEffect(() => {
+    const curLen = Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0);
+    if (curLen > maxLen) {
+      setMaxLen(curLen);
+    }
+  }, [valor, maxLen]);
+
+  useEffect(() => {
+    const startVal = floatValRef.current;
+    const endVal = valor;
+    if (startVal === endVal) return;
+
+    setIsAnimating(true);
+    let startTime: number | null = null;
+
+    const anim = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duracion, 1);
+
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const currentFloat = startVal + (endVal - startVal) * ease;
+      
+      floatValRef.current = currentFloat;
+      setRenderVal(currentFloat);
+
+      if (progress < 1) {
+        animRef.current = requestAnimationFrame(anim);
+      } else {
+        setRenderVal(endVal);
+        floatValRef.current = endVal;
+        setIsAnimating(false);
+      }
+    };
+
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    animRef.current = requestAnimationFrame(anim);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [valor, duracion]);
+
+  const base = Math.floor(renderVal);
+  const frac = renderVal - base;
+  const items = [base + 2, base + 1, base, base - 1];
+
+  return (
+    <span
+      className={`relative inline-flex flex-col items-end font-mono leading-none tracking-tight tabular-nums overflow-hidden ${className}`}
+      style={{
+        minWidth: `${maxLen}ch`,
+        height: "1em",
+        boxSizing: "content-box",
+        paddingTop: isAnimating ? "0.15em" : "0",
+        paddingBottom: isAnimating ? "0.15em" : "0",
+        marginTop: isAnimating ? "-0.15em" : "0",
+        marginBottom: isAnimating ? "-0.15em" : "0",
+        maskImage: isAnimating
+          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
+          : "none",
+        WebkitMaskImage: isAnimating
+          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
+          : "none",
+      }}
+    >
+      <span
+        className="flex flex-col items-end w-full will-change-transform"
+        style={{
+          transform: `translateY(-${2 - frac}em)`,
+        }}
+      >
+        {items.map((num) => (
+          <span key={num} className="flex h-[1em] w-full items-center justify-end whitespace-nowrap">
+            {num}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+// Saldo grande (mismo aspecto y duración que antes)
+function SaldoAnimado({ valor }: { valor: number }) {
+  return <NumeroRodante valor={valor} className="text-[64px] text-ink" duracion={800} />;
+}
+
 function FilaPregunta({
   pregunta,
   onApostar,
@@ -319,8 +442,17 @@ function FilaPregunta({
     <article className={`py-6 w-full ${ocultarBorde ? "" : "border-b border-linea"}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="min-w-0 flex-1 break-words text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
-        <span className={`shrink-0 font-mono text-[30px] leading-none tabular-nums ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}>
-          {tieneApuestas ? `${prob}%` : "--%"}
+        <span
+          className={`flex shrink-0 items-center font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
+        >
+          {tieneApuestas ? (
+            <>
+              <NumeroRodante valor={Math.round(prob)} duracion={600} />
+              <span>%</span>
+            </>
+          ) : (
+            "--%"
+          )}
         </span>
       </div>
 
@@ -386,9 +518,12 @@ function Asignaturas({
         return (
           <button
             key={a.id}
-            onClick={() => setAsigActiva(a.id)}
+            onClick={(e) => {
+              reboteTag(e.currentTarget);
+              setAsigActiva(a.id);
+            }}
             style={fuenteApple}
-            className={`relative touch-manipulation whitespace-nowrap rounded-full border flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium transition-colors active:opacity-70 ${
+            className={`relative touch-manipulation whitespace-nowrap rounded-full border flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color,border-color,transform] duration-200 ease-out active:scale-95 ${
               a.id === asigId ? "border-ink bg-ink text-white" : "border-borde bg-white text-ink hover:border-ink/30"
             }`}
           >
@@ -541,97 +676,6 @@ function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; m
         </div>
       </Link>
     </div>
-  );
-}
-
-function SaldoAnimado({ valor }: { valor: number }) {
-  const [renderVal, setRenderVal] = useState(valor);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const floatValRef = useRef(valor);
-  const animRef = useRef<number | null>(null);
-
-  const [maxLen, setMaxLen] = useState(() => Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0));
-
-  useEffect(() => {
-    const curLen = Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0);
-    if (curLen > maxLen) {
-      setMaxLen(curLen);
-    }
-  }, [valor, maxLen]);
-
-  useEffect(() => {
-    const startVal = floatValRef.current;
-    const endVal = valor;
-    if (startVal === endVal) return;
-
-    setIsAnimating(true);
-    const duration = 800;
-    let startTime: number | null = null;
-
-    const anim = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      const ease = 1 - Math.pow(1 - progress, 3);
-      const currentFloat = startVal + (endVal - startVal) * ease;
-      
-      floatValRef.current = currentFloat;
-      setRenderVal(currentFloat);
-
-      if (progress < 1) {
-        animRef.current = requestAnimationFrame(anim);
-      } else {
-        setRenderVal(endVal);
-        floatValRef.current = endVal;
-        setIsAnimating(false);
-      }
-    };
-
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-    animRef.current = requestAnimationFrame(anim);
-
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
-  }, [valor]);
-
-  const base = Math.floor(renderVal);
-  const frac = renderVal - base;
-  const items = [base + 2, base + 1, base, base - 1];
-
-  return (
-    <span
-      className="relative inline-flex flex-col items-end font-mono text-[64px] leading-none tracking-tight text-ink tabular-nums overflow-hidden"
-      style={{
-        minWidth: `${maxLen}ch`,
-        height: "1em",
-        boxSizing: "content-box",
-        paddingTop: isAnimating ? "0.15em" : "0",
-        paddingBottom: isAnimating ? "0.15em" : "0",
-        marginTop: isAnimating ? "-0.15em" : "0",
-        marginBottom: isAnimating ? "-0.15em" : "0",
-        maskImage: isAnimating
-          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
-          : "none",
-        WebkitMaskImage: isAnimating
-          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
-          : "none",
-      }}
-    >
-      <span
-        className="flex flex-col items-end w-full will-change-transform"
-        style={{
-          transform: `translateY(-${2 - frac}em)`,
-        }}
-      >
-        {items.map((num) => (
-          <span key={num} className="flex h-[1em] w-full items-center justify-end whitespace-nowrap">
-            {num}
-          </span>
-        ))}
-      </span>
-    </span>
   );
 }
 
