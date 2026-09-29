@@ -318,7 +318,7 @@ function PaginaRanking() {
             </td>
 
             <td className="py-3 text-right font-mono font-medium tabular-nums">
-              {stats.participantes}
+              {stats.participantes}/{stats.usuariosTotales}
             </td>
           </tr>
 
