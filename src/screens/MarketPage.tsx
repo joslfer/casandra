@@ -835,7 +835,15 @@ export function MarketPage() {
         if (!nuevoOrden[a.id]) {
           nuevoOrden[a.id] = preguntas
             .filter((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
-            .sort((p1, p2) => probabilidad(p2) - probabilidad(p1))
+            .sort((p1, p2) => {
+              // 1º) Mayor probabilidad primero (redondeada, como se ve en pantalla).
+              const difProb = Math.round(probabilidad(p2)) - Math.round(probabilidad(p1));
+              if (difProb !== 0) return difProb;
+              // 2º) Si empatan, primero la que tenga más volumen de apuestas.
+              const vol1 = (p1.poolSi || 0) + (p1.poolNo || 0);
+              const vol2 = (p2.poolSi || 0) + (p2.poolNo || 0);
+              return vol2 - vol1;
+            })
             .map((p) => p.id);
           huboCambios = true;
         }

@@ -100,6 +100,9 @@ export function hashAleatorio(): string {
 
 export const RECOMPENSA_CREAR_PREGUNTA = 1;
 
+// Ventana para el WAU (weekly active users)
+const MS_SEMANA = 7 * 24 * 60 * 60 * 1000;
+
 export function haceTexto(cuando: number, ahora = Date.now()): string {
   const min = Math.max(1, Math.round((ahora - cuando) / 60000));
   if (min < 60) return `hace ${min} min`;
@@ -127,6 +130,8 @@ export function useMercado(usuario: Usuario | null) {
   const [apuestas, setApuestas] = useState<Apuesta[]>([]);
   const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
   const [apostadoAbierto, setApostadoAbierto] = useState<Record<string, number>>({});
+  // IDs de usuarios distintos que han apostado en los últimos 7 días
+  const [activosSemana, setActivosSemana] = useState<string[]>([]);
 
   const [perfilCargado, setPerfilCargado] = useState(false);
   const [idCargado, setIdCargado] = useState<string | null>(null);
@@ -147,7 +152,9 @@ export function useMercado(usuario: Usuario | null) {
   }, []);
 
   const cargarDatos = useCallback(async () => {
-    const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas] = await Promise.all([
+    const desdeSemana = new Date(Date.now() - MS_SEMANA).toISOString();
+
+    const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas, resApuSemana] = await Promise.all([
       supabase.from("clases").select("*").order("nombre"),
       supabase.from("asignaturas").select("*"),
       supabase.from("perfiles").select("*"),
@@ -157,7 +164,11 @@ export function useMercado(usuario: Usuario | null) {
         .from("apuestas")
         .select("usuario_id, tokens, preguntas!inner(resultado, archivada)")
         .is("preguntas.resultado", null)
-        .eq("preguntas.archivada", false)
+        .eq("preguntas.archivada", false),
+      supabase
+        .from("apuestas")
+        .select("usuario_id")
+        .gte("cuando", desdeSemana)
     ]);
 
     let misApuestas: any[] = [];
@@ -243,6 +254,12 @@ export function useMercado(usuario: Usuario | null) {
       setApostadoAbierto(acumulado);
     }
 
+    if (resApuSemana.data) {
+      const ids = new Set<string>();
+      for (const a of resApuSemana.data as any[]) ids.add(a.usuario_id);
+      setActivosSemana(Array.from(ids));
+    }
+
     if (resPreg.data) {
       const pregs: Pregunta[] = resPreg.data.map((p: any) => {
         let misSi = 0;
@@ -320,6 +337,12 @@ export function useMercado(usuario: Usuario | null) {
     }
     return agrupadas.slice(0, 15);
   }, [apuestas, alumnos, miClaseId]);
+
+  // WAU: usuarios de mi clase que han apostado en los últimos 7 días.
+  const leerWAU = useCallback((): number => {
+    const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
+    return activosSemana.filter((id) => alumnosClase.has(id)).length;
+  }, [activosSemana, alumnos, miClaseId]);
 
 const leerRanking = useCallback(() => {
     return [...alumnos]
@@ -772,6 +795,7 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
       leerApuestas,
       leerApuestasDePregunta,
       leerRanking,
+      leerWAU,
       apostadoAbierto,
       resumen,
       apostar,
@@ -820,6 +844,7 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
       leerApuestas,
       leerApuestasDePregunta,
       leerRanking,
+      leerWAU,
       apostadoAbierto,
       resumen,
       apostar,
