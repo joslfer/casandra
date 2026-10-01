@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useSesion } from "@/hooks/useSesion";
 import { useHaptic } from "@/hooks/useHaptic";
 import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
@@ -34,6 +35,11 @@ export function AdminPage() {
   const [detalleApuestas, setDetalleApuestas] = useState<ApuestaDetalle[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
+  // Tokens iniciales para cuentas nuevas
+  const [saldoInicialGuardado, setSaldoInicialGuardado] = useState<number | null>(null);
+  const [saldoInicialInput, setSaldoInicialInput] = useState("");
+  const [guardandoSaldoInicial, setGuardandoSaldoInicial] = useState(false);
+
   useEffect(() => {
     if (!modalResolucion) {
       setDetalleApuestas([]);
@@ -53,6 +59,19 @@ export function AdminPage() {
   useEffect(() => {
     if (claseFiltroId !== FILTRO_TODAS) setNuevaAsigClase(claseFiltroId);
   }, [claseFiltroId]);
+
+  useEffect(() => {
+    if (!usuario?.esAdmin) return;
+    let cancelado = false;
+    supabase.rpc("admin_get_saldo_inicial").then(({ data, error }) => {
+      if (cancelado || error) return;
+      const n = Number(data);
+      if (!Number.isFinite(n)) return;
+      setSaldoInicialGuardado(n);
+      setSaldoInicialInput(String(n));
+    });
+    return () => { cancelado = true; };
+  }, [usuario?.esAdmin]);
 
   if (cargando || !mercado.perfilCargado) {
     return (
@@ -99,6 +118,24 @@ export function AdminPage() {
     haptic();
     await mercado.resolver(modalResolucion.pregunta.id, modalResolucion.resultado);
     setModalResolucion(null);
+  };
+
+  const saldoInicialNumero = Number(saldoInicialInput);
+  const saldoInicialValido =
+    saldoInicialInput.trim() !== "" && Number.isFinite(saldoInicialNumero) && saldoInicialNumero >= 0;
+  const saldoInicialCambiado = saldoInicialValido && saldoInicialNumero !== saldoInicialGuardado;
+
+  const guardarSaldoInicial = async () => {
+    if (!saldoInicialCambiado) return;
+    haptic();
+    setGuardandoSaldoInicial(true);
+    const { error } = await supabase.rpc("admin_set_saldo_inicial", { p_valor: saldoInicialNumero });
+    setGuardandoSaldoInicial(false);
+    if (error) {
+      window.alert(`No se pudo guardar: ${error.message}`);
+      return;
+    }
+    setSaldoInicialGuardado(saldoInicialNumero);
   };
 
   return (
@@ -272,6 +309,42 @@ export function AdminPage() {
         {/* VISTA: USUARIOS (Solo Admin puede gestionar roles mod) */}
         {vistaAdmin === "usuarios" && esAdmin && (
           <div className="space-y-3">
+            {/* TOKENS INICIALES PARA CUENTAS NUEVAS */}
+            <div className="rounded-xl border border-borde bg-white p-4 space-y-3">
+              <div>
+                <h3 className="text-[14px] font-bold text-ink">Tokens iniciales</h3>
+                <p className="mt-0.5 text-[12px] leading-snug text-sutil">
+                  Tokens que recibe cada cuenta nueva al crearse. No afecta a los usuarios que ya existen.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={saldoInicialInput}
+                  onChange={(e) => setSaldoInicialInput(e.target.value)}
+                  disabled={saldoInicialGuardado === null}
+                  placeholder={saldoInicialGuardado === null ? "Cargando…" : "0"}
+                  style={{ fontSize: 16 }}
+                  className="flex-1 rounded-lg border border-borde px-3 py-1.5 font-mono tabular-nums outline-none disabled:opacity-50"
+                />
+                <button
+                  onClick={guardarSaldoInicial}
+                  disabled={!saldoInicialCambiado || guardandoSaldoInicial}
+                  className="touch-manipulation rounded-lg bg-ink px-4 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-40"
+                >
+                  {guardandoSaldoInicial ? "Guardando…" : "Guardar"}
+                </button>
+              </div>
+              {saldoInicialGuardado !== null && (
+                <p className="font-mono text-[11px] text-sutil">
+                  Valor actual: {saldoInicialGuardado} tokens
+                </p>
+              )}
+            </div>
+
             {[...mercado.leerAlumnos(true)]
               .filter((a) => viendoTodas || a.claseId === claseFiltroId)
               .sort((a, b) => nombreVisible(a).localeCompare(nombreVisible(b), 'es', { sensitivity: 'base' }))
