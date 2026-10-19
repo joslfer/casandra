@@ -48,23 +48,46 @@ export function ResueltasScreen() {
     );
   }
 
-  const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
+  // incluirHuerfanas: también devuelve las preguntas en las que apostaste
+  // cuya asignatura fue eliminada, para que el registro nunca se pierda.
+  const preguntas = mercado.leerPreguntas({ estado: "todas", incluirHuerfanas: true }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
 
   const resueltasUsuario = preguntas.filter(
     (p) => p.resultado !== null && ((p.misSi || 0) > 0 || (p.misNo || 0) > 0)
   );
 
-  const gruposPorAsignatura = asignaturas.map((asig) => {
-    const preguntasAsig = resueltasUsuario
+  const ordenarPorFecha = (a: { creadaEn?: number }, b: { creadaEn?: number }) => {
+    const fechaA = a.creadaEn || 0;
+    const fechaB = b.creadaEn || 0;
+    return fechaB - fechaA;
+  };
+
+  // Grupos de asignaturas que siguen existiendo
+  const gruposActivos = asignaturas.map((asig) => ({
+    id: asig.id,
+    nombre: asig.nombre,
+    preguntas: resueltasUsuario
       .filter((p) => p.asignaturaId === asig.id)
-      .sort((a, b) => {
-        const fechaA = a.creadaEn || 0;
-        const fechaB = b.creadaEn || 0;
-        return fechaB - fechaA;
-      });
-    return { asignatura: asig, preguntas: preguntasAsig };
-  }).filter((g) => g.preguntas.length > 0);
+      .sort(ordenarPorFecha),
+  }));
+
+  // Grupos de asignaturas eliminadas (se agrupan por el nombre guardado)
+  const huerfanas = resueltasUsuario.filter((p) => !p.asignaturaId);
+  const nombresHuerfanas = Array.from(
+    new Set(huerfanas.map((p) => p.asignaturaNombre || "Asignatura eliminada"))
+  );
+  const gruposHuerfanos = nombresHuerfanas.map((nombre) => ({
+    id: `huerfana:${nombre}`,
+    nombre,
+    preguntas: huerfanas
+      .filter((p) => (p.asignaturaNombre || "Asignatura eliminada") === nombre)
+      .sort(ordenarPorFecha),
+  }));
+
+  const gruposPorAsignatura = [...gruposActivos, ...gruposHuerfanos].filter(
+    (g) => g.preguntas.length > 0
+  );
 
   return (
     <div className="min-h-screen bg-lienzo pb-10 touch-pan-y overscroll-x-none" style={fuenteApple}>
@@ -87,11 +110,11 @@ export function ResueltasScreen() {
             </div>
           ) : (
             <div className="space-y-10">
-              {gruposPorAsignatura.map(({ asignatura, preguntas: preguntasAsig }) => (
-                <section key={asignatura.id}>
+              {gruposPorAsignatura.map(({ id, nombre, preguntas: preguntasAsig }) => (
+                <section key={id}>
                   
                   <h2 className="text-center text-[18px] font-semibold tracking-tight text-ink mb-3">
-                    {asignatura.nombre}
+                    {nombre}
                   </h2>
 
                   <div className="flex flex-col">

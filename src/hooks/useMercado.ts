@@ -26,7 +26,10 @@ export interface Asignatura {
 export interface Pregunta {
   id: string;
   titulo: string;
+  // "" cuando la asignatura original fue eliminada (pregunta huérfana)
   asignaturaId: string;
+  // Nombre guardado de la asignatura al eliminarla ("" si no aplica)
+  asignaturaNombre: string;
   poolSi: number;
   poolNo: number;
   historial: number[];
@@ -273,7 +276,9 @@ export function useMercado(usuario: Usuario | null) {
         return {
           id: p.id,
           titulo: p.titulo,
-          asignaturaId: p.asignatura_id,
+          // Si la asignatura fue eliminada, asignatura_id llega como null
+          asignaturaId: p.asignatura_id ?? "",
+          asignaturaNombre: p.asignatura_nombre ?? "",
           poolSi: Number(p.pool_si),
           poolNo: Number(p.pool_no),
           historial: typeof p.historial === "string" ? JSON.parse(p.historial) : p.historial || [],
@@ -367,12 +372,25 @@ const leerRanking = useCallback(() => {
   }, [alumnos, apostadoAbierto, miClaseId]);
 
   const leerPreguntas = useCallback(
-    (opts?: { asignaturaId?: string; estado?: "abiertas" | "resueltas" | "archivadas" | "todas", todasAdmin?: boolean }) => {
+    (opts?: {
+      asignaturaId?: string;
+      estado?: "abiertas" | "resueltas" | "archivadas" | "todas";
+      todasAdmin?: boolean;
+      // Incluye preguntas cuya asignatura fue eliminada, pero solo
+      // aquellas en las que el usuario actual ha apostado (para Comprueba).
+      incluirHuerfanas?: boolean;
+    }) => {
       const estado = opts?.estado ?? "todas";
       const asigPermitidas = new Set(asignaturas.filter(a => (opts?.todasAdmin && tienePermisoExamenes) ? true : a.claseId === miClaseId).map(a => a.id));
 
       return preguntas
-        .filter((p) => asigPermitidas.has(p.asignaturaId))
+        .filter((p) => {
+          if (p.asignaturaId) return asigPermitidas.has(p.asignaturaId);
+          // Pregunta huérfana (su asignatura fue eliminada)
+          if (opts?.todasAdmin && esAdmin) return true;
+          if (opts?.incluirHuerfanas) return p.misSi > 0 || p.misNo > 0;
+          return false;
+        })
         .filter((p) => (opts?.asignaturaId ? p.asignaturaId === opts.asignaturaId : true))
         .filter((p) => {
           if (estado === "abiertas") return p.resultado === null && !p.archivada;
@@ -382,7 +400,7 @@ const leerRanking = useCallback(() => {
         })
         .sort((a, b) => probabilidad(b) - probabilidad(a));
     },
-    [preguntas, asignaturas, miClaseId, tienePermisoExamenes]
+    [preguntas, asignaturas, miClaseId, tienePermisoExamenes, esAdmin]
   );
 
   const resumen = useCallback(() => {
