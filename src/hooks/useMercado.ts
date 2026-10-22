@@ -101,7 +101,7 @@ export function hashAleatorio(): string {
   return s;
 }
 
-export const RECOMPENSA_CREAR_PREGUNTA = 1;
+export const RECOMPENSA_CREAR_PREGUNTA = 0;
 
 // Ventana para el WAU (weekly active users)
 const MS_SEMANA = 7 * 24 * 60 * 60 * 1000;

@@ -1,4 +1,4 @@
-import { c as createPlugin, a as createStream } from "./seroval.mjs";
+import { c as createPlugin, i as isStream, a as createStream } from "./seroval.mjs";
 const READABLE_STREAM_FACTORY = {};
 const READABLE_STREAM_FACTORY_CONSTRUCTOR = (stream) => new ReadableStream({ start(controller) {
   stream.on({
@@ -44,15 +44,17 @@ const ReadableStreamFactoryPlugin = /* @__PURE__ */ createPlugin({
 });
 async function drainStream(stream, reader) {
   try {
-    const result = await reader.read();
-    if (result.done) {
-      stream.return(result.value);
-      reader.releaseLock();
-    } else {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        stream.return(result.value);
+        reader.releaseLock();
+        break;
+      }
       stream.next(result.value);
-      await drainStream(stream, reader);
     }
   } catch (error) {
+    reader.releaseLock();
     stream.throw(error);
   }
 }
@@ -102,6 +104,7 @@ const ReadableStreamPlugin = /* @__PURE__ */ createPlugin({
   },
   deserialize(node, ctx) {
     const stream = ctx.deserialize(node.stream);
+    if (!stream || typeof stream !== "object" || !isStream(stream)) throw new Error("Expected a stream source.");
     return READABLE_STREAM_FACTORY_CONSTRUCTOR(stream);
   }
 });

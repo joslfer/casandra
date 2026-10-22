@@ -3,6 +3,8 @@ import require$$1 from "crypto";
 import require$$2 from "async_hooks";
 import require$$5 from "stream";
 import { a as requireReact, g as getDefaultExportFromCjs } from "./react.mjs";
+var server_node = {};
+var reactDomServerLegacy_node_production = {};
 var reactDom = { exports: {} };
 var reactDom_production = {};
 var hasRequiredReactDom_production;
@@ -172,9 +174,6 @@ function requireReactDom() {
   }
   return reactDom.exports;
 }
-requireReactDom();
-var server_node = {};
-var reactDomServerLegacy_node_production = {};
 var hasRequiredReactDomServerLegacy_node_production;
 function requireReactDomServerLegacy_node_production() {
   if (hasRequiredReactDomServerLegacy_node_production) return reactDomServerLegacy_node_production;
@@ -10773,6 +10772,8 @@ function requireServer_node() {
 }
 var server_nodeExports = requireServer_node();
 const ReactDOMServer = /* @__PURE__ */ getDefaultExportFromCjs(server_nodeExports);
+var reactDomExports = requireReactDom();
 export {
-  ReactDOMServer as R
+  ReactDOMServer as R,
+  reactDomExports as r
 };
