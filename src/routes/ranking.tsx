@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
-import { haceTexto, useMercado, type Pregunta } from "@/hooks/useMercado";
+import { haceTexto, useMercado } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import { LoaderApp } from "@/components/LoaderApp";
@@ -68,22 +68,9 @@ function Actividad({ texto }: { texto: string }) {
 // ESTADÍSTICAS
 // -----------------------------------------------------
 
-function sumarTokensApostados(preguntas: Pregunta[]): number {
-  return preguntas.reduce(
-    (total, p) => total + (p.poolSi || 0) + (p.poolNo || 0),
-    0
-  );
-}
-
-function porcentaje(parte: number, total: number): number {
-  return total > 0 ? Math.round((parte / total) * 100) : 0;
-}
-
 // Cada usuario aporta una cantidad de "opiniones"
 // equivalente a la fracción de sus tokens que tiene en uso.
-//
 // 100 tokens en uso / 100 tokens totales = 1 opinión
-// 50 tokens en uso / 100 tokens totales = 0.5 opiniones
 function calcularOpinionesAgregadas(ranking: any[]): number {
   return ranking.reduce((total, r) => {
     const tokens = r.tokens || 0;
@@ -97,48 +84,23 @@ function calcularOpinionesAgregadas(ranking: any[]): number {
   }, 0);
 }
 
-function calcularEstadisticas(
-  preguntas: Pregunta[],
-  ranking: any[]
-) {
-  const tokensApostados = sumarTokensApostados(preguntas);
-
-  const tokensTotales = ranking.reduce(
-    (total, r) => total + (r.tokens || 0),
-    0
-  );
-
-  const participantes = ranking.filter(
-    (r) => (r.apostado || 0) > 0
-  ).length;
-
+function calcularEstadisticas(ranking: any[]) {
+  // Calculamos los tokens basándonos directamente en los perfiles de la clase (ranking)
+  // para que cuadre exactamente y no se rompa si hay preguntas huérfanas o archivadas.
+  const tokensTotales = ranking.reduce((total, r) => total + (r.tokens || 0), 0);
+  const tokensApostados = ranking.reduce((total, r) => total + (r.apostado || 0), 0);
+  
+  const participantes = ranking.filter((r) => (r.apostado || 0) > 0).length;
   const usuariosTotales = ranking.length;
-
-  const totalPreguntas = preguntas.length;
-
-  const resueltas = preguntas.filter(
-    (p) => p.resultado !== null
-  );
-
-  const opinionesAgregadas = calcularOpinionesAgregadas(
-    ranking
-  );
+  
+  const opinionesAgregadas = calcularOpinionesAgregadas(ranking);
 
   return {
     tokensApostados,
     tokensTotales,
-
-    pctSobreTotal: porcentaje(
-      tokensApostados,
-      tokensTotales
-    ),
-
+    pctSobreTotal: tokensTotales > 0 ? Math.round((tokensApostados / tokensTotales) * 100) : 0,
     participantes,
     usuariosTotales,
-
-    totalPreguntas,
-    resueltas: resueltas.length,
-
     opinionesAgregadas,
   };
 }
@@ -165,7 +127,6 @@ function PaginaRanking() {
   const mercado = useMercado(usuario);
 
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
-  const [actividadFija, setActividadFija] = useState<any[]>([]);
 
   const rankingActual = mercado.leerRanking();
   const actividadActual = mercado.leerApuestas();
@@ -210,19 +171,6 @@ function PaginaRanking() {
   }, [rankingActual, rankingFijo.length]);
 
   // -----------------------------------------------------
-  // FIJAR ACTIVIDAD INICIAL
-  // -----------------------------------------------------
-
-  useEffect(() => {
-    if (
-      actividadFija.length === 0 &&
-      actividadActual.length > 0
-    ) {
-      setActividadFija(actividadActual);
-    }
-  }, [actividadActual, actividadFija.length]);
-
-  // -----------------------------------------------------
   // ESTADOS DE CARGA / LOGIN
   // -----------------------------------------------------
 
@@ -264,7 +212,9 @@ function PaginaRanking() {
   // -----------------------------------------------------
 
   const listaCombinada = rankingFijo.map((r) => {
-    const ultimaActividad = actividadFija.find(
+    // Usamos actividadActual en vez de una fija para que el "hace X min" 
+    // se actualice en vivo sin necesidad de recargar la página.
+    const ultimaActividad = actividadActual.find(
       (a) => a.usuario === r.usuario
     );
 
@@ -280,11 +230,7 @@ function PaginaRanking() {
   // ESTADÍSTICAS
   // -----------------------------------------------------
 
-  const stats = calcularEstadisticas(
-    mercado.leerPreguntas({ estado: "todas" }) || [],
-    rankingActual
-  );
-
+  const stats = calcularEstadisticas(rankingActual);
   const wau = mercado.leerWAU();
 
   const bloqueEstadisticas = (

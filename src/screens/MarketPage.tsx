@@ -10,6 +10,7 @@ import { LoaderApp } from "@/components/LoaderApp";
 
 import {
   probabilidad,
+  multiplicador,
   useMercado,
   RECOMPENSA_CREAR_PREGUNTA,
   type Lado,
@@ -408,6 +409,11 @@ function FilaPregunta({
   const prob = probabilidad(pregunta);
   const totalApuestas = (pregunta.poolSi || 0) + (pregunta.poolNo || 0);
   const tieneApuestas = totalApuestas > 0;
+  
+  // Ahora la probabilidad solo se muestra si alguien ha aportado información (tieneApuestas),
+  // independientemente de que el algoritmo LMSR ya tenga un precio en la sombra.
+  const mostrarProb = tieneApuestas; 
+  
   const positivo = prob >= 50;
   const tengoApuesta = (pregunta.misSi || 0) + (pregunta.misNo || 0) > 0;
 
@@ -436,24 +442,29 @@ function FilaPregunta({
   };
 
   const visuallyBlocked = bloqueado && !cooldown;
-  const btnBase = "flex flex-1 h-[42px] touch-manipulation items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium transition-all duration-150 ease-out";
 
   return (
     <article className={`py-6 w-full ${ocultarBorde ? "" : "border-b border-linea"}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="min-w-0 flex-1 break-words text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
-        <span
-          className={`flex shrink-0 items-center font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
-        >
-          {tieneApuestas ? (
-            <>
-              <NumeroRodante valor={Math.round(prob)} duracion={600} />
-              <span>%</span>
-            </>
-          ) : (
-            "--%"
-          )}
-        </span>
+        
+        <div className="flex flex-col items-end gap-1.5">
+          <span
+            className={`flex shrink-0 items-center font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
+          >
+            {mostrarProb ? (
+              <>
+                <NumeroRodante valor={Math.round(prob)} duracion={600} />
+                <span>%</span>
+              </>
+            ) : (
+              "--%"
+            )}
+          </span>
+          <span className="rounded bg-black/5 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-sutil">
+            {pregunta.mecanismo === "lmsr" ? "LMSR" : "PM"}
+          </span>
+        </div>
       </div>
 
       <EscalaPuntos si={pregunta.poolSi} no={pregunta.poolNo} misSi={pregunta.misSi} misNo={pregunta.misNo} />
@@ -464,20 +475,26 @@ function FilaPregunta({
           onClick={(e) => handleApostar("no", e.currentTarget)}
           disabled={visuallyBlocked}
           style={fuenteApple}
-          className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border py-1.5 touch-manipulation min-h-[46px] transition-all duration-150 ease-out ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
-          <span>NO</span>
-          {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
+          <div className="flex items-center gap-1 text-[14px] font-medium">
+            <span>NO</span>
+            {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
+          </div>
+
         </button>
         <button
           data-apuesta
           onClick={(e) => handleApostar("si", e.currentTarget)}
           disabled={visuallyBlocked}
           style={fuenteApple}
-          className={`${btnBase} ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border py-1.5 touch-manipulation min-h-[46px] transition-all duration-150 ease-out ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
-          <span>SÍ</span>
-          {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
+          <div className="flex items-center gap-1 text-[14px] font-medium">
+            <span>SÍ</span>
+            {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
+          </div>
+
         </button>
       </div>
 
@@ -1216,19 +1233,7 @@ export function MarketPage() {
                         <ToggleInfo titulo="¿No entiendes cómo funciona? Lee esto.">
                           <div className="space-y-4 text-[16px] leading-relaxed text-ink">
                             <p>
-                              Imagina que Fulanito cree que va a caer el ciclo del agua en el examen, porque hace mucho que no cae. Él está muy seguro porque estuvo atento en clase. Pone 1 token en el SÍ. Sus compañeros Menganito y Zitanito creen que no va a entar, entonces ponen 1 token cada uno al NO. 
-                            </p>
-                            <p>
-                              La probabilidad de que caiga es del 33% porque esa es la fracción de los participantes creen que va a entrar (1/3). La opinión del grupo queda guardada en ese número.
-                            </p>
-                            <p>
-                            Cuando llega el día del examen, Fulanito tiene razón. Como Fulanito acertó, se lleva los 2 tokens de sus amigos. Fulanito tiene ahora 3 tokens. ¡Es rico!
-                            </p>
-                            <p>
-                            El mercado recompensa al que aporta información verdadera. Casandra es simplemente una máquina que agrega conocimiento colectivo y produce un porcentaje fiable %.
-                            </p>
-                            <p>
-                            Úsalo para consultar la opinión de tu clase.
+                              Próximamente habrá aquí un artículo explicativo. 
                             </p>
                           </div>
                         </ToggleInfo>
