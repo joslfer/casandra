@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useSesion } from "@/hooks/useSesion";
-import { probabilidad, useMercado } from "@/hooks/useMercado";
+import { pagoSiGana, probabilidad, useMercado, type Lado } from "@/hooks/useMercado";
 import { LoaderApp } from "@/components/LoaderApp";
 
 const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -121,29 +121,23 @@ export function ResueltasScreen() {
                     {preguntasAsig.map((p) => {
                       const misSi = p.misSi || 0;
                       const misNo = p.misNo || 0;
-                      const poolSi = p.poolSi || 0;
-                      const poolNo = p.poolNo || 0;
-                      const poolTotal = poolSi + poolNo;
+                      const poolTotal = (p.poolSi || 0) + (p.poolNo || 0);
                       const prob = probabilidad(p);
+                      const esLmsr = p.mecanismo === "lmsr";
 
-                      const acertoSi = p.resultado === true && misSi > 0;
-                      const acertoNo = p.resultado === false && misNo > 0;
-                      const haGanado = acertoSi || acertoNo;
-                      const apuestaUsuario = misSi > 0 ? misSi : misNo;
-                      const poolGanador = p.resultado ? poolSi : poolNo;
-                      const poolPerdedor = p.resultado ? poolNo : poolSi;
+                      // Lo apostado en total (por si apostó a ambos lados) y lo cobrado
+                      // por el lado ganador. En pari-mutuel es el reparto del bote; en LMSR,
+                      // las acciones ganadoras (1 token cada una, redondeado como en el servidor).
+                      const ladoGanador: Lado = p.resultado ? "si" : "no";
+                      const apostadoTotal = misSi + misNo;
+                      const apostoGanador = (p.resultado ? misSi : misNo) > 0;
+                      const cobro = apostoGanador ? Math.round(pagoSiGana(p, ladoGanador)) : 0;
+                      const beneficio = cobro - apostadoTotal;
+                      const haGanado = apostoGanador && beneficio >= 0;
 
-                      let tokensRecuperados = 0;
-                      if (haGanado && poolGanador > 0) {
-                        const proporcion = apuestaUsuario / poolGanador;
-                        tokensRecuperados = Math.round(apuestaUsuario + proporcion * poolPerdedor);
-                      }
-                      const beneficio = tokensRecuperados - apuestaUsuario;
-
-                      const ladoStr = misSi > 0 ? "SÍ" : "NO";
-                      const accionStr = haGanado 
-                        ? `acertaste y ganaste ${beneficio} tokens` 
-                        : `no acertaste y perdiste ${apuestaUsuario} tokens`;
+                      const accionStr = haGanado
+                        ? `acertaste y ganaste ${beneficio} tokens`
+                        : `no acertaste y perdiste ${-beneficio} tokens`;
 
                       const colorResultado = p.resultado ? "text-verde" : "text-rojo";
                       const textoResultado = p.resultado ? "ENTRÓ" : "NO ENTRÓ";
@@ -163,8 +157,14 @@ export function ResueltasScreen() {
                           </div>
 
                           <p className="mt-1 text-[13px] text-ink pr-14 relative z-10">
-                            Apostaste {apuestaUsuario} tokens a <strong>{ladoStr}</strong>, <strong>{accionStr}</strong> 
-                            <span className="text-sutil ml-1.5 whitespace-nowrap">· pool: {poolTotal}</span>
+                            Apostaste{" "}
+                            {misSi > 0 && misNo > 0 ? (
+                              <>{misSi} tokens a <strong>SÍ</strong> y {misNo} a <strong>NO</strong></>
+                            ) : (
+                              <>{apostadoTotal} tokens a <strong>{misSi > 0 ? "SÍ" : "NO"}</strong></>
+                            )}
+                            , <strong>{accionStr}</strong> 
+                            <span className="text-sutil ml-1.5 whitespace-nowrap">· {esLmsr ? "apostado" : "pool"}: {poolTotal}</span>
                           </p>
 
                           <span className="absolute bottom-3.5 right-0 z-0 font-mono text-[24px] font-bold tracking-tighter text-black/15 leading-none pointer-events-none">

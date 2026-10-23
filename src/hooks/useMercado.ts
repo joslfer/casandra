@@ -1,14 +1,12 @@
 /**
  * CAPA DE DATOS CONECTADA A SUPABASE
  * ----------------------------------
- * Toda la lógica del mercado se conecta ahora a la base de datos real.
- * Se utilizan las funciones RPC de PostgreSQL para garantizar seguridad
- * atómica en las transacciones (apuestas y repartos).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Lado = "si" | "no";
+export type Mecanismo = "pari_mutuel" | "lmsr";
 
 export interface Clase {
   id: string;
@@ -26,9 +24,7 @@ export interface Asignatura {
 export interface Pregunta {
   id: string;
   titulo: string;
-  // "" cuando la asignatura original fue eliminada (pregunta huérfana)
   asignaturaId: string;
-  // Nombre guardado de la asignatura al eliminarla ("" si no aplica)
   asignaturaNombre: string;
   poolSi: number;
   poolNo: number;
@@ -38,6 +34,12 @@ export interface Pregunta {
   resultado: boolean | null;
   archivada: boolean;
   creadaEn: number;
+  mecanismo: Mecanismo;
+  qSi: number;
+  qNo: number;
+  b: number | null;
+  misAccionesSi: number;
+  misAccionesNo: number;
 }
 
 export interface Apuesta {
@@ -53,6 +55,7 @@ export interface ApuestaDetalle {
   nombre: string;
   lado: Lado;
   tokens: number;
+  acciones: number;
 }
 
 export interface Usuario {
@@ -72,7 +75,33 @@ export interface Alumno {
   mod: boolean;
 }
 
-export function probabilidad(p: Pick<Pregunta, "poolSi" | "poolNo">): number {
+type InfoMercado = Pick<Pregunta, "poolSi" | "poolNo"> &
+  Partial<Pick<Pregunta, "mecanismo" | "qSi" | "qNo" | "b">>;
+
+export function lmsrProbSi(qSi: number, qNo: number, b: number): number {
+  return 1 / (1 + Math.exp((qNo - qSi) / b));
+}
+
+export function lmsrCoste(qSi: number, qNo: number, b: number): number {
+  const m = Math.max(qSi, qNo);
+  return m + b * Math.log(Math.exp((qSi - m) / b) + Math.exp((qNo - m) / b));
+}
+
+export function lmsrAcciones(lado: Lado, tokens: number, qSi: number, qNo: number, b: number): number {
+  const p = lmsrProbSi(qSi, qNo, b);
+  const e = Math.exp(tokens / b);
+  if (lado === "si") return b * Math.log((e - 1 + p) / p);
+  return b * Math.log((e - p) / (1 - p));
+}
+
+function lmsrParams(p: InfoMercado): { qSi: number; qNo: number; b: number } | null {
+  if (p.mecanismo !== "lmsr" || !p.b || p.b <= 0) return null;
+  return { qSi: p.qSi ?? 0, qNo: p.qNo ?? 0, b: p.b };
+}
+
+export function probabilidad(p: InfoMercado): number {
+  const l = lmsrParams(p);
+  if (l) return Math.round(lmsrProbSi(l.qSi, l.qNo, l.b) * 100);
   const total = p.poolSi + p.poolNo;
   if (total === 0) return 50;
   return Math.round((p.poolSi / total) * 100);
@@ -88,7 +117,14 @@ export function premio(stake: number, lado: Lado, poolSi: number, poolNo: number
   return poolNo === 0 ? 0 : total * (stake / poolNo);
 }
 
-export function multiplicador(lado: Lado, p: Pick<Pregunta, "poolSi" | "poolNo">): number {
+export function pagoSiGana(p: Pregunta, lado: Lado): number {
+  if (p.mecanismo === "lmsr") return lado === "si" ? p.misAccionesSi : p.misAccionesNo;
+  return premio(lado === "si" ? p.misSi : p.misNo, lado, p.poolSi, p.poolNo);
+}
+
+export function multiplicador(lado: Lado, p: InfoMercado): number {
+  const l = lmsrParams(p);
+  if (l) return lmsrAcciones(lado, 1, l.qSi, l.qNo, l.b);
   const poolSi = p.poolSi + (lado === "si" ? 1 : 0);
   const poolNo = p.poolNo + (lado === "no" ? 1 : 0);
   return premio(1, lado, poolSi, poolNo);
@@ -103,7 +139,6 @@ export function hashAleatorio(): string {
 
 export const RECOMPENSA_CREAR_PREGUNTA = 0;
 
-// Ventana para el WAU (weekly active users)
 const MS_SEMANA = 7 * 24 * 60 * 60 * 1000;
 
 export function haceTexto(cuando: number, ahora = Date.now()): string {
@@ -133,19 +168,15 @@ export function useMercado(usuario: Usuario | null) {
   const [apuestas, setApuestas] = useState<Apuesta[]>([]);
   const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
   const [apostadoAbierto, setApostadoAbierto] = useState<Record<string, number>>({});
-  // IDs de usuarios distintos que han apostado en los últimos 7 días
   const [activosSemana, setActivosSemana] = useState<string[]>([]);
 
   const [perfilCargado, setPerfilCargado] = useState(false);
   const [idCargado, setIdCargado] = useState<string | null>(null);
 
-  // Referencias para debouncing de ediciones de texto (evita que el polling /
-  // los refetch pisen lo que el usuario está escribiendo en cada tecla).
   const debounceClases = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const debounceAsignaturas = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    // Limpieza al desmontar: cancela timers pendientes.
     const dc = debounceClases.current;
     const da = debounceAsignaturas.current;
     return () => {
@@ -180,9 +211,6 @@ export function useMercado(usuario: Usuario | null) {
       if (data) misApuestas = data;
     }
 
-    // No pisar clases/asignaturas que el usuario está editando activamente
-    // (hay un debounce pendiente para ese id): se dejará que el propio
-    // debounce actualice el estado cuando confirme contra el servidor.
     if (resClases.data) {
       setClases((prev) => {
         const pendientes = new Set(Object.keys(debounceClases.current));
@@ -267,16 +295,22 @@ export function useMercado(usuario: Usuario | null) {
       const pregs: Pregunta[] = resPreg.data.map((p: any) => {
         let misSi = 0;
         let misNo = 0;
+        let misAccionesSi = 0;
+        let misAccionesNo = 0;
         for (const ap of misApuestas) {
           if (ap.pregunta_id === p.id) {
-            if (ap.lado === "si") misSi += Number(ap.tokens);
-            else misNo += Number(ap.tokens);
+            if (ap.lado === "si") {
+              misSi += Number(ap.tokens);
+              misAccionesSi += Number(ap.acciones) || 0;
+            } else {
+              misNo += Number(ap.tokens);
+              misAccionesNo += Number(ap.acciones) || 0;
+            }
           }
         }
         return {
           id: p.id,
           titulo: p.titulo,
-          // Si la asignatura fue eliminada, asignatura_id llega como null
           asignaturaId: p.asignatura_id ?? "",
           asignaturaNombre: p.asignatura_nombre ?? "",
           poolSi: Number(p.pool_si),
@@ -286,7 +320,13 @@ export function useMercado(usuario: Usuario | null) {
           misNo,
           resultado: p.resultado,
           archivada: p.archivada,
-          creadaEn: new Date(p.creada_en).getTime()
+          creadaEn: new Date(p.creada_en).getTime(),
+          mecanismo: (p.mecanismo === "lmsr" ? "lmsr" : "pari_mutuel") as Mecanismo,
+          qSi: Number(p.q_si ?? 0),
+          qNo: Number(p.q_no ?? 0),
+          b: p.b == null ? null : Number(p.b),
+          misAccionesSi,
+          misAccionesNo
         };
       });
       setPreguntas(pregs);
@@ -343,13 +383,12 @@ export function useMercado(usuario: Usuario | null) {
     return agrupadas.slice(0, 15);
   }, [apuestas, alumnos, miClaseId]);
 
-  // WAU: usuarios de mi clase que han apostado en los últimos 7 días.
   const leerWAU = useCallback((): number => {
     const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
     return activosSemana.filter((id) => alumnosClase.has(id)).length;
   }, [activosSemana, alumnos, miClaseId]);
 
-const leerRanking = useCallback(() => {
+  const leerRanking = useCallback(() => {
     return [...alumnos]
       .filter(a => a.claseId === miClaseId)
       .map((a) => {
@@ -376,8 +415,6 @@ const leerRanking = useCallback(() => {
       asignaturaId?: string;
       estado?: "abiertas" | "resueltas" | "archivadas" | "todas";
       todasAdmin?: boolean;
-      // Incluye preguntas cuya asignatura fue eliminada, pero solo
-      // aquellas en las que el usuario actual ha apostado (para Comprueba).
       incluirHuerfanas?: boolean;
     }) => {
       const estado = opts?.estado ?? "todas";
@@ -386,7 +423,6 @@ const leerRanking = useCallback(() => {
       return preguntas
         .filter((p) => {
           if (p.asignaturaId) return asigPermitidas.has(p.asignaturaId);
-          // Pregunta huérfana (su asignatura fue eliminada)
           if (opts?.todasAdmin && esAdmin) return true;
           if (opts?.incluirHuerfanas) return p.misSi > 0 || p.misNo > 0;
           return false;
@@ -411,11 +447,11 @@ const leerRanking = useCallback(() => {
     for (const p of preguntasVisibles) {
       if ((!p.misSi && !p.misNo)) continue;
       if (p.misSi > 0) {
-        ganar += premio(p.misSi, "si", p.poolSi, p.poolNo) - p.misSi;
+        ganar += pagoSiGana(p, "si") - p.misSi;
         perder += p.misSi;
       }
       if (p.misNo > 0) {
-        ganar += premio(p.misNo, "no", p.poolSi, p.poolNo) - p.misNo;
+        ganar += pagoSiGana(p, "no") - p.misNo;
         perder += p.misNo;
       }
       nombres.push(nombreCorto(p.titulo));
@@ -450,12 +486,18 @@ const leerRanking = useCallback(() => {
 
     setPreguntas((prev) => prev.map((p) => {
       if (p.id !== id) return p;
+      const l = lmsrParams(p);
+      const acciones = l ? lmsrAcciones(lado, tokens, l.qSi, l.qNo, l.b) : 0;
       return {
         ...p,
         poolSi: p.poolSi + (lado === "si" ? tokens : 0),
         poolNo: p.poolNo + (lado === "no" ? tokens : 0),
+        qSi: p.qSi + (lado === "si" ? acciones : 0),
+        qNo: p.qNo + (lado === "no" ? acciones : 0),
         misSi: p.misSi + (lado === "si" ? tokens : 0),
-        misNo: p.misNo + (lado === "no" ? tokens : 0)
+        misNo: p.misNo + (lado === "no" ? tokens : 0),
+        misAccionesSi: p.misAccionesSi + (lado === "si" ? acciones : 0),
+        misAccionesNo: p.misAccionesNo + (lado === "no" ? acciones : 0)
       };
     }));
     setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo - tokens } : prev));
@@ -469,7 +511,14 @@ const leerRanking = useCallback(() => {
   const retirar = useCallback(async (id: string) => {
     if (pausado) return 0;
     const p = preguntas.find((p) => p.id === id);
-    const devolucion = p ? p.misSi + p.misNo : 0;
+
+    let devolucion = 0;
+    if (p) {
+      const l = lmsrParams(p);
+      devolucion = l
+        ? lmsrCoste(l.qSi, l.qNo, l.b) - lmsrCoste(l.qSi - p.misAccionesSi, l.qNo - p.misAccionesNo, l.b)
+        : p.misSi + p.misNo;
+    }
 
     setPreguntas((prev) => prev.map((p) => {
       if (p.id !== id) return p;
@@ -477,8 +526,12 @@ const leerRanking = useCallback(() => {
         ...p,
         poolSi: Math.max(0, p.poolSi - p.misSi),
         poolNo: Math.max(0, p.poolNo - p.misNo),
+        qSi: p.qSi - p.misAccionesSi,
+        qNo: p.qNo - p.misAccionesNo,
         misSi: 0,
-        misNo: 0
+        misNo: 0,
+        misAccionesSi: 0,
+        misAccionesNo: 0
       };
     }));
     setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + devolucion } : prev));
@@ -489,28 +542,30 @@ const leerRanking = useCallback(() => {
     return devolucion;
   }, [pausado, preguntas, cargarDatos]);
 
-const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
-  const t = titulo.trim();
-  if (!t || pausado || !asignaturaId) return null;
+  const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
+    const t = titulo.trim();
+    if (!t || pausado || !asignaturaId) return null;
 
-  const { data, error } = await supabase.rpc("crear_pregunta_con_recompensa", {
-    p_titulo: t,
-    p_asignatura_id: asignaturaId,
-    p_recompensa: RECOMPENSA_CREAR_PREGUNTA
-  });
+    const { data, error } = await supabase.rpc("crear_pregunta_con_recompensa", {
+      p_titulo: t,
+      p_asignatura_id: asignaturaId,
+      p_recompensa: RECOMPENSA_CREAR_PREGUNTA,
+      p_mecanismo: "lmsr",
+      p_b: 3
+    });
 
-  if (error || !data) {
-    console.error("Error al crear pregunta:", error);
-    return null;
-  }
+    if (error || !data) {
+      console.error("Error al crear pregunta:", error);
+      return null;
+    }
 
-  if (RECOMPENSA_CREAR_PREGUNTA > 0) {
-    setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + RECOMPENSA_CREAR_PREGUNTA } : prev));
-  }
+    if (RECOMPENSA_CREAR_PREGUNTA > 0) {
+      setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + RECOMPENSA_CREAR_PREGUNTA } : prev));
+    }
 
-  await cargarDatos();
-  return data as unknown as Pregunta;
-}, [pausado, cargarDatos]);
+    await cargarDatos();
+    return data as unknown as Pregunta;
+  }, [pausado, cargarDatos]);
 
   const simular = useCallback(() => { console.log("Simular deshabilitado."); }, []);
 
@@ -548,7 +603,7 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
   const leerApuestasDePregunta = useCallback(async (preguntaId: string): Promise<ApuestaDetalle[]> => {
     const { data, error } = await supabase
       .from("apuestas")
-      .select("usuario_id, lado, tokens, perfiles(nombre, usa_hash, hash)")
+      .select("usuario_id, lado, tokens, acciones, perfiles(nombre, usa_hash, hash)")
       .eq("pregunta_id", preguntaId);
 
     if (error) { console.error("Error al leer apuestas:", error); return []; }
@@ -562,12 +617,14 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
       const existente = agrupado.get(clave);
       if (existente) {
         existente.tokens += Number(a.tokens);
+        existente.acciones += Number(a.acciones) || 0;
       } else {
         agrupado.set(clave, {
           usuarioId: a.usuario_id,
           nombre,
           lado: a.lado as Lado,
-          tokens: Number(a.tokens)
+          tokens: Number(a.tokens),
+          acciones: Number(a.acciones) || 0
         });
       }
     }
@@ -642,12 +699,6 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
     return true;
   }, [tienePermisoExamenes, esAdmin, esMod, asignaturas, miClaseId, cargarDatos]);
 
-  /**
-   * Renombrar asignatura: actualización optimista inmediata en estado local
-   * + debounce de 600ms antes de escribir en Supabase. Evita que un
-   * cargarDatos() (propio o de otra pestaña) revierta el texto mientras
-   * el usuario sigue escribiendo.
-   */
   const renombrarAsignatura = useCallback((id: string, nombre: string) => {
     if (!tienePermisoExamenes) return;
     if (!esAdmin && esMod) {
@@ -655,10 +706,8 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
       if (!asig || asig.claseId !== miClaseId) return;
     }
 
-    // 1. Reflejar el cambio en pantalla al instante.
     setAsignaturas((prev) => prev.map((a) => (a.id === id ? { ...a, nombre } : a)));
 
-    // 2. Reiniciar el temporizador de guardado para este id.
     if (debounceAsignaturas.current[id]) clearTimeout(debounceAsignaturas.current[id]);
 
     debounceAsignaturas.current[id] = setTimeout(async () => {
@@ -720,21 +769,11 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
     return true;
   }, [esAdmin, cargarDatos]);
 
-  /**
-   * Renombrar clase: mismo patrón optimista + debounce que renombrarAsignatura.
-   * Antes: cada tecla disparaba update() + cargarDatos() (refetch completo),
-   * y las respuestas fuera de orden pisaban lo que el usuario acababa de
-   * escribir. Ahora el estado local manda mientras hay una edición en curso
-   * (ver el filtro de "pendientes" en cargarDatos) y solo se escribe en la
-   * base de datos 600ms después de la última tecla.
-   */
   const renombrarClase = useCallback((claseId: string, nombre: string) => {
     if (!esAdmin) return;
 
-    // 1. Reflejar el cambio en pantalla al instante.
     setClases((prev) => prev.map((c) => (c.id === claseId ? { ...c, nombre } : c)));
 
-    // 2. Reiniciar el temporizador de guardado para esta clase.
     if (debounceClases.current[claseId]) clearTimeout(debounceClases.current[claseId]);
 
     debounceClases.current[claseId] = setTimeout(async () => {
