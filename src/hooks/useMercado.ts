@@ -546,16 +546,12 @@ const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) =
     const t = titulo.trim();
     if (!t || pausado || !asignaturaId) return null;
 
-    // Consultar el valor global de liquidez LMSR antes de crear
-    const { data: bData } = await supabase.rpc("get_lmsr_b");
-    const liquidez = Number(bData) || 5;
-
+    // Llamamos a la función de Supabase sin pasarle b, para que use obligatoriamente el global del Admin
     const { data, error } = await supabase.rpc("crear_pregunta_con_recompensa", {
       p_titulo: t,
       p_asignatura_id: asignaturaId,
       p_recompensa: RECOMPENSA_CREAR_PREGUNTA,
-      p_mecanismo: "lmsr",
-      p_b: liquidez
+      p_mecanismo: "lmsr"
     });
 
     if (error || !data) {

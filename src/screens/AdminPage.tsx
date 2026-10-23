@@ -255,13 +255,11 @@ export function AdminPage() {
                                         value={p.mecanismo}
                                         onChange={async (e) => {
                                           const nuevoMec = e.target.value;
-                                          
-                                          // Consultamos la variable global para inyectarla al instante
                                           const { data: bData } = await supabase.rpc("get_lmsr_b");
                                           const bVal = nuevoMec === "lmsr" ? (Number(bData) || 5) : null;
 
                                           if (volumen(p) > 0) {
-                                            if (!window.confirm(`Esta pregunta ya tiene apuestas. Si cambias el sistema a ${nuevoMec.toUpperCase()}, se cancelarán todas las apuestas actuales, se devolverán los tokens a los alumnos y la pregunta volverá a 0. ¿Continuar?`)) {
+                                            if (!window.confirm(`Esta pregunta ya tiene apuestas. Si cambias el sistema a ${nuevoMec.toUpperCase()}, se cancelarán todas las apuestas actuales, se devolverán los tokens y la pregunta volverá a 0. ¿Continuar?`)) {
                                               return;
                                             }
                                             haptic();
@@ -420,16 +418,20 @@ export function AdminPage() {
                 <button
                   onClick={async () => {
                     const num = Number(bGlobalInput);
-                    if (num > 0 && num !== bGlobalGuardado) {
+                    if (num > 0) {
                       haptic();
                       setGuardandoBGlobal(true);
                       const { error } = await supabase.rpc("admin_set_lmsr_b", { p_valor: num });
                       setGuardandoBGlobal(false);
-                      if (error) window.alert(error.message);
-                      else setBGlobalGuardado(num);
+                      if (error) {
+                        window.alert(error.message);
+                      } else {
+                        setBGlobalGuardado(num);
+                        if (mercado.recargar) await mercado.recargar();
+                      }
                     }
                   }}
-                  disabled={Number(bGlobalInput) <= 0 || Number(bGlobalInput) === bGlobalGuardado || guardandoBGlobal}
+                  disabled={!bGlobalInput.trim() || Number(bGlobalInput) <= 0 || guardandoBGlobal}
                   className="touch-manipulation rounded-lg bg-ink px-4 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-40"
                 >
                   {guardandoBGlobal ? "Guardando…" : "Guardar"}
