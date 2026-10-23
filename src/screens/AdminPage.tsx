@@ -246,39 +246,11 @@ export function AdminPage() {
                                     <span className="font-mono text-[16px] tabular-nums text-sutil shrink-0">{probabilidad(p)}%</span>
                                   </div>
                                   
-                                  {/* ETIQUETAS Y SISTEMA DE MERCADO */}
                                   <div className="flex items-center justify-between text-[11px] font-mono text-sutil gap-2">
                                     <span>
                                       vol {volumen(p)} · {p.resultado === null ? "abierta" : p.resultado ? "entró" : "no entró"}
                                     </span>
                                     <div className="flex items-center gap-1.5">
-                                      {/* NUEVO INPUT PARA EDITAR LA LIQUIDEZ 'b' INDIVIDUAL */}
-                                      {p.mecanismo === "lmsr" && (
-                                        <div className="flex items-center gap-1 rounded border border-borde bg-lienzo px-1.5 py-1 text-[11px]">
-                                          <span className="text-sutil">b=</span>
-                                          <input
-                                            type="number"
-                                            min="1"
-                                            value={p.b || ""}
-                                            onChange={async (e) => {
-                                              const nuevoB = Number(e.target.value);
-                                              if (nuevoB < 1) return;
-                                              
-                                              if (volumen(p) > 0) {
-                                                if (!window.confirm("Cambiar la liquidez 'b' en un mercado en curso alterará los precios y los pagos futuros. ¿Estás seguro?")) {
-                                                  return;
-                                                }
-                                              }
-                                              
-                                              haptic();
-                                              await supabase.from("preguntas").update({ b: nuevoB }).eq("id", p.id);
-                                              if (mercado.recargar) await mercado.recargar();
-                                            }}
-                                            className="w-8 bg-transparent text-center font-mono font-semibold text-ink outline-none"
-                                          />
-                                        </div>
-                                      )}
-
                                       <select
                                         value={p.mecanismo}
                                         onChange={async (e) => {
