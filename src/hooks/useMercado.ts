@@ -542,16 +542,20 @@ export function useMercado(usuario: Usuario | null) {
     return devolucion;
   }, [pausado, preguntas, cargarDatos]);
 
-  const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
+const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
     const t = titulo.trim();
     if (!t || pausado || !asignaturaId) return null;
+
+    // Consultar el valor global de liquidez LMSR antes de crear
+    const { data: bData } = await supabase.rpc("get_lmsr_b");
+    const liquidez = Number(bData) || 5;
 
     const { data, error } = await supabase.rpc("crear_pregunta_con_recompensa", {
       p_titulo: t,
       p_asignatura_id: asignaturaId,
       p_recompensa: RECOMPENSA_CREAR_PREGUNTA,
       p_mecanismo: "lmsr",
-      p_b: 3
+      p_b: liquidez
     });
 
     if (error || !data) {
