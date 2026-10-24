@@ -3,7 +3,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useHaptic } from "@/hooks/useHaptic";
 import { useSesion } from "@/hooks/useSesion";
-import { Settings, ClipboardList, Lock } from "lucide-react"; 
+import { Settings, ClipboardList, Lock, Copy } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
 import { LoaderApp } from "@/components/LoaderApp"; 
@@ -13,6 +14,7 @@ import {
   multiplicador,
   useMercado,
   RECOMPENSA_CREAR_PREGUNTA,
+  calcularEstadisticas, // <-- Añadido aquí para que no de error al copiar la predicción
   type Lado,
   type Pregunta,
 } from "@/hooks/useMercado";
@@ -285,8 +287,6 @@ function EscalaPuntos({ si, no, misSi, misNo }: { si: number; no: number; misSi:
 
 // ============================================================================
 // NÚMERO RODANTE GENÉRICO
-// Hereda tamaño de fuente y color del padre (todo va en unidades em).
-// Lo usan el saldo (grande) y las probabilidades (pequeño).
 // ============================================================================
 function NumeroRodante({
   valor,
@@ -351,17 +351,18 @@ function NumeroRodante({
   const frac = renderVal - base;
   const items = [base + 2, base + 1, base, base - 1];
 
+  // 1.15em garantiza espacio suficiente para el trazado inferior (como el 9) 
+  // manteniendo la ventana del tamaño exacto de un solo número.
+  const altoFila = 1.15; 
+
   return (
     <span
-      className={`relative inline-flex flex-col items-end font-mono leading-none tracking-tight tabular-nums overflow-hidden ${className}`}
+      className={`relative inline-flex flex-col items-end font-mono tracking-tight tabular-nums overflow-hidden ${className}`}
       style={{
         minWidth: `${maxLen}ch`,
-        height: "1em",
+        height: `${altoFila}em`,
+        lineHeight: `${altoFila}em`,
         boxSizing: "content-box",
-        paddingTop: isAnimating ? "0.15em" : "0",
-        paddingBottom: isAnimating ? "0.15em" : "0",
-        marginTop: isAnimating ? "-0.15em" : "0",
-        marginBottom: isAnimating ? "-0.15em" : "0",
         maskImage: isAnimating
           ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
           : "none",
@@ -373,11 +374,16 @@ function NumeroRodante({
       <span
         className="flex flex-col items-end w-full will-change-transform"
         style={{
-          transform: `translateY(-${2 - frac}em)`,
+          // Multiplicamos el desplazamiento por la nueva altura de la fila
+          transform: `translateY(-${(2 - frac) * altoFila}em)`,
         }}
       >
         {items.map((num) => (
-          <span key={num} className="flex h-[1em] w-full items-center justify-end whitespace-nowrap">
+          <span 
+            key={num} 
+            className="flex w-full items-center justify-end whitespace-nowrap"
+            style={{ height: `${altoFila}em` }}
+          >
             {num}
           </span>
         ))}
@@ -386,9 +392,16 @@ function NumeroRodante({
   );
 }
 
+
 // Saldo grande (mismo aspecto y duración que antes)
 function SaldoAnimado({ valor }: { valor: number }) {
-  return <NumeroRodante valor={valor} className="text-[64px] text-ink" duracion={800} />;
+  return (
+    <NumeroRodante 
+      valor={valor} 
+      className="text-[64px] text-ink -translate-y-[10px]" 
+      duracion={800} 
+    />
+  );
 }
 
 function FilaPregunta({
@@ -730,6 +743,7 @@ export function MarketPage() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [prediccionEstado, setPrediccionEstado] = useState<"idle" | "copiado" | "vacio">("idle");
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
@@ -990,7 +1004,91 @@ export function MarketPage() {
       // El usuario canceló el menú de compartir, o no hay soporte: no hacemos nada.
     }
   };
+// -----------------------------------------------------
+  // COPIAR PREDICCIÓN: arma un texto para WhatsApp con las preguntas
+  // abiertas del examen seleccionado y sus probabilidades.
+  // -----------------------------------------------------
+  const copiarPrediccion = async () => {
+    haptic();
 
+    const asig = asignaturas.find((a) => a.id === asigId);
+    if (!asig) return;
+
+    // Mismas preguntas y mismo orden que se ven en pantalla, sin las que nadie ha apostado.
+    const idsOrden = ordenSnapshot[asigId] || [];
+    const lista = idsOrden
+      .map((id) => preguntas.find((p) => p.id === id))
+      .filter(
+        (p): p is Pregunta =>
+          !!p && p.resultado === null && !p.archivada && (p.poolSi || 0) + (p.poolNo || 0) > 0
+      );
+
+    if (lista.length === 0) {
+      setPrediccionEstado("vacio");
+      setTimeout(() => setPrediccionEstado("idle"), 2000);
+      return;
+    }
+
+    const construirTexto = async (): Promise<string> => {
+      // Cabecera: nombre del examen + cuenta atrás precisa (si tiene fecha futura)
+      let cabecera = `*${asig.nombre.toUpperCase()}*`;
+      if (asig.fechaExamen && asig.fechaExamen > Date.now()) {
+        const totalMin = Math.floor((asig.fechaExamen - Date.now()) / 60000);
+        const dias = Math.floor(totalMin / 1440);
+        const horas = Math.floor((totalMin % 1440) / 60);
+        const min = totalMin % 60;
+        const partes: string[] = [];
+        if (dias > 0) partes.push(`${dias} ${dias === 1 ? "día" : "días"}`);
+        if (dias > 0 || horas > 0) partes.push(`${horas} h`);
+        partes.push(`${min} min`);
+        cabecera += ` · faltan ${partes.join(" ")}`;
+      }
+
+      // Una barra de 10 cuadros por pregunta: verde si ≥50 %, rojo si no.
+      const bloques = lista.map((p) => {
+        const prob = probabilidad(p);
+        const llenos = Math.max(0, Math.min(10, Math.round(prob / 10)));
+        const barra = (prob >= 50 ? "🟩" : "🟥").repeat(llenos) + "⬜".repeat(10 - llenos);
+        return `${barra} *${prob}%*\n${p.titulo}`;
+      });
+
+      // Opiniones agregadas usando la función unificada
+      let estadistica = "";
+      const rankingActual = mercado.leerRanking();
+      const stats = calcularEstadisticas(rankingActual);
+
+      if (stats.opinionesAgregadas > 0) {
+        estadistica = `Opiniones agregadas overall: ${stats.opinionesAgregadas.toFixed(1)}`;
+      }
+
+      return [
+        cabecera,
+        "Probabilidad de que entre, según la clase",
+        "",
+        bloques.join("\n\n"),
+        "",
+        ...(estadistica ? [estadistica] : []),
+        "Participar o proponer preguntas: https://casndra.vercel.app/"
+      ].join("\n");
+    };
+
+    try {
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": construirTexto().then((t) => new Blob([t], { type: "text/plain" })),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(await construirTexto());
+      }
+      setPrediccionEstado("copiado");
+      setTimeout(() => setPrediccionEstado("idle"), 2000);
+    } catch (err) {
+      console.error("No se pudo copiar la predicción:", err);
+    }
+  };
+  
   if (cargando) {
     return (
       <div className="min-h-screen bg-lienzo flex items-center justify-center">
@@ -1148,8 +1246,6 @@ export function MarketPage() {
                 
                 <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
                 
-
-
               </div>
             )}
 
@@ -1221,14 +1317,28 @@ export function MarketPage() {
                       </div>
 
                       <article className="w-full text-left mb-28">
-                        <button
-                          onClick={compartirApp}
-                          style={fuenteApple}
-                          className="flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
-                        >
-                          <IconoCompartirApple className="h-4 w-4" />
-                          {copiado ? "enlace copiado" : "compartir la app"}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                          <button
+                            onClick={compartirApp}
+                            style={fuenteApple}
+                            className="flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
+                          >
+                            <IconoCompartirApple className="h-4 w-4" />
+                            {copiado ? "enlace copiado" : "compartir la app"}
+                          </button>
+                          <button
+                            onClick={copiarPrediccion}
+                            style={fuenteApple}
+                            className="flex touch-manipulation items-center gap-1.5 text-[16px] leading-relaxed text-sutil transition-colors hover:text-ink active:opacity-60"
+                          >
+                            <Copy className="h-4 w-4" />
+                            {prediccionEstado === "copiado"
+                              ? "predicción copiada"
+                              : prediccionEstado === "vacio"
+                                ? "aún no hay predicciones"
+                                : "copiar predicción"}
+                          </button>
+                        </div>
 
                         <ToggleInfo titulo="¿No entiendes cómo funciona? Lee esto.">
                           <div className="space-y-4 text-[16px] leading-relaxed text-ink">

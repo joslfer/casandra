@@ -1,6 +1,6 @@
 /**
- * CAPA DE DATOS CONECTADA A SUPABASE
- * ----------------------------------
+- CAPA DE DATOS CONECTADA A SUPABASE
+- ----------------------------------
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -159,6 +159,30 @@ export function nombreCorto(titulo: string): string {
 export function nombreVisible(a: Alumno): string {
   return a.usaHash ? `#${a.hash}` : a.nombre || a.id;
 }
+
+// -----------------------------------------------------
+// FUNCIÓN ESTADÍSTICAS GLOBAL (EXTRAÍDA)
+// -----------------------------------------------------
+export function calcularEstadisticas(ranking: any[]) {
+  const tokensTotales = ranking.reduce((total, r) => total + (r.tokens || 0), 0);
+  const tokensApostados = ranking.reduce((total, r) => total + (r.apostado || 0), 0);
+  
+  const participantes = ranking.filter((r) => (r.apostado || 0) > 0).length;
+  const usuariosTotales = ranking.length;
+  
+  const tokensPromedio = usuariosTotales > 0 ? tokensTotales / usuariosTotales : 0;
+  const opinionesAgregadas = tokensPromedio > 0 ? tokensApostados / tokensPromedio : 0;
+
+  return {
+    tokensApostados,
+    tokensTotales,
+    pctSobreTotal: tokensTotales > 0 ? Math.round((tokensApostados / tokensTotales) * 100) : 0,
+    participantes,
+    usuariosTotales,
+    opinionesAgregadas,
+  };
+}
+
 
 export function useMercado(usuario: Usuario | null) {
   const [clases, setClases] = useState<Clase[]>([]);
@@ -542,7 +566,7 @@ export function useMercado(usuario: Usuario | null) {
     return devolucion;
   }, [pausado, preguntas, cargarDatos]);
 
-const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
+  const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
     const t = titulo.trim();
     if (!t || pausado || !asignaturaId) return null;
 
