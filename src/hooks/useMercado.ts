@@ -188,6 +188,35 @@ export function calcularEstadisticas(ranking: any[]) {
   };
 }
 
+// Rechaza si la promesa no termina a tiempo (evita loaders eternos con peticiones colgadas).
+function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout de ${ms} ms cargando datos`)), ms);
+    promesa.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
+function leerHistorial(h: any): number[] {
+  if (typeof h === "string") {
+    try {
+      const v = JSON.parse(h);
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(h) ? h : [];
+}
+
 
 export function useMercado(usuario: Usuario | null) {
   // Suplantación: solo vale si el usuario real es admin (el servidor lo vuelve a comprobar).
@@ -214,174 +243,210 @@ export function useMercado(usuario: Usuario | null) {
   const debounceClases = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const debounceAsignaturas = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // Control de cargas: solo la última puede aplicar resultados; los fallos se reintentan.
+  const peticion = useRef(0);
+  const reintento = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cargarRef = useRef<() => Promise<void>>(async () => {});
+
   useEffect(() => {
     const dc = debounceClases.current;
     const da = debounceAsignaturas.current;
     return () => {
       Object.values(dc).forEach(clearTimeout);
       Object.values(da).forEach(clearTimeout);
+      if (reintento.current) clearTimeout(reintento.current);
     };
   }, []);
 
   const cargarDatos = useCallback(async () => {
-    // Todas las consultas van en paralelo (incluida misApuestas, que antes iba
-    // después en serie). El apostado abierto, los activos de la semana y la
-    // última actividad se agregan en Postgres vía RPC en vez de traer una fila
-    // por apuesta.
-    const pMisApuestas = idEfectivo
-      ? supabase.from("apuestas").select("*").eq("usuario_id", idEfectivo)
-      : Promise.resolve({ data: null as any[] | null });
-
-    const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas, resApuSemana, resUltima, resMis] = await Promise.all([
-      supabase.from("clases").select("*").order("nombre"),
-      supabase.from("asignaturas").select("*"),
-      supabase.from("perfiles").select("*"),
-      supabase.from("preguntas").select("*").order("creada_en", { ascending: false }),
-      supabase.from("apuestas").select("*, perfiles(nombre, usa_hash, hash)").order("cuando", { ascending: false }).limit(60),
-      supabase.rpc("apostado_abierto_por_usuario"),
-      supabase.rpc("activos_semana"),
-      supabase.rpc("ultima_actividad_por_usuario"),
-      pMisApuestas
-    ]);
-
-    const misApuestas: any[] = (resMis.data as any[] | null) ?? [];
-
-    if (resClases.data) {
-      setClases((prev) => {
-        const pendientes = new Set(Object.keys(debounceClases.current));
-        const frescas = resClases.data.map((c: any) => ({ id: c.id, nombre: c.nombre }));
-        if (pendientes.size === 0) return frescas;
-        return frescas.map((c) => {
-          if (!pendientes.has(c.id)) return c;
-          const local = prev.find((p) => p.id === c.id);
-          return local ?? c;
-        });
-      });
+    // Si una carga anterior (p. ej. con usuario aún null) termina tarde, se descarta:
+    // solo la última petición lanzada actualiza el estado y marca "cargado".
+    const miPeticion = ++peticion.current;
+    const esVigente = () => miPeticion === peticion.current;
+    if (reintento.current) {
+      clearTimeout(reintento.current);
+      reintento.current = null;
     }
 
-    if (resAsig.data) {
-      setAsignaturas((prev) => {
-        const pendientes = new Set(Object.keys(debounceAsignaturas.current));
-        const frescas = resAsig.data.map((a: any) => ({
-          id: a.id,
-          claseId: a.clase_id,
-          nombre: a.nombre,
-          cerrada: a.cerrada,
-          fechaExamen: a.fecha_examen ? new Date(a.fecha_examen).getTime() : null
+    try {
+      // Todas las consultas van en paralelo. El apostado abierto, los activos de la
+      // semana y la última actividad se agregan en Postgres vía RPC.
+      const pMisApuestas = idEfectivo
+        ? supabase.from("apuestas").select("*").eq("usuario_id", idEfectivo)
+        : Promise.resolve({ data: null as any[] | null });
+
+      const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas, resApuSemana, resUltima, resMis] = await conTimeout(
+        Promise.all([
+          supabase.from("clases").select("*").order("nombre"),
+          supabase.from("asignaturas").select("*"),
+          supabase.from("perfiles").select("*"),
+          supabase.from("preguntas").select("*").order("creada_en", { ascending: false }),
+          supabase.from("apuestas").select("*, perfiles(nombre, usa_hash, hash)").order("cuando", { ascending: false }).limit(60),
+          supabase.rpc("apostado_abierto_por_usuario"),
+          supabase.rpc("activos_semana"),
+          supabase.rpc("ultima_actividad_por_usuario"),
+          pMisApuestas
+        ]),
+        20000
+      );
+
+      if (!esVigente()) return;
+
+      // Si falla una consulta crítica no se marca como cargado (así nunca se ve
+      // una pantalla a medias, ni la de elegir curso por error): se reintenta.
+      const errorCritico = resClases.error || resAsig.error || resPerf.error || resPreg.error;
+      if (errorCritico) throw errorCritico;
+
+      const misApuestas: any[] = (resMis.data as any[] | null) ?? [];
+
+      if (resClases.data) {
+        setClases((prev) => {
+          const pendientes = new Set(Object.keys(debounceClases.current));
+          const frescas = resClases.data.map((c: any) => ({ id: c.id, nombre: c.nombre }));
+          if (pendientes.size === 0) return frescas;
+          return frescas.map((c) => {
+            if (!pendientes.has(c.id)) return c;
+            const local = prev.find((p) => p.id === c.id);
+            return local ?? c;
+          });
+        });
+      }
+
+      if (resAsig.data) {
+        setAsignaturas((prev) => {
+          const pendientes = new Set(Object.keys(debounceAsignaturas.current));
+          const frescas = resAsig.data.map((a: any) => ({
+            id: a.id,
+            claseId: a.clase_id,
+            nombre: a.nombre,
+            cerrada: a.cerrada,
+            fechaExamen: a.fecha_examen ? new Date(a.fecha_examen).getTime() : null
+          }));
+          if (pendientes.size === 0) return frescas;
+          return frescas.map((a) => {
+            if (!pendientes.has(a.id)) return a;
+            const local = prev.find((p) => p.id === a.id);
+            return local ?? a;
+          });
+        });
+      }
+
+      if (resPerf.data) {
+        const alums = resPerf.data.map((p: any) => ({
+          id: p.id,
+          claseId: p.clase_id || null,
+          nombre: p.nombre || "",
+          saldo: Number(p.saldo),
+          pausado: p.pausado,
+          usaHash: p.usa_hash,
+          hash: p.hash || "",
+          mod: !!p.mod
         }));
-        if (pendientes.size === 0) return frescas;
-        return frescas.map((a) => {
-          if (!pendientes.has(a.id)) return a;
-          const local = prev.find((p) => p.id === a.id);
-          return local ?? a;
+        setAlumnos(alums);
+        if (idEfectivo) {
+          const mio = alums.find((a) => a.id === idEfectivo);
+          if (mio) setMiPerfil(mio);
+        }
+      }
+
+      if (resApu.data) {
+        const apFormateadas: Apuesta[] = resApu.data.map((a: any) => {
+          const p = a.perfiles;
+          let nombre = "Anónimo";
+          if (p) nombre = p.usa_hash ? `#${p.hash}` : p.nombre || "Anónimo";
+          return {
+            id: a.id,
+            usuarioId: a.usuario_id,
+            usuario: nombre,
+            tokens: Number(a.tokens),
+            cuando: new Date(a.cuando).getTime()
+          };
         });
-      });
-    }
-
-    if (resPerf.data) {
-      const alums = resPerf.data.map((p: any) => ({
-        id: p.id,
-        claseId: p.clase_id || null,
-        nombre: p.nombre || "",
-        saldo: Number(p.saldo),
-        pausado: p.pausado,
-        usaHash: p.usa_hash,
-        hash: p.hash || "",
-        mod: !!p.mod
-      }));
-      setAlumnos(alums);
-      if (idEfectivo) {
-        const mio = alums.find((a) => a.id === idEfectivo);
-        if (mio) setMiPerfil(mio);
+        setApuestas(apFormateadas);
       }
-    }
 
-    if (resApu.data) {
-      const apFormateadas: Apuesta[] = resApu.data.map((a: any) => {
-        const p = a.perfiles;
-        let nombre = "Anónimo";
-        if (p) nombre = p.usa_hash ? `#${p.hash}` : p.nombre || "Anónimo";
-        return {
-          id: a.id,
-          usuarioId: a.usuario_id,
-          usuario: nombre,
-          tokens: Number(a.tokens),
-          cuando: new Date(a.cuando).getTime()
-        };
-      });
-      setApuestas(apFormateadas);
-    }
-
-    if (resApuAbiertas.error) {
-      console.error("Error en apostado_abierto_por_usuario:", resApuAbiertas.error);
-    } else if (resApuAbiertas.data) {
-      const acumulado: Record<string, number> = {};
-      for (const a of resApuAbiertas.data as any[]) {
-        acumulado[a.usuario_id] = Number(a.apostado) || 0;
+      if (resApuAbiertas.error) {
+        console.error("Error en apostado_abierto_por_usuario:", resApuAbiertas.error);
+      } else if (resApuAbiertas.data) {
+        const acumulado: Record<string, number> = {};
+        for (const a of resApuAbiertas.data as any[]) {
+          acumulado[a.usuario_id] = Number(a.apostado) || 0;
+        }
+        setApostadoAbierto(acumulado);
       }
-      setApostadoAbierto(acumulado);
-    }
 
-    if (resApuSemana.error) {
-      console.error("Error en activos_semana:", resApuSemana.error);
-    } else if (resApuSemana.data) {
-      setActivosSemana((resApuSemana.data as any[]).map((a) => a.usuario_id));
-    }
-
-    if (resUltima.error) {
-      console.error("Error en ultima_actividad_por_usuario:", resUltima.error);
-    } else if (resUltima.data) {
-      const ult: Record<string, number> = {};
-      for (const a of resUltima.data as any[]) {
-        ult[a.usuario_id] = new Date(a.cuando).getTime();
+      if (resApuSemana.error) {
+        console.error("Error en activos_semana:", resApuSemana.error);
+      } else if (resApuSemana.data) {
+        setActivosSemana((resApuSemana.data as any[]).map((a) => a.usuario_id));
       }
-      setUltimaActividad(ult);
-    }
 
-    if (resPreg.data) {
-      const pregs: Pregunta[] = resPreg.data.map((p: any) => {
-        let misSi = 0;
-        let misNo = 0;
-        let misAccionesSi = 0;
-        let misAccionesNo = 0;
-        for (const ap of misApuestas) {
-          if (ap.pregunta_id === p.id) {
-            if (ap.lado === "si") {
-              misSi += Number(ap.tokens);
-              misAccionesSi += Number(ap.acciones) || 0;
-            } else {
-              misNo += Number(ap.tokens);
-              misAccionesNo += Number(ap.acciones) || 0;
+      if (resUltima.error) {
+        console.error("Error en ultima_actividad_por_usuario:", resUltima.error);
+      } else if (resUltima.data) {
+        const ult: Record<string, number> = {};
+        for (const a of resUltima.data as any[]) {
+          ult[a.usuario_id] = new Date(a.cuando).getTime();
+        }
+        setUltimaActividad(ult);
+      }
+
+      if (resPreg.data) {
+        const pregs: Pregunta[] = resPreg.data.map((p: any) => {
+          let misSi = 0;
+          let misNo = 0;
+          let misAccionesSi = 0;
+          let misAccionesNo = 0;
+          for (const ap of misApuestas) {
+            if (ap.pregunta_id === p.id) {
+              if (ap.lado === "si") {
+                misSi += Number(ap.tokens);
+                misAccionesSi += Number(ap.acciones) || 0;
+              } else {
+                misNo += Number(ap.tokens);
+                misAccionesNo += Number(ap.acciones) || 0;
+              }
             }
           }
-        }
-        return {
-          id: p.id,
-          titulo: p.titulo,
-          asignaturaId: p.asignatura_id ?? "",
-          asignaturaNombre: p.asignatura_nombre ?? "",
-          poolSi: Number(p.pool_si),
-          poolNo: Number(p.pool_no),
-          historial: typeof p.historial === "string" ? JSON.parse(p.historial) : p.historial || [],
-          misSi,
-          misNo,
-          resultado: p.resultado,
-          archivada: p.archivada,
-          creadaEn: new Date(p.creada_en).getTime(),
-          mecanismo: (p.mecanismo === "lmsr" ? "lmsr" : "pari_mutuel") as Mecanismo,
-          qSi: Number(p.q_si ?? 0),
-          qNo: Number(p.q_no ?? 0),
-          b: p.b == null ? null : Number(p.b),
-          misAccionesSi,
-          misAccionesNo
-        };
-      });
-      setPreguntas(pregs);
-    }
+          return {
+            id: p.id,
+            titulo: p.titulo,
+            asignaturaId: p.asignatura_id ?? "",
+            asignaturaNombre: p.asignatura_nombre ?? "",
+            poolSi: Number(p.pool_si),
+            poolNo: Number(p.pool_no),
+            historial: leerHistorial(p.historial),
+            misSi,
+            misNo,
+            resultado: p.resultado,
+            archivada: p.archivada,
+            creadaEn: new Date(p.creada_en).getTime(),
+            mecanismo: (p.mecanismo === "lmsr" ? "lmsr" : "pari_mutuel") as Mecanismo,
+            qSi: Number(p.q_si ?? 0),
+            qNo: Number(p.q_no ?? 0),
+            b: p.b == null ? null : Number(p.b),
+            misAccionesSi,
+            misAccionesNo
+          };
+        });
+        setPreguntas(pregs);
+      }
 
-    setIdCargado(idEfectivo);
-    setPerfilCargado(true);
+      setIdCargado(idEfectivo);
+      setPerfilCargado(true);
+    } catch (e) {
+      console.error("Error al cargar datos (reintentando en 3 s):", e);
+      if (esVigente()) {
+        reintento.current = setTimeout(() => {
+          if (esVigente()) void cargarRef.current();
+        }, 3000);
+      }
+    }
   }, [idEfectivo]);
+
+  useEffect(() => {
+    cargarRef.current = cargarDatos;
+  }, [cargarDatos]);
 
   useEffect(() => {
     cargarDatos();
