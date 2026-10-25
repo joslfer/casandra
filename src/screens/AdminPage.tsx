@@ -1,8 +1,9 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSesion } from "@/hooks/useSesion";
 import { useHaptic } from "@/hooks/useHaptic";
+import { suplantarUsuario, dejarDeSuplantar } from "@/hooks/useSuplantado";
 import { nombreVisible, premio, probabilidad, useMercado, volumen, type ApuestaDetalle, type Pregunta } from "@/hooks/useMercado";
 import { PantallaLogin } from "@/components/PantallaLogin";
 import { PantallaSeleccionClase } from "@/components/PantallaSeleccionClase";
@@ -24,6 +25,7 @@ export function AdminPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
   const haptic = useHaptic();
+  const navigate = useNavigate();
   
   const [vistaAdmin, setVistaAdmin] = useState<VistaAdmin>("preguntas");
   const [claseFiltroId, setClaseFiltroId] = useState<string>(FILTRO_TODAS);
@@ -44,6 +46,11 @@ export function AdminPage() {
   const [bGlobalGuardado, setBGlobalGuardado] = useState<number | null>(null);
   const [bGlobalInput, setBGlobalInput] = useState("");
   const [guardandoBGlobal, setGuardandoBGlobal] = useState(false);
+
+  // El panel admin siempre se ve como el admin real: al entrar se sale de la suplantación.
+  useEffect(() => {
+    dejarDeSuplantar();
+  }, []);
 
   useEffect(() => {
     if (!modalResolucion) {
@@ -485,6 +492,18 @@ export function AdminPage() {
                       <button onClick={() => { haptic(); if (window.confirm(`¿Devolver apuestas?`)) mercado.adminRetirarApuestas(a.id); }} disabled={apostado === 0} className="rounded border border-borde px-2.5 py-1 text-[12px] disabled:opacity-40">Quitar apuestas</button>
                       <button onClick={() => { haptic(); mercado.pausarAlumno(a.id, !a.pausado); }} className={`rounded border px-2.5 py-1 text-[12px] ${a.pausado ? "bg-ink text-white border-ink" : "bg-white border-borde"}`}>
                         {a.pausado ? "Reanudar" : "Pausar"}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          haptic();
+                          suplantarUsuario({ id: a.id, nombre: nombreVisible(a) });
+                          navigate({ to: "/" });
+                        }}
+                        disabled={a.pausado || !a.claseId || a.id === usuario.id}
+                        className="rounded border border-borde px-2.5 py-1 text-[12px] disabled:opacity-40"
+                      >
+                        Entrar como
                       </button>
                     </div>
                   </div>
