@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSuplantado } from "@/hooks/useSuplantado";
 
 export type Lado = "si" | "no";
 export type Mecanismo = "pari_mutuel" | "lmsr";
@@ -47,6 +48,12 @@ export interface Apuesta {
   usuarioId: string;
   usuario: string;
   tokens: number;
+  cuando: number;
+}
+
+export interface ActividadUsuario {
+  usuarioId: string;
+  usuario: string;
   cuando: number;
 }
 
@@ -139,8 +146,6 @@ export function hashAleatorio(): string {
 
 export const RECOMPENSA_CREAR_PREGUNTA = 0;
 
-const MS_SEMANA = 7 * 24 * 60 * 60 * 1000;
-
 export function haceTexto(cuando: number, ahora = Date.now()): string {
   const min = Math.max(1, Math.round((ahora - cuando) / 60000));
   if (min < 60) return `hace ${min} min`;
@@ -185,6 +190,14 @@ export function calcularEstadisticas(ranking: any[]) {
 
 
 export function useMercado(usuario: Usuario | null) {
+  // Suplantación: solo vale si el usuario real es admin (el servidor lo vuelve a comprobar).
+  const suplantadoGuardado = useSuplantado();
+  const suplantando =
+    usuario?.esAdmin && suplantadoGuardado && suplantadoGuardado.id !== usuario.id
+      ? suplantadoGuardado
+      : null;
+  const idEfectivo: string | null = suplantando ? suplantando.id : usuario ? usuario.id : null;
+
   const [clases, setClases] = useState<Clase[]>([]);
   const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
@@ -193,6 +206,7 @@ export function useMercado(usuario: Usuario | null) {
   const [miPerfil, setMiPerfil] = useState<Alumno | null>(null);
   const [apostadoAbierto, setApostadoAbierto] = useState<Record<string, number>>({});
   const [activosSemana, setActivosSemana] = useState<string[]>([]);
+  const [ultimaActividad, setUltimaActividad] = useState<Record<string, number>>({});
 
   const [perfilCargado, setPerfilCargado] = useState(false);
   const [idCargado, setIdCargado] = useState<string | null>(null);
@@ -210,30 +224,27 @@ export function useMercado(usuario: Usuario | null) {
   }, []);
 
   const cargarDatos = useCallback(async () => {
-    const desdeSemana = new Date(Date.now() - MS_SEMANA).toISOString();
+    // Todas las consultas van en paralelo (incluida misApuestas, que antes iba
+    // después en serie). El apostado abierto, los activos de la semana y la
+    // última actividad se agregan en Postgres vía RPC en vez de traer una fila
+    // por apuesta.
+    const pMisApuestas = idEfectivo
+      ? supabase.from("apuestas").select("*").eq("usuario_id", idEfectivo)
+      : Promise.resolve({ data: null as any[] | null });
 
-    const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas, resApuSemana] = await Promise.all([
+    const [resClases, resAsig, resPerf, resPreg, resApu, resApuAbiertas, resApuSemana, resUltima, resMis] = await Promise.all([
       supabase.from("clases").select("*").order("nombre"),
       supabase.from("asignaturas").select("*"),
       supabase.from("perfiles").select("*"),
       supabase.from("preguntas").select("*").order("creada_en", { ascending: false }),
       supabase.from("apuestas").select("*, perfiles(nombre, usa_hash, hash)").order("cuando", { ascending: false }).limit(60),
-      supabase
-        .from("apuestas")
-        .select("usuario_id, tokens, preguntas!inner(resultado, archivada)")
-        .is("preguntas.resultado", null)
-        .eq("preguntas.archivada", false),
-      supabase
-        .from("apuestas")
-        .select("usuario_id")
-        .gte("cuando", desdeSemana)
+      supabase.rpc("apostado_abierto_por_usuario"),
+      supabase.rpc("activos_semana"),
+      supabase.rpc("ultima_actividad_por_usuario"),
+      pMisApuestas
     ]);
 
-    let misApuestas: any[] = [];
-    if (usuario) {
-      const { data } = await supabase.from("apuestas").select("*").eq("usuario_id", usuario.id);
-      if (data) misApuestas = data;
-    }
+    const misApuestas: any[] = (resMis.data as any[] | null) ?? [];
 
     if (resClases.data) {
       setClases((prev) => {
@@ -279,8 +290,8 @@ export function useMercado(usuario: Usuario | null) {
         mod: !!p.mod
       }));
       setAlumnos(alums);
-      if (usuario) {
-        const mio = alums.find((a) => a.id === usuario.id);
+      if (idEfectivo) {
+        const mio = alums.find((a) => a.id === idEfectivo);
         if (mio) setMiPerfil(mio);
       }
     }
@@ -301,18 +312,30 @@ export function useMercado(usuario: Usuario | null) {
       setApuestas(apFormateadas);
     }
 
-    if (resApuAbiertas.data) {
+    if (resApuAbiertas.error) {
+      console.error("Error en apostado_abierto_por_usuario:", resApuAbiertas.error);
+    } else if (resApuAbiertas.data) {
       const acumulado: Record<string, number> = {};
       for (const a of resApuAbiertas.data as any[]) {
-        acumulado[a.usuario_id] = (acumulado[a.usuario_id] || 0) + Number(a.tokens);
+        acumulado[a.usuario_id] = Number(a.apostado) || 0;
       }
       setApostadoAbierto(acumulado);
     }
 
-    if (resApuSemana.data) {
-      const ids = new Set<string>();
-      for (const a of resApuSemana.data as any[]) ids.add(a.usuario_id);
-      setActivosSemana(Array.from(ids));
+    if (resApuSemana.error) {
+      console.error("Error en activos_semana:", resApuSemana.error);
+    } else if (resApuSemana.data) {
+      setActivosSemana((resApuSemana.data as any[]).map((a) => a.usuario_id));
+    }
+
+    if (resUltima.error) {
+      console.error("Error en ultima_actividad_por_usuario:", resUltima.error);
+    } else if (resUltima.data) {
+      const ult: Record<string, number> = {};
+      for (const a of resUltima.data as any[]) {
+        ult[a.usuario_id] = new Date(a.cuando).getTime();
+      }
+      setUltimaActividad(ult);
     }
 
     if (resPreg.data) {
@@ -356,9 +379,9 @@ export function useMercado(usuario: Usuario | null) {
       setPreguntas(pregs);
     }
 
-    setIdCargado(usuario ? usuario.id : null);
+    setIdCargado(idEfectivo);
     setPerfilCargado(true);
-  }, [usuario]);
+  }, [idEfectivo]);
 
   useEffect(() => {
     cargarDatos();
@@ -380,7 +403,9 @@ export function useMercado(usuario: Usuario | null) {
     ? { nombre: miPerfil.nombre, usaHash: miPerfil.usaHash, hash: miPerfil.hash, claseId: miPerfil.claseId, mod: miPerfil.mod }
     : { nombre: "", usaHash: false, hash: "", claseId: null, mod: false };
 
-  const miNombre = perfil.usaHash ? `#${perfil.hash}` : perfil.nombre || usuario?.nombre || "Tú";
+  const miNombre = perfil.usaHash
+    ? `#${perfil.hash}`
+    : perfil.nombre || (suplantando ? suplantando.nombre : usuario?.nombre) || "Tú";
 
   const leerClases = useCallback((): Clase[] => clases, [clases]);
 
@@ -406,6 +431,23 @@ export function useMercado(usuario: Usuario | null) {
     }
     return agrupadas.slice(0, 15);
   }, [apuestas, alumnos, miClaseId]);
+
+  // Última actividad (última apuesta) de cada alumno de mi clase.
+  // `usuario` usa el mismo nombre visible que leerRanking, para poder cruzarlos.
+  const leerActividadUsuarios = useCallback((): ActividadUsuario[] => {
+    const resultado: ActividadUsuario[] = [];
+    for (const a of alumnos) {
+      if (a.claseId !== miClaseId) continue;
+      const cuando = ultimaActividad[a.id];
+      if (!cuando) continue;
+      resultado.push({
+        usuarioId: a.id,
+        usuario: a.usaHash ? `#${a.hash}` : (a.nombre || "Anónimo"),
+        cuando
+      });
+    }
+    return resultado;
+  }, [alumnos, ultimaActividad, miClaseId]);
 
   const leerWAU = useCallback((): number => {
     const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
@@ -484,7 +526,7 @@ export function useMercado(usuario: Usuario | null) {
   }, [leerPreguntas]);
 
   const elegirClase = useCallback(async (claseId: string) => {
-    if (!usuario || pausado) return;
+    if (!usuario || pausado || suplantando) return;
     const esCambio = miPerfil?.claseId && miPerfil.claseId !== claseId;
 
     const { error } = await supabase.rpc("cambiar_clase_y_resetear", {
@@ -500,7 +542,7 @@ export function useMercado(usuario: Usuario | null) {
     const nuevoSaldo = esCambio ? 0 : (miPerfil?.saldo || 0);
     setMiPerfil(prev => prev ? { ...prev, claseId, saldo: nuevoSaldo } : prev);
     await cargarDatos();
-  }, [usuario, pausado, miPerfil, cargarDatos]);
+  }, [usuario, pausado, suplantando, miPerfil, cargarDatos]);
 
   const apostar = useCallback(async (id: string, lado: Lado, tokens = 1) => {
     if (!Number.isFinite(tokens) || tokens <= 0 || pausado || saldo < tokens) return false;
@@ -526,11 +568,18 @@ export function useMercado(usuario: Usuario | null) {
     }));
     setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo - tokens } : prev));
 
-    const { error } = await supabase.rpc("apostar", { p_pregunta_id: id, p_lado: lado, p_tokens: tokens });
+    const { error } = suplantando
+      ? await supabase.rpc("admin_apostar_como", {
+          p_usuario_id: suplantando.id,
+          p_pregunta_id: id,
+          p_lado: lado,
+          p_tokens: tokens
+        })
+      : await supabase.rpc("apostar", { p_pregunta_id: id, p_lado: lado, p_tokens: tokens });
     if (error) console.error("Error al apostar:", error);
     await cargarDatos();
     return !error;
-  }, [saldo, pausado, cargarDatos, preguntas, asignaturas]);
+  }, [saldo, pausado, cargarDatos, preguntas, asignaturas, suplantando]);
 
   const retirar = useCallback(async (id: string) => {
     if (pausado) return 0;
@@ -560,15 +609,17 @@ export function useMercado(usuario: Usuario | null) {
     }));
     setMiPerfil((prev) => (prev ? { ...prev, saldo: prev.saldo + devolucion } : prev));
 
-    const { error } = await supabase.rpc("retirar_todo", { p_pregunta_id: id });
+    const { error } = suplantando
+      ? await supabase.rpc("admin_retirar_como", { p_usuario_id: suplantando.id, p_pregunta_id: id })
+      : await supabase.rpc("retirar_todo", { p_pregunta_id: id });
     if (error) console.error("Error al retirar:", error);
     await cargarDatos();
     return devolucion;
-  }, [pausado, preguntas, cargarDatos]);
+  }, [pausado, preguntas, cargarDatos, suplantando]);
 
   const crearPregunta = useCallback(async (titulo: string, asignaturaId: string) => {
     const t = titulo.trim();
-    if (!t || pausado || !asignaturaId) return null;
+    if (!t || pausado || !asignaturaId || suplantando) return null;
 
     // Llamamos a la función de Supabase sin pasarle b, para que use obligatoriamente el global del Admin
     const { data, error } = await supabase.rpc("crear_pregunta_con_recompensa", {
@@ -589,7 +640,7 @@ export function useMercado(usuario: Usuario | null) {
 
     await cargarDatos();
     return data as unknown as Pregunta;
-  }, [pausado, cargarDatos]);
+  }, [pausado, suplantando, cargarDatos]);
 
   const simular = useCallback(() => { console.log("Simular deshabilitado."); }, []);
 
@@ -598,19 +649,19 @@ export function useMercado(usuario: Usuario | null) {
   }, []);
 
   const guardarNombre = useCallback(async (nombre: string) => {
-    if (!usuario) return;
+    if (!usuario || suplantando) return;
     setMiPerfil((prev) => (prev ? { ...prev, nombre } : prev));
     await supabase.from("perfiles").update({ nombre }).eq("id", usuario.id);
     await cargarDatos();
-  }, [usuario, cargarDatos]);
+  }, [usuario, suplantando, cargarDatos]);
 
   const usarHash = useCallback(async (valor: boolean) => {
-    if (!usuario) return;
+    if (!usuario || suplantando) return;
     const nuevoHash = valor ? hashAleatorio() : miPerfil?.hash;
     setMiPerfil((prev) => (prev ? { ...prev, usaHash: valor, hash: nuevoHash || "" } : prev));
     await supabase.from("perfiles").update({ usa_hash: valor, hash: nuevoHash }).eq("id", usuario.id);
     await cargarDatos();
-  }, [usuario, miPerfil, cargarDatos]);
+  }, [usuario, suplantando, miPerfil, cargarDatos]);
 
   // --------------------------------------------------------
   // ADMIN & MOD
@@ -863,7 +914,8 @@ export function useMercado(usuario: Usuario | null) {
 
   return useMemo(
     () => ({
-      perfilCargado: perfilCargado && idCargado === (usuario ? usuario.id : null),
+      perfilCargado: perfilCargado && idCargado === idEfectivo,
+      suplantando,
       saldo,
       pausado,
       perfil,
@@ -874,6 +926,7 @@ export function useMercado(usuario: Usuario | null) {
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
+      leerActividadUsuarios,
       leerApuestasDePregunta,
       leerRanking,
       leerWAU,
@@ -912,7 +965,8 @@ export function useMercado(usuario: Usuario | null) {
     [
       perfilCargado,
       idCargado,
-      usuario?.id,
+      idEfectivo,
+      suplantando,
       saldo,
       pausado,
       perfil,
@@ -923,6 +977,7 @@ export function useMercado(usuario: Usuario | null) {
       leerAsignaturas,
       leerAlumnos,
       leerApuestas,
+      leerActividadUsuarios,
       leerApuestasDePregunta,
       leerRanking,
       leerWAU,
