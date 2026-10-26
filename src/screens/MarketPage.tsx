@@ -286,8 +286,9 @@ function EscalaPuntos({ si, no, misSi, misNo }: { si: number; no: number; misSi:
 }
 
 // ============================================================================
-// NÚMERO RODANTE GENÉRICO
+// NÚMERO RODANTE GENÉRICO (VERSIÓN ANTIGUA, COMENTADA)
 // ============================================================================
+/*
 function NumeroRodante({
   valor,
   className = "",
@@ -314,28 +315,33 @@ function NumeroRodante({
   useEffect(() => {
     const startVal = floatValRef.current;
     const endVal = valor;
-    if (startVal === endVal) return;
+
+    // Si ya estamos en el destino, aseguramos estado de reposo limpio.
+    if (startVal === endVal) {
+      setRenderVal(endVal);
+      setIsAnimating(false);
+      return;
+    }
 
     setIsAnimating(true);
     let startTime: number | null = null;
 
     const anim = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duracion, 1);
-
+      if (startTime === null) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duracion, 1);
       const ease = 1 - Math.pow(1 - progress, 3);
-      const currentFloat = startVal + (endVal - startVal) * ease;
-      
-      floatValRef.current = currentFloat;
-      setRenderVal(currentFloat);
 
       if (progress < 1) {
+        const currentFloat = startVal + (endVal - startVal) * ease;
+        floatValRef.current = currentFloat;
+        setRenderVal(currentFloat);
         animRef.current = requestAnimationFrame(anim);
       } else {
-        setRenderVal(endVal);
+        // Último frame: valor exacto y reposo en el mismo render.
         floatValRef.current = endVal;
+        setRenderVal(endVal);
         setIsAnimating(false);
+        animRef.current = null;
       }
     };
 
@@ -347,13 +353,11 @@ function NumeroRodante({
     };
   }, [valor, duracion]);
 
+  const altoFila = 1.15; // espacio suficiente para el trazo inferior (p. ej. el 9)
   const base = Math.floor(renderVal);
   const frac = renderVal - base;
-  const items = [base + 2, base + 1, base, base - 1];
 
-  // 1.15em garantiza espacio suficiente para el trazado inferior (como el 9) 
-  // manteniendo la ventana del tamaño exacto de un solo número.
-  const altoFila = 1.15; 
+  const mascara = "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)";
 
   return (
     <span
@@ -363,43 +367,104 @@ function NumeroRodante({
         height: `${altoFila}em`,
         lineHeight: `${altoFila}em`,
         boxSizing: "content-box",
-        maskImage: isAnimating
-          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
-          : "none",
-        WebkitMaskImage: isAnimating
-          ? "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
-          : "none",
+        maskImage: isAnimating ? mascara : "none",
+        WebkitMaskImage: isAnimating ? mascara : "none",
       }}
     >
-      <span
-        className="flex flex-col items-end w-full will-change-transform"
-        style={{
-          // Multiplicamos el desplazamiento por la nueva altura de la fila
-          transform: `translateY(-${(2 - frac) * altoFila}em)`,
-        }}
-      >
-        {items.map((num) => (
-          <span 
-            key={num} 
-            className="flex w-full items-center justify-end whitespace-nowrap"
-            style={{ height: `${altoFila}em` }}
-          >
-            {num}
-          </span>
-        ))}
+      {!isAnimating ? (
+        <span
+          className="flex w-full items-center justify-end whitespace-nowrap"
+          style={{ height: `${altoFila}em` }}
+        >
+          {Math.round(renderVal)}
+        </span>
+      ) : (
+        <span
+          className="flex flex-col items-end w-full will-change-transform"
+          style={{ transform: `translateY(-${frac * 50}%)` }}
+        >
+          {[base, base + 1].map((num) => (
+            <span
+              key={num}
+              className="flex w-full items-center justify-end whitespace-nowrap"
+              style={{ height: `${altoFila}em` }}
+            >
+              {num}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+*/
+
+// ============================================================================
+// NÚMERO SIMPLE CON PEQUEÑO FUNDIDO AL CAMBIAR
+// ============================================================================
+// Muestra el número tal cual. Cuando el valor cambia, hace un fundido muy
+// sutil (opacidad + 4px de desplazamiento, 220 ms). Sin columnas ni máscaras,
+// así que no puede quedar ningún número "entre medias".
+// Mantiene la misma altura y ancho mínimo que la versión anterior.
+// El parámetro `duracion` se acepta por compatibilidad pero ya no se usa.
+function NumeroRodante({
+  valor,
+  className = "",
+}: {
+  valor: number;
+  className?: string;
+  duracion?: number;
+}) {
+  const numero = Math.round(valor);
+  const interiorRef = useRef<HTMLSpanElement>(null);
+  const previoRef = useRef(numero);
+
+  const [maxLen, setMaxLen] = useState(() => String(Math.abs(numero)).length + (numero < 0 ? 1 : 0));
+
+  useEffect(() => {
+    const curLen = String(Math.abs(numero)).length + (numero < 0 ? 1 : 0);
+    if (curLen > maxLen) setMaxLen(curLen);
+  }, [numero, maxLen]);
+
+  useEffect(() => {
+    if (previoRef.current === numero) return;
+    const subio = numero > previoRef.current;
+    previoRef.current = numero;
+
+    interiorRef.current?.animate(
+      [
+        { opacity: 0.35, transform: `translateY(${subio ? 4 : -4}px)` },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 220, easing: "ease-out" }
+    );
+  }, [numero]);
+
+  const altoFila = 1.15;
+
+  return (
+    <span
+      className={`inline-flex items-center justify-end font-mono tracking-tight tabular-nums whitespace-nowrap ${className}`}
+      style={{
+        minWidth: `${maxLen}ch`,
+        height: `${altoFila}em`,
+        lineHeight: `${altoFila}em`,
+        boxSizing: "content-box",
+      }}
+    >
+      <span ref={interiorRef} className="inline-block">
+        {numero}
       </span>
     </span>
   );
 }
 
-
-// Saldo grande (mismo aspecto y duración que antes)
+// Saldo grande
 function SaldoAnimado({ valor }: { valor: number }) {
   return (
     <NumeroRodante 
       valor={valor} 
-      className="text-[64px] text-ink -translate-y-[10px]" 
-      duracion={800} 
+      className="text-[64px] text-ink -translate-y-[0px]" 
     />
   );
 }
@@ -467,7 +532,7 @@ function FilaPregunta({
           >
             {mostrarProb ? (
               <>
-                <NumeroRodante valor={Math.round(prob)} duracion={600} />
+                <NumeroRodante valor={Math.round(prob)} />
                 <span>%</span>
               </>
             ) : (
