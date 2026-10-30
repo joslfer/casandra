@@ -14,14 +14,17 @@ const fuenteApple = {
 
 const MOSTRAR_ADS = false;
 
+// Máximo de usuarios que se muestran en el ranking
+const LIMITE_RANKING = 50;
+
 function Moneda({ className = "" }: { className?: string }) {
   return (
-    <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} /> 
-  ); 
-}  
+    <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />
+  );
+}
 
-function IconoReloj({ className = "" }: { className?: string }) { 
-  return ( 
+function IconoReloj({ className = "" }: { className?: string }) {
+  return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${className}`}>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 3" />
@@ -52,10 +55,10 @@ function PaginaRanking() {
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
   const rankingActual = mercado.leerRanking();
-  
-  // NOTA: Para que esto sea "entrar a la app" y no solo apostar, el backend y 
-  // tu hook `useMercado` deben estar trackeando la última conexión. 
-  const actividadActual = mercado.leerActividadUsuarios?.() || mercado.leerApuestas(); 
+
+  // NOTA: Para que esto sea "entrar a la app" y no solo apostar, el backend y
+  // tu hook `useMercado` deben estar trackeando la última conexión.
+  const actividadActual = mercado.leerActividadUsuarios?.() || mercado.leerApuestas();
   const miNombre = mercado.miNombre;
 
   useEffect(() => {
@@ -87,7 +90,7 @@ function PaginaRanking() {
   const LIMITE_10_DIAS = 10 * 24 * 60 * 60 * 1000;
   const ahora = Date.now();
 
-  const listaCombinada = rankingFijo.map((r) => {
+  const listaCombinada = rankingFijo.slice(0, LIMITE_RANKING).map((r) => {
     const ultimaActividad = actividadActual.find((a: any) => a.usuario === r.usuario);
     let textoActividad = null;
 

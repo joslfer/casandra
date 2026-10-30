@@ -538,7 +538,7 @@ export function useMercado(usuario: Usuario | null) {
         }
         return a.usuario.localeCompare(b.usuario, 'es', { sensitivity: 'base' });
       })
-      .slice(0, 10);
+      .slice(0, 50);
   }, [alumnos, apostadoAbierto, miClaseId]);
 
   const leerPreguntas = useCallback(
