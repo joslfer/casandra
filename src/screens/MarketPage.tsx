@@ -526,73 +526,121 @@ function EscalaPuntos({ si, no, misSi, misNo }: { si: number; no: number; misSi:
 // ============================================================================
 // NÚMERO SIMPLE CON PEQUEÑO FUNDIDO AL CAMBIAR
 // ============================================================================
-function NumeroRodante({
-  modo = "deslizar",
-  valor,
-  className = "",
-}: {
-  valor: number;
-  className?: string;
-  duracion?: number;
-  modo?: "deslizar" | "salto";
-}) {
-  const numero = Math.round(valor);
+
+
+
+
+function NumeroRodante({ valor, className = "" }) {
+  const valorRedondeado = Math.round(valor);
+
+  const [numero, setNumero] = useState(valorRedondeado);
+  const [maxLen, setMaxLen] = useState(
+    String(valorRedondeado).length
+  );
+
   const interiorRef = useRef<HTMLSpanElement>(null);
-  const previoRef = useRef(numero);
-
-  const [maxLen, setMaxLen] = useState(() => String(Math.abs(numero)).length + (numero < 0 ? 1 : 0));
-
-  useEffect(() => {
-    const curLen = String(Math.abs(numero)).length + (numero < 0 ? 1 : 0);
-    if (curLen > maxLen) setMaxLen(curLen);
-  }, [numero, maxLen]);
+  const animacionRef = useRef<Animation | null>(null);
+  const objetivoRef = useRef(valorRedondeado);
 
   useEffect(() => {
-    if (previoRef.current === numero) return;
-    const subio = numero > previoRef.current;
-    previoRef.current = numero;
+    const nuevoNumero = Math.round(valor);
 
-    if (reducirMovimiento()) return;
+    setMaxLen((prev) =>
+      Math.max(prev, String(nuevoNumero).length)
+    );
 
-    if (modo === "salto") {
-      interiorRef.current?.animate(
-        [
-          { transform: "translateY(0) scale(1)" },
-          { transform: "translateY(-6px) scale(1.18)", offset: 0.4 },
-          { transform: "translateY(0) scale(1)" },
-        ],
-        { duration: 260, easing: "cubic-bezier(0.3, 0.7, 0.4, 1)" }
-      );
+    if (nuevoNumero === objetivoRef.current) return;
+
+    const el = interiorRef.current;
+
+    if (!el) {
+      objetivoRef.current = nuevoNumero;
+      setNumero(nuevoNumero);
       return;
     }
 
-    interiorRef.current?.animate(
-      [
-        { opacity: 0.35, transform: `translateY(${subio ? 4 : -4}px)` },
-        { opacity: 1, transform: "translateY(0)" },
-      ],
-      { duration: 220, easing: "ease-out" }
-    );
-  }, [numero, modo]);
+    const transformActual = getComputedStyle(el).transform;
 
-  const altoFila = 1.15;
+    animacionRef.current?.cancel();
+    animacionRef.current = null;
+
+    objetivoRef.current = nuevoNumero;
+    setNumero(nuevoNumero);
+
+    const animacion = el.animate(
+      [
+        {
+          transform: transformActual === "none"
+            ? "translateY(0) scale(1, 1)"
+            : transformActual,
+        },
+        {
+          transform: "translateY(-35%) scale(0.85, 1.25)",
+          offset: 0.4,
+        },
+        {
+          transform: "translateY(15%) scale(1.15, 0.85)",
+          offset: 0.7,
+        },
+        {
+          transform: "translateY(0) scale(1, 1)",
+        },
+      ],
+      {
+        duration: 250,
+        easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+      }
+    );
+
+    animacionRef.current = animacion;
+
+    animacion.onfinish = () => {
+      if (animacionRef.current !== animacion) return;
+      animacionRef.current = null;
+    };
+  }, [valor]);
+
+  useEffect(() => {
+    return () => {
+      animacionRef.current?.cancel();
+    };
+  }, []);
 
   return (
     <span
-      className={`inline-flex items-center justify-end font-mono tracking-tight tabular-nums whitespace-nowrap ${className}`}
+      className={`relative inline-block font-mono tracking-tight tabular-nums whitespace-nowrap align-baseline ${className}`}
       style={{
         minWidth: `${maxLen}ch`,
-        height: `${altoFila}em`,
-        lineHeight: `${altoFila}em`,
-        boxSizing: "content-box",
+        height: "1.2em",
+        verticalAlign: "-0.15em",
       }}
     >
-      <span ref={interiorRef} className="inline-block" style={{ transformOrigin: "50% 100%" }}>
+      <span className="invisible pointer-events-none select-none block">
         {numero}
+      </span>
+
+      {/* Clipping window with extra vertical space */}
+      <span
+        className="absolute inset-x-0 overflow-hidden pointer-events-none"
+        style={{
+          top: "-0.20em",
+          bottom: "-0.20em",
+        }}
+      >
+        <span
+          ref={interiorRef}
+          className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
+          {numero}
+        </span>
       </span>
     </span>
   );
 }
+
+
+
+
 
 // ============================================================================
 // CODIGO ANTIGUO COMENTADO: SALDO GIGANTE Y WIDGET DE RIVALIDAD (NO BORRAR)
@@ -1493,11 +1541,12 @@ export function MarketPage() {
               <span style={fuenteApple} className="text-[18px] font-medium text-ink">
                 Te quedan
               </span>
-              <span className="inline-block min-w-[2ch] text-right font-mono text-[18px] font-semibold text-ink tabular-nums">
-                {Math.round(mercado.saldo || 0)}
-              </span>
+              <NumeroRodante 
+                valor={mercado.saldo || 0} 
+                className="text-[18px] font-semibold text-ink" 
+              />
               <span style={fuenteApple} className="text-[18px] font-medium text-ink">
-                tokens
+              tokens
               </span>
               <Moneda className="!h-[18px] !w-[18px] shrink-0" />
               
