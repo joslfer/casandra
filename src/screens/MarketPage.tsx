@@ -1160,6 +1160,8 @@ export function MarketPage() {
   const REFRESH_THRESHOLD = 75;
   const SPINNER_OFFSET = 55;
   const SPRING_CONFIG = "0.4s cubic-bezier(0.3, 0.7, 0, 1)";
+  // Si recargar() tarda más que esto, se da por terminado para no dejar la pantalla atascada
+  const TIMEOUT_RECARGA_MS = 8000;
 
   const handleMainTouchStart = (e: React.TouchEvent) => {
     const scrollTop = mainContainerRef.current?.scrollTop ?? 0;
@@ -1210,7 +1212,10 @@ export function MarketPage() {
 
       try {
         if (typeof mercado.recargar === 'function') {
-          await mercado.recargar();
+          await Promise.race([
+            mercado.recargar(),
+            new Promise((resolve) => setTimeout(resolve, TIMEOUT_RECARGA_MS)),
+          ]);
           setOrdenSnapshot({});
           setRankingParticipacion(null);
         } else {
@@ -1224,6 +1229,13 @@ export function MarketPage() {
     } else {
       setPullDistance(0);
     }
+  };
+
+  // iOS puede cancelar un toque (por ejemplo al arrancar audio o por un gesto del sistema).
+  // Sin esto, isPulling y pullDistance se quedaban colgados y el contenido desplazado.
+  const handleMainTouchCancel = () => {
+    setIsPulling(false);
+    if (!isRefreshing) setPullDistance(0);
   };
 
   // CONTROL DEL HEADER STICKY AL HACER SCROLL
@@ -1527,6 +1539,7 @@ export function MarketPage() {
       onTouchStart={handleMainTouchStart}
       onTouchMove={handleMainTouchMove}
       onTouchEnd={handleMainTouchEnd}
+      onTouchCancel={handleMainTouchCancel}
       className="h-[100dvh] w-full overflow-x-hidden overflow-y-auto overscroll-y-none bg-lienzo select-none relative"
       style={{ ...fuenteApple, WebkitOverflowScrolling: "touch", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
     >
@@ -1629,11 +1642,13 @@ export function MarketPage() {
           </div>
         </div>
 
-        {/* ENVOLTORIO PRINCIPAL QUE BAJA AL TIRAR */}
+        {/* ENVOLTORIO PRINCIPAL QUE BAJA AL TIRAR.
+            Usa paddingTop (layout) en vez de transform: así lo que se pinta y la zona táctil
+            coinciden siempre, y no se crea una capa compuesta que en iOS puede desfasar los toques. */}
         <div 
           style={{
-            transform: `translateY(${pullDistance}px)`,
-            transition: isPulling ? 'none' : `transform ${SPRING_CONFIG}`
+            paddingTop: `${pullDistance}px`,
+            transition: isPulling ? 'none' : `padding-top ${SPRING_CONFIG}`
           }}
         >
           {/* HEADER PRINCIPAL (INFORMACIÓN DE PARTICIPANTES) */}
