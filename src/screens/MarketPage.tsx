@@ -6,6 +6,7 @@ import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useHaptic } from "@/hooks/useHaptic";
+import { useSound } from "@/hooks/useSound";
 import { useSesion } from "@/hooks/useSesion";
 import { Settings, ClipboardList, Lock, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -1129,6 +1130,7 @@ export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
   const haptic = useHaptic();
+  const playApuesta = useSound("/token_sound.m4a");
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -1513,7 +1515,8 @@ export function MarketPage() {
       ], { duration: 280, easing: "ease-in-out" });
       return;
     }
-    mercado.apostar(id, lado); 
+    playApuesta();
+    mercado.apostar(id, lado);
   };
 
   const retirarPregunta = (id: string) => {
