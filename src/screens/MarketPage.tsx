@@ -1131,6 +1131,7 @@ export function MarketPage() {
   const mercado = useMercado(usuario);
   const haptic = useHaptic();
   const playApuesta = useSound("/token_sound.m4a");
+  const playRetirar = useSound("/retirar_sound_2.m4a");
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -1519,11 +1520,11 @@ export function MarketPage() {
     mercado.apostar(id, lado);
   };
 
-  const retirarPregunta = (id: string) => {
-    haptic(); 
-    mercado.retirar(id);
-  };
-
+    const retirarPregunta = (id: string) => {
+      haptic();
+      playRetirar();
+      mercado.retirar(id);
+    };
   const pullProgress = Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1);
 
   const esModerador = !!(mercado.perfil as any)?.mod || !!usuario.esAdmin;
