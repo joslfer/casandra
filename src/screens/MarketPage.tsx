@@ -1586,7 +1586,7 @@ export function MarketPage() {
             </div>
           ) : (
             <div key="header-top" className="flex w-full items-center justify-between animate-in fade-in duration-200">
-              <span style={fuenteApple} className="text-[17px] font-bold tracking-tight">Probabilidad fiable?</span>
+              <span style={fuenteApple} className="text-[17px] font-bold tracking-tight">Fiable?</span>
               <div className="flex items-center gap-2">
                 {usuario.esAdmin && (
                   <Link to={"/admin" as never} style={fuenteApple} className="mr-1 flex touch-manipulation items-center rounded-md bg-ink px-2.5 py-1 text-[12px] font-semibold text-white transition-transform active:scale-95">
