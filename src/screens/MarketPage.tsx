@@ -76,7 +76,7 @@ function Actividad({ texto }: { texto: string }) {
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-[17px] font-medium text-sutil">
       <span className="relative flex items-center justify-center">
-        <span className="absolute h-5 w-5 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_3_forwards] rounded-full bg-ink/20" />
+        <span className="absolute h-5 w-5 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] rounded-full bg-ink/20" />
         <IconoReloj className="relative z-10 text-ink/50" />
       </span>
       {textoLimpio}
@@ -750,6 +750,36 @@ function FilaPregunta({
     if (bloqueado) return;
     juice(el);
     onApostar(lado);
+
+    // Efecto de partícula flotante que escapa del pulgar
+    if (el && !reducirMovimiento() && !sinTokens) {
+      const rect = el.getBoundingClientRect();
+          const span = document.createElement("span");
+          
+          // Calculamos el nuevo total sumando 1 al valor actual
+          const nuevoTotal = (lado === "si" ? (pregunta.misSi || 0) : (pregunta.misNo || 0)) + 1;
+          span.textContent = String(nuevoTotal);
+      // Usamos 'fixed' para que flote libre sobre toda la interfaz
+      span.className = `fixed z-50 pointer-events-none font-mono text-[22px] font-bold drop-shadow-md ${lado === "si" ? "text-verde" : "text-rojo"}`;
+      
+      // Lo posicionamos en la parte superior central del botón, con una ligerísima variación aleatoria
+      const randomX = (Math.random() - 0.5) * 15; 
+      span.style.left = `${rect.left + rect.width / 2 + randomX}px`;
+      span.style.top = `${rect.top - 5}px`;
+      span.style.transform = "translate(-50%, -50%)";
+      
+      document.body.appendChild(span);
+
+      // Animación: entra haciendo "pop", sube y se desvanece
+      span.animate([
+        { opacity: 0, transform: "translate(-50%, -50%) scale(0.5)" },
+        { opacity: 1, transform: "translate(-50%, -80%) scale(1.1)", offset: 0.15 },
+        { opacity: 0, transform: "translate(-50%, -250%) scale(0.9)" }
+      ], {
+        duration: 650,
+        easing: "cubic-bezier(0.2, 1, 0.3, 1)"
+      }).onfinish = () => span.remove();
+    }
   };
 
   const visuallyBlocked = bloqueado;
@@ -1402,14 +1432,14 @@ export function MarketPage() {
 
       {/* HEADER TOP-BAR STICKY */}
       <header 
-        className={`sticky top-0 z-40 bg-lienzo/90 backdrop-blur-md transition-shadow duration-200 ${scrolled ? "border-b border-borde/50 shadow-sm" : ""}`} 
+        className={`sticky top-0 z-40 bg-lienzo/100 backdrop-blur-md transition-shadow duration-200 ${scrolled ? "border-b border-borde/50 shadow-sm" : ""}`} 
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
           {scrolled ? (
             <div key="header-scrolled" className="flex w-full items-center justify-center gap-1.5 animate-in fade-in duration-200">
               <span style={fuenteApple} className="text-[18px] font-medium text-ink">
-                Has apostado y te quedan
+                Te quedan
               </span>
               <span className="inline-block min-w-[2ch] text-right font-mono text-[18px] font-semibold text-ink tabular-nums">
                 {Math.round(mercado.saldo || 0)}
