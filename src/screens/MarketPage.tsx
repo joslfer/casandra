@@ -1,3 +1,7 @@
+/**
+- CAPA DE DATOS CONECTADA A SUPABASE
+- ----------------------------------
+ */
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -14,13 +18,18 @@ import {
   multiplicador,
   useMercado,
   RECOMPENSA_CREAR_PREGUNTA,
-  calcularEstadisticas, // <-- Añadido aquí para que no de error al copiar la predicción
+  calcularEstadisticas,
+  haceTexto,
   type Lado,
   type Pregunta,
 } from "@/hooks/useMercado";
 
 // Activa/desactiva el aviso de recompensa en el botón de proponer pregunta.
 const BOTON_INCENTIVADO = true;
+
+// Respeta la preferencia del sistema "reducir movimiento" en las animaciones hechas con JS.
+const reducirMovimiento = () =>
+  typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 // ============================================================================
 // SPINNER ESTILO NATIVO IOS (12 barritas)
@@ -50,12 +59,98 @@ function IosSpinner({ className, style }: { className?: string; style?: React.CS
   );
 }
 
+// ============================================================================
+// COMPONENTES MINI RANKING
+// ============================================================================
+function IconoReloj({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${className}`}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function Actividad({ texto }: { texto: string }) {
+  const textoLimpio = texto.replace(/^hace\s+/i, "");
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 text-[17px] font-medium text-sutil">
+      <span className="relative flex items-center justify-center">
+        <span className="absolute h-5 w-5 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_3_forwards] rounded-full bg-ink/20" />
+        <IconoReloj className="relative z-10 text-ink/50" />
+      </span>
+      {textoLimpio}
+    </span>
+  );
+}
+
+function MiniRanking({ rankingFijo, miNombre, actividadActual }: { rankingFijo: any[], miNombre: string, actividadActual: any[] }) {
+  // Limite de 10 días en milisegundos
+  const LIMITE_10_DIAS = 10 * 24 * 60 * 60 * 1000;
+  const ahora = Date.now();
+  const LIMITE_RANKING = 15; // Mostramos solo los 15 primeros para no saturar
+
+  const listaCombinada = rankingFijo.slice(0, LIMITE_RANKING).map((r) => {
+    const ultimaActividad = actividadActual.find((a: any) => a.usuario === r.usuario);
+    let textoActividad = null;
+
+    if (ultimaActividad && ultimaActividad.cuando) {
+      const tiempoTranscurrido = ahora - ultimaActividad.cuando;
+      if (tiempoTranscurrido <= LIMITE_10_DIAS) {
+        textoActividad = haceTexto(ultimaActividad.cuando);
+      }
+    }
+
+    return { ...r, cuando: textoActividad };
+  });
+
+  if (listaCombinada.length === 0) return null;
+
+  return (
+    <div className="mt-8 w-full">
+      <div className="flex items-center justify-between mb-4">
+        <h3 style={fuenteApple} className="text-[19px] font-bold text-ink">Clasificación</h3>
+        <Link to="/ranking" style={fuenteApple} className="text-[15px] font-medium text-sutil hover:text-ink">
+          Ver todos →
+        </Link>
+      </div>
+      
+      <ul style={fuenteApple} className="text-[17px] text-ink">
+        {listaCombinada.map((r: any, i: number) => {
+          const esMiFila = r.usuario === miNombre;
+          const esSiguienteMiFila = i < listaCombinada.length - 1 && listaCombinada[i + 1].usuario === miNombre;
+          const mostrarBorde = !esMiFila && !esSiguienteMiFila && i !== listaCombinada.length - 1;
+
+          return (
+            <li key={i} className={`flex items-center justify-between gap-3 py-3.5 ${esMiFila ? "my-1 -mx-3 rounded-xl bg-black/[0.04] px-3" : ""} ${mostrarBorde ? "border-b border-linea" : ""}`}>
+              <div className="flex min-w-0 items-center gap-4">
+                <span className={`w-11 shrink-0 pr-1 text-right font-mono text-[39px] font-bold leading-none tracking-tighter ${i === 0 ? "bg-gradient-to-b from-amber-400 to-amber-600 bg-clip-text text-transparent" : i === 1 ? "bg-gradient-to-b from-amber-300 to-amber-500 bg-clip-text text-transparent" : i === 2 ? "bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent" : "text-sutil/40"}`}>
+                  {i + 1}
+                </span>
+                <div className="flex min-w-0 items-baseline gap-2.5">
+                  <span className="truncate text-[17px] font-medium">{r.usuario}</span>
+                  {r.cuando && <Actividad texto={r.cuando} />}
+                </div>
+              </div>
+              <span className="flex shrink-0 items-center gap-1.5 font-mono text-[17px] font-medium tabular-nums">
+                {r.apostado > 0 && <span className="text-sutil/60">{r.apostado}/</span>}
+                {r.tokens}
+                <Moneda className="h-4 w-4 align-[-2px]" />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+
 function Moneda({ className = "" }: { className?: string }) {
   return <span className={`h-3.5 w-3.5 rounded-full bg-moneda ${className}`} />;
 }
 
 // Icono estilo el de compartir de Apple/iOS (square.and.arrow.up):
-// una caja abierta por arriba con una flecha saliendo hacia arriba.
 function IconoCompartirApple({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -88,7 +183,7 @@ const fuenteApple = { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI"
 
 // Rebote (squash & stretch) para las pestañas de asignatura al pulsarlas.
 function reboteTag(el: HTMLElement | null) {
-  if (!el) return;
+  if (!el || reducirMovimiento()) return;
   el.animate(
     [
       { transform: "scale(1)" },
@@ -242,178 +337,204 @@ function CountdownExamen({
   );
 }
 
+// ============================================================================
+// PUNTO DE APUESTA: entra con un pequeño "pop" cuando se crea después de la carga
+// inicial y sale con un "pop" inverso escalonado (tu-tu-tu-tut) cuando se retira
+// ============================================================================
+const DURACION_SALIDA_PUNTO = 110;
+
+function Punto({
+  colorClase,
+  animar,
+  saliendo = false,
+  retardoSalida = 0,
+}: {
+  colorClase: string;
+  animar: boolean;
+  saliendo?: boolean;
+  retardoSalida?: number;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const animSalidaRef = useRef<Animation | null>(null);
+
+  // Entrada: solo al crearse, y nunca en la carga inicial
+  useEffect(() => {
+    if (!animar || reducirMovimiento()) return;
+    ref.current?.animate(
+      [
+        { opacity: 0, transform: "scale(0)" },
+        { opacity: 1, transform: "scale(1)" },
+      ],
+      { duration: 320, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Salida escalonada. Si el punto vuelve a ser "vivo" antes de desaparecer, se cancela.
+  useEffect(() => {
+    if (saliendo) {
+      const sinMov = reducirMovimiento();
+      animSalidaRef.current =
+        ref.current?.animate(
+          [
+            { opacity: 1, transform: "scale(1)" },
+            { opacity: 0, transform: "scale(0)" },
+          ],
+          {
+            duration: sinMov ? 1 : DURACION_SALIDA_PUNTO,
+            delay: sinMov ? 0 : retardoSalida,
+            easing: "ease-in",
+            fill: "forwards",
+          }
+        ) ?? null;
+    } else if (animSalidaRef.current) {
+      animSalidaRef.current.cancel();
+      animSalidaRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saliendo]);
+
+  return <span ref={ref} className={`block h-2 w-2 shrink-0 rounded-full ${colorClase}`} />;
+}
+
+// Mantiene montados los puntos que sobran durante su animación de salida y los
+// quita todos juntos cuando termina. Al subir el número, los puntos aparecen al instante.
+function useConteoConSalida(objetivo: number) {
+  const [mostrados, setMostrados] = useState(objetivo);
+  const sobrantes = Math.max(0, mostrados - objetivo);
+  // Con muchos puntos el "tu-tu-tu" se acelera para que la salida no dure más de ~0,5 s
+  const paso = sobrantes > 0 ? Math.min(45, Math.floor(450 / sobrantes)) : 45;
+
+  useEffect(() => {
+    if (mostrados < objetivo) {
+      setMostrados(objetivo);
+      return;
+    }
+    if (mostrados === objetivo) return;
+    const id = setTimeout(
+      () => setMostrados(objetivo),
+      (sobrantes - 1) * paso + DURACION_SALIDA_PUNTO + 30
+    );
+    return () => clearTimeout(id);
+  }, [objetivo, mostrados, sobrantes, paso]);
+
+  return { total: Math.max(mostrados, objetivo), paso };
+}
+
 function EscalaPuntos({ si, no, misSi, misNo }: { si: number; no: number; misSi: number; misNo: number; }) {
   const safeSi = si || 0;
   const safeNo = no || 0;
   const safeMisSi = misSi || 0;
   const safeMisNo = misNo || 0;
-  
-  const total = safeSi + safeNo;
-
-  if (total === 0) {
-    return (
-      <div className="mt-2.5 flex min-h-[16px] items-center">
-        <p className="font-mono text-[11px] leading-none text-sutil">esperando apuestas</p>
-      </div>
-    );
-  }
 
   const otrosNo = Math.max(0, safeNo - safeMisNo);
   const otrosSi = Math.max(0, safeSi - safeMisSi);
 
+  const gNoOtros = useConteoConSalida(otrosNo);
+  const gNoMios = useConteoConSalida(safeMisNo);
+  const gSiOtros = useConteoConSalida(otrosSi);
+  const gSiMios = useConteoConSalida(safeMisSi);
+
+  // Hay puntos en pantalla si hay apuestas o si alguno todavía se está yendo
+  const hayPuntos = gNoOtros.total + gNoMios.total + gSiOtros.total + gSiMios.total > 0;
+
+  const interiorRef = useRef<HTMLDivElement>(null);
+  const [alto, setAlto] = useState<number | null>(null);
+  const [listo, setListo] = useState(false);
+  // Los puntos creados antes de este momento no animan (carga inicial)
+  const montadoRef = useRef(false);
+
+  useEffect(() => {
+    const el = interiorRef.current;
+    if (!el) return;
+    const medir = () => setAlto(Math.max(16, el.offsetHeight));
+    medir();
+    const raf = requestAnimationFrame(() => {
+      montadoRef.current = true;
+      setListo(true);
+    });
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(medir);
+      observer.observe(el);
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
+  const animar = montadoRef.current;
+
   return (
-    <div className="mt-2.5 flex min-h-[16px] w-full items-center">
-      <div className="flex w-full gap-4 items-start" aria-hidden="true">
-        <div className="flex flex-1 flex-wrap content-start items-start justify-start gap-1">
-          {Array.from({ length: otrosNo }).map((_, i) => (
-            <span key={`no-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-rojo" />
-          ))}
-          {Array.from({ length: safeMisNo }).map((_, i) => (
-            <span key={`no-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
-          ))}
-        </div>
-        <div className="flex flex-1 flex-wrap flex-row-reverse content-start items-start gap-1">
-          {Array.from({ length: otrosSi }).map((_, i) => (
-            <span key={`si-o-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-verde" />
-          ))}
-          {Array.from({ length: safeMisSi }).map((_, i) => (
-            <span key={`si-m-${i}`} className="block h-2 w-2 shrink-0 rounded-full bg-moneda" />
-          ))}
-        </div>
+    <div
+      className={`mt-2.5 w-full overflow-hidden ${listo ? "transition-[height] duration-300 ease-out" : ""}`}
+      style={{ height: alto === null ? "auto" : `${alto}px` }}
+    >
+      <div ref={interiorRef} className="flex min-h-[16px] w-full items-center">
+        {!hayPuntos ? (
+          <p className="font-mono text-[11px] leading-none text-sutil">esperando apuestas</p>
+        ) : (
+          <div className="flex w-full gap-4 items-start" aria-hidden="true">
+            <div className="flex flex-1 flex-wrap content-start items-start justify-start gap-1">
+              {Array.from({ length: gNoOtros.total }).map((_, i) => (
+                <Punto
+                  key={`no-o-${i}`}
+                  colorClase="bg-rojo"
+                  animar={animar}
+                  saliendo={i >= otrosNo}
+                  retardoSalida={(gNoOtros.total - 1 - i) * gNoOtros.paso}
+                />
+              ))}
+              {Array.from({ length: gNoMios.total }).map((_, i) => (
+                <Punto
+                  key={`no-m-${i}`}
+                  colorClase="bg-moneda"
+                  animar={animar}
+                  saliendo={i >= safeMisNo}
+                  retardoSalida={(gNoMios.total - 1 - i) * gNoMios.paso}
+                />
+              ))}
+            </div>
+            <div className="flex flex-1 flex-wrap flex-row-reverse content-start items-start gap-1">
+              {Array.from({ length: gSiOtros.total }).map((_, i) => (
+                <Punto
+                  key={`si-o-${i}`}
+                  colorClase="bg-verde"
+                  animar={animar}
+                  saliendo={i >= otrosSi}
+                  retardoSalida={(gSiOtros.total - 1 - i) * gSiOtros.paso}
+                />
+              ))}
+              {Array.from({ length: gSiMios.total }).map((_, i) => (
+                <Punto
+                  key={`si-m-${i}`}
+                  colorClase="bg-moneda"
+                  animar={animar}
+                  saliendo={i >= safeMisSi}
+                  retardoSalida={(gSiMios.total - 1 - i) * gSiMios.paso}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ============================================================================
-// NÚMERO RODANTE GENÉRICO (VERSIÓN ANTIGUA, COMENTADA)
-// ============================================================================
-/*
-function NumeroRodante({
-  valor,
-  className = "",
-  duracion = 800,
-}: {
-  valor: number;
-  className?: string;
-  duracion?: number;
-}) {
-  const [renderVal, setRenderVal] = useState(valor);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const floatValRef = useRef(valor);
-  const animRef = useRef<number | null>(null);
-
-  const [maxLen, setMaxLen] = useState(() => Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0));
-
-  useEffect(() => {
-    const curLen = Math.floor(Math.abs(valor)).toString().length + (valor < 0 ? 1 : 0);
-    if (curLen > maxLen) {
-      setMaxLen(curLen);
-    }
-  }, [valor, maxLen]);
-
-  useEffect(() => {
-    const startVal = floatValRef.current;
-    const endVal = valor;
-
-    // Si ya estamos en el destino, aseguramos estado de reposo limpio.
-    if (startVal === endVal) {
-      setRenderVal(endVal);
-      setIsAnimating(false);
-      return;
-    }
-
-    setIsAnimating(true);
-    let startTime: number | null = null;
-
-    const anim = (currentTime: number) => {
-      if (startTime === null) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duracion, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-
-      if (progress < 1) {
-        const currentFloat = startVal + (endVal - startVal) * ease;
-        floatValRef.current = currentFloat;
-        setRenderVal(currentFloat);
-        animRef.current = requestAnimationFrame(anim);
-      } else {
-        // Último frame: valor exacto y reposo en el mismo render.
-        floatValRef.current = endVal;
-        setRenderVal(endVal);
-        setIsAnimating(false);
-        animRef.current = null;
-      }
-    };
-
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-    animRef.current = requestAnimationFrame(anim);
-
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
-  }, [valor, duracion]);
-
-  const altoFila = 1.15; // espacio suficiente para el trazo inferior (p. ej. el 9)
-  const base = Math.floor(renderVal);
-  const frac = renderVal - base;
-
-  const mascara = "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)";
-
-  return (
-    <span
-      className={`relative inline-flex flex-col items-end font-mono tracking-tight tabular-nums overflow-hidden ${className}`}
-      style={{
-        minWidth: `${maxLen}ch`,
-        height: `${altoFila}em`,
-        lineHeight: `${altoFila}em`,
-        boxSizing: "content-box",
-        maskImage: isAnimating ? mascara : "none",
-        WebkitMaskImage: isAnimating ? mascara : "none",
-      }}
-    >
-      {!isAnimating ? (
-        <span
-          className="flex w-full items-center justify-end whitespace-nowrap"
-          style={{ height: `${altoFila}em` }}
-        >
-          {Math.round(renderVal)}
-        </span>
-      ) : (
-        <span
-          className="flex flex-col items-end w-full will-change-transform"
-          style={{ transform: `translateY(-${frac * 50}%)` }}
-        >
-          {[base, base + 1].map((num) => (
-            <span
-              key={num}
-              className="flex w-full items-center justify-end whitespace-nowrap"
-              style={{ height: `${altoFila}em` }}
-            >
-              {num}
-            </span>
-          ))}
-        </span>
-      )}
-    </span>
-  );
-}
-*/
-
-// ============================================================================
 // NÚMERO SIMPLE CON PEQUEÑO FUNDIDO AL CAMBIAR
 // ============================================================================
-// Muestra el número tal cual. Cuando el valor cambia, hace un fundido muy
-// sutil (opacidad + 4px de desplazamiento, 220 ms). Sin columnas ni máscaras,
-// así que no puede quedar ningún número "entre medias".
-// Mantiene la misma altura y ancho mínimo que la versión anterior.
-// El parámetro `duracion` se acepta por compatibilidad pero ya no se usa.
 function NumeroRodante({
+  modo = "deslizar",
   valor,
   className = "",
 }: {
   valor: number;
   className?: string;
   duracion?: number;
+  modo?: "deslizar" | "salto";
 }) {
   const numero = Math.round(valor);
   const interiorRef = useRef<HTMLSpanElement>(null);
@@ -431,6 +552,20 @@ function NumeroRodante({
     const subio = numero > previoRef.current;
     previoRef.current = numero;
 
+    if (reducirMovimiento()) return;
+
+    if (modo === "salto") {
+      interiorRef.current?.animate(
+        [
+          { transform: "translateY(0) scale(1)" },
+          { transform: "translateY(-6px) scale(1.18)", offset: 0.4 },
+          { transform: "translateY(0) scale(1)" },
+        ],
+        { duration: 260, easing: "cubic-bezier(0.3, 0.7, 0.4, 1)" }
+      );
+      return;
+    }
+
     interiorRef.current?.animate(
       [
         { opacity: 0.35, transform: `translateY(${subio ? 4 : -4}px)` },
@@ -438,7 +573,7 @@ function NumeroRodante({
       ],
       { duration: 220, easing: "ease-out" }
     );
-  }, [numero]);
+  }, [numero, modo]);
 
   const altoFila = 1.15;
 
@@ -452,20 +587,132 @@ function NumeroRodante({
         boxSizing: "content-box",
       }}
     >
-      <span ref={interiorRef} className="inline-block">
+      <span ref={interiorRef} className="inline-block" style={{ transformOrigin: "50% 100%" }}>
         {numero}
       </span>
     </span>
   );
 }
 
-// Saldo grande
+// ============================================================================
+// CODIGO ANTIGUO COMENTADO: SALDO GIGANTE Y WIDGET DE RIVALIDAD (NO BORRAR)
+// ============================================================================
+/*
 function SaldoAnimado({ valor }: { valor: number }) {
   return (
     <NumeroRodante 
       valor={valor} 
       className="text-[64px] text-ink -translate-y-[0px]" 
     />
+  );
+}
+
+function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
+  if (rankingFijo.length === 0) return null;
+
+  const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
+  if (miIndice === -1) return null;
+
+  const miPosicion = miIndice + 1;
+  const yo = rankingFijo[miIndice];
+  const todosCero = rankingFijo.every((r) => r.tokens === 0);
+
+  // Buscar al que está justo encima
+  const personasEncima = rankingFijo.filter((r) => r.tokens > yo.tokens);
+  const maxScoreEncima = personasEncima.length > 0 ? Math.max(...personasEncima.map((r) => r.tokens)) : null;
+  const elDeArriba = maxScoreEncima !== null ? personasEncima.find((r) => r.tokens === maxScoreEncima) : null;
+  const faltan = elDeArriba ? elDeArriba.tokens - yo.tokens + 1 : 0;
+
+  if (todosCero) {
+    return (
+      <div className="mt-3 flex w-full justify-center px-4">
+        <Link to="/ranking" className="text-[14px] text-sutil hover:text-ink">Nadie ha sumado tokens todavía →</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 flex w-full justify-center px-5">
+      <Link 
+        to="/ranking" 
+        style={fuenteApple}
+        className="group relative flex w-full max-w-[340px] items-center justify-between overflow-hidden rounded-xl border border-borde bg-white p-3 shadow-sm transition-all active:scale-[0.98] active:bg-black/5"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-full bg-ink text-white">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-70 leading-none">Rank</span>
+            <span className="font-mono text-[17px] font-bold leading-none mt-0.5">#{miPosicion}</span>
+          </div>
+          <div className="flex flex-col text-left">
+            {miPosicion === 1 ? (
+              <>
+                <span className="text-[14px] font-bold text-ink">¡Vas en cabeza! 👑</span>
+                <span className="text-[12px] font-medium text-sutil">Nadie tiene más tokens que tú</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[14px] font-bold text-ink">Supera a {elDeArriba?.usuario}</span>
+                <span className="text-[13px] font-medium text-sutil flex items-center gap-1">
+                  Estás a {faltan} <Moneda className="!h-3 !w-3 -mt-0.5 opacity-60" /> de alcanzarle
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="text-sutil transition-transform group-hover:translate-x-1 pr-1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </Link>
+    </div>
+  );
+}
+*/
+
+// ============================================================================
+// NUEVO COMPONENTE: FRASE SIMPLE DE PARTICIPACIÓN
+// ============================================================================
+function ParticipacionInfo({ rankingFijo }: { rankingFijo: any[] }) {
+  if (!rankingFijo || rankingFijo.length === 0) return null;
+
+  // Filtramos ESTRICTAMENTE a los que tienen tokens apostados ahora mismo
+  // (es decir, apuestas activas, que vienen del 'apostadoAbierto' de Supabase),
+  // y los ordenamos de más apostado a menos para destacar a los "peces gordos".
+  const participantesActivos = [...rankingFijo]
+    .filter(r => r.apostado > 0)
+    .sort((a, b) => b.apostado - a.apostado);
+  
+  if (participantesActivos.length === 0) {
+    return (
+      <div className="mt-8 mb-4 flex w-full justify-center px-4">
+         <span style={fuenteApple} className="text-[17px] text-ink/90 leading-snug">
+            Nadie ha apostado todavía.
+         </span>
+      </div>
+    );
+  }
+
+// Cogemos hasta 10 nombres para la frase
+  const nombres = participantesActivos.slice(0, 10).map(r => r.usuario);
+  const resto = participantesActivos.length - 10;
+  let frase = "";
+  
+  if (participantesActivos.length === 1) {
+    frase = `${nombres[0]} ya ha apostado en la clase.`;
+  } else if (resto > 0) {
+    // Si hay más de 10, ponemos los 10 con comas y el "y X más" al final
+    frase = `${nombres.join(", ")}... y ${resto} más han apostado.`;
+  } else {
+    // Si son entre 2 y 10, los separamos por comas y ponemos "y" en el último
+    const ultimo = nombres.pop();
+    frase = `${nombres.join(", ")} y ${ultimo} ya han apostado en la clase.`;
+  }
+
+  return (
+    <div className="mt-8 mb-4 flex w-full justify-center px-4">
+      <span style={fuenteApple} className="text-[19px] text-ink/90 leading-snug text-center max-w-[340px] break-words">
+        {frase}
+      </span>
+    </div>
   );
 }
 
@@ -476,50 +723,36 @@ function FilaPregunta({
   bloqueado,
   sinTokens,
   ocultarBorde,
-}: {
-  pregunta: Pregunta;
-  onApostar: (lado: Lado) => void;
-  onRetirar: () => void;
-  bloqueado?: boolean;
-  sinTokens?: boolean;
-  ocultarBorde?: boolean;
 }) {
   const prob = probabilidad(pregunta);
   const totalApuestas = (pregunta.poolSi || 0) + (pregunta.poolNo || 0);
   const tieneApuestas = totalApuestas > 0;
   
-  // Ahora la probabilidad solo se muestra si alguien ha aportado información (tieneApuestas),
-  // independientemente de que el algoritmo LMSR ya tenga un precio en la sombra.
   const mostrarProb = tieneApuestas; 
-  
   const positivo = prob >= 50;
   const tengoApuesta = (pregunta.misSi || 0) + (pregunta.misNo || 0) > 0;
 
-  const [cooldown, setCooldown] = useState(false);
-
   const juice = (el: HTMLElement | null) => {
-    if (!el) return;
+    if (!el || reducirMovimiento()) return;
+    el.getAnimations().forEach(a => a.cancel());
     el.animate(
       [
         { transform: "scale(1)" },
-        { transform: "scale(0.82)", offset: 0.2 },
-        { transform: "scale(1.14)", offset: 0.5 },
-        { transform: "scale(0.97)", offset: 0.75 },
+        { transform: "scale(0.88)", offset: 0.3 },
+        { transform: "scale(1.04)", offset: 0.7 },
         { transform: "scale(1)" },
       ],
-      { duration: 420, easing: "cubic-bezier(0.22, 0.9, 0.32, 1)" }
+      { duration: 200, easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)" }
     );
   };
 
   const handleApostar = (lado: Lado, el: HTMLButtonElement | null) => {
-    if (cooldown || bloqueado) return;
-    setCooldown(true);
+    if (bloqueado) return;
     juice(el);
     onApostar(lado);
-    setTimeout(() => setCooldown(false), 400);
   };
 
-  const visuallyBlocked = bloqueado && !cooldown;
+  const visuallyBlocked = bloqueado;
 
   return (
     <article className={`py-6 w-full ${ocultarBorde ? "" : "border-b border-linea"}`}>
@@ -528,7 +761,7 @@ function FilaPregunta({
         
         <div className="flex flex-col items-end gap-1.5">
           <span
-            className={`flex shrink-0 items-center font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
+            className={`flex h-[1.15em] shrink-0 items-center font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
           >
             {mostrarProb ? (
               <>
@@ -553,11 +786,11 @@ function FilaPregunta({
           onClick={(e) => handleApostar("no", e.currentTarget)}
           disabled={visuallyBlocked}
           style={fuenteApple}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border py-1.5 touch-manipulation min-h-[46px] transition-all duration-150 ease-out ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border py-1.5 touch-manipulation min-h-[46px] transition-[transform,background-color,border-color,color,opacity] duration-150 ease-out ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misNo || 0) > 0 ? "border-rojo bg-rojo text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
-          <div className="flex items-center gap-1 text-[14px] font-medium">
+          <div className="flex items-center gap-1 text-[14px] font-medium pointer-events-none">
             <span>NO</span>
-            {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misNo}</span>}
+            {(pregunta.misNo || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· <NumeroRodante valor={pregunta.misNo} modo="salto" /></span>}
           </div>
 
         </button>
@@ -566,26 +799,40 @@ function FilaPregunta({
           onClick={(e) => handleApostar("si", e.currentTarget)}
           disabled={visuallyBlocked}
           style={fuenteApple}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border py-1.5 touch-manipulation min-h-[46px] transition-all duration-150 ease-out ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border py-1.5 touch-manipulation min-h-[46px] transition-[transform,background-color,border-color,color,opacity] duration-150 ease-out ${visuallyBlocked ? "opacity-40" : "active:scale-[0.93]"} ${(pregunta.misSi || 0) > 0 ? "border-verde bg-verde text-white" : sinTokens ? "border-linea bg-black/5 text-sutil" : "border-borde bg-white text-ink hover:border-ink/30"}`}
         >
-          <div className="flex items-center gap-1 text-[14px] font-medium">
+          <div className="flex items-center gap-1 text-[14px] font-medium pointer-events-none">
             <span>SÍ</span>
-            {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· {pregunta.misSi}</span>}
+            {(pregunta.misSi || 0) > 0 && <span className="font-mono text-[16px] font-semibold tabular-nums">· <NumeroRodante valor={pregunta.misSi} modo="salto" /></span>}
           </div>
 
         </button>
       </div>
 
-      {tengoApuesta && (
-        <button
-          onClick={onRetirar}
-          disabled={visuallyBlocked || cooldown}
-          style={fuenteApple}
-          className={`mt-2 flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink transition-transform duration-150 active:bg-black/5 ${visuallyBlocked ? "opacity-40" : "active:scale-95"}`}
-        >
-          Retirar predicción
-        </button>
-      )}
+      {/* Botón de retirar: siempre montado y colapsado con grid-rows para que entre y salga con fluidez */}
+      <div
+        aria-hidden={!tengoApuesta}
+        className={`grid ease-out ${tengoApuesta ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+        style={{
+          transitionProperty: "grid-template-rows, opacity",
+          transitionDuration: tengoApuesta ? "260ms, 160ms" : "260ms, 120ms",
+          transitionDelay: tengoApuesta ? "0ms, 180ms" : "100ms, 0ms",
+        }}
+      >
+        <div className="overflow-hidden">
+          <div className="pt-2">
+            <button
+              onClick={onRetirar}
+              disabled={visuallyBlocked || !tengoApuesta}
+              tabIndex={tengoApuesta ? 0 : -1}
+              style={fuenteApple}
+              className={`flex h-[36px] w-full touch-manipulation items-center justify-center rounded-lg border border-borde bg-white text-[13px] font-medium text-sutil hover:border-ink/30 hover:text-ink transition-transform duration-150 active:bg-black/5 ${visuallyBlocked ? "opacity-40" : "active:scale-95"}`}
+            >
+              Retirar predicción
+            </button>
+          </div>
+        </div>
+      </div>
     </article>
   );
 }
@@ -596,12 +843,6 @@ function Asignaturas({
   setAsigActiva,
   preguntas,
   saldo,
-}: {
-  asignaturas: Array<{ id: string; nombre: string; cerrada?: boolean; fechaExamen?: number | null }>;
-  asigId: string;
-  setAsigActiva: (id: string) => void;
-  preguntas: Pregunta[];
-  saldo: number;
 }) {
   return (
     <div className="flex flex-wrap justify-center gap-2 pb-6 pt-2 px-5">
@@ -641,11 +882,6 @@ function PantallaNuevaPregunta({
   asigInicial,
   onCerrar,
   onCrear,
-}: {
-  asignaturas: Array<{ id: string; nombre: string; cerrada?: boolean }>;
-  asigInicial: string;
-  onCerrar: () => void;
-  onCrear: (titulo: string, asignaturaId: string) => Promise<any>;
 }) {
   const [titulo, setTitulo] = useState("");
   const [asigId, setAsigId] = useState(asigInicial);
@@ -706,74 +942,6 @@ function PantallaNuevaPregunta({
   );
 }
 
-function BotonRankingDinamico({ rankingFijo, miNombre }: { rankingFijo: any[]; miNombre: string }) {
-  if (rankingFijo.length === 0) {
-    return (
-      <div className="mt-4 flex w-full justify-center px-4">
-        <Link to="/ranking" className="text-[17px] text-ink/90 transition-colors hover:text-ink text-left">
-          ver clasificación global →
-        </Link>
-      </div>
-    );
-  }
-
-  const miIndice = rankingFijo.findIndex((r) => r.usuario === miNombre);
-
-  if (miIndice === -1) {
-    return (
-      <div className="mt-4 flex w-full justify-center px-4">
-        <Link to="/ranking" className="text-[17px] text-ink/90 transition-colors hover:text-ink text-left">
-          ver clasificación global →
-        </Link>
-      </div>
-    );
-  }
-
-  const miPosicion = miIndice + 1;
-  const yo = rankingFijo[miIndice];
-
-  const empatadosConmigo = rankingFijo.filter(r => r.tokens === yo.tokens && r.usuario !== miNombre);
-  const esEmpate = empatadosConmigo.length > 0;
-  const compañeroEmpate = empatadosConmigo[0];
-
-  const personasEncima = rankingFijo.filter(r => r.tokens > yo.tokens);
-  const maxScoreEncima = personasEncima.length > 0 ? Math.max(...personasEncima.map(r => r.tokens)) : null;
-  const grupoEncima = maxScoreEncima !== null ? personasEncima.filter(r => r.tokens === maxScoreEncima) : [];
-  const elDeArriba = grupoEncima[0];
-  
-  const faltan = maxScoreEncima !== null ? (maxScoreEncima - yo.tokens) + 1 : 1;
-  const todosCero = rankingFijo.every(r => r.tokens === 0);
-
-  return (
-    <div className="mt-5 flex w-full justify-center px-4">
-      <Link to="/ranking" className="group relative inline-block max-w-[340px] text-left transition-colors">
-        <div className="text-[17px] text-ink/90 leading-snug break-words group-hover:text-ink transition-colors">
-          {todosCero ? (
-            <>Nadie ha sumado tokens todavía</>
-          ) : (
-            <>
-              Vas <strong className="font-semibold text-ink">#{miPosicion}</strong>
-              {miPosicion === 1 && !esEmpate ? (
-                <>. ¡Gracias por tu precisión!</>
-              ) : miPosicion === 1 && esEmpate ? (
-                <>, empatado en el primer puesto con <strong className="font-medium text-ink">{compañeroEmpate?.usuario}</strong></>
-              ) : esEmpate ? (
-                <>, empatado con <strong className="font-medium text-ink">{compañeroEmpate?.usuario}</strong></>
-              ) : (
-                <>, a <span className="inline-flex items-center gap-0.5 font-mono font-bold text-ink">{faltan} <Moneda className="h-[14px] w-[14px] -mt-0.5" /></span> de <strong className="font-medium text-ink">{elDeArriba?.usuario}</strong></>
-              )}
-            </>
-          )}
-          <br />
-          <span className="underline decoration-sutil/50 underline-offset-4 group-hover:decoration-ink/80 transition-colors">
-            mira la clasificación
-          </span> <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
-        </div>
-      </Link>
-    </div>
-  );
-}
-
 // ============================================================================
 // TOGGLE ESTILO NOTION (triangulito) PARA LA EXPLICACIÓN
 // ============================================================================
@@ -799,7 +967,7 @@ function ToggleInfo({ titulo, children }: { titulo: string; children: React.Reac
 }
 
 // ============================================================================
-// MARKET PAGE CON PULL TO REFRESH NATIVO - ESTILO SPINNER CIRCULAR
+// MARKET PAGE CON PULL TO REFRESH NATIVO Y STICKY HEADER
 // ============================================================================
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
@@ -809,11 +977,15 @@ export function MarketPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [prediccionEstado, setPrediccionEstado] = useState<"idle" | "copiado" | "vacio">("idle");
+  const [scrolled, setScrolled] = useState(false); // ESTADO PARA EL STICKY HEADER
 
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
 
-  const [rankingFijo, setRankingFijo] = useState<any[]>([]);
+  const rankingFijo = mercado.leerRanking();
+
+  // Snapshot de la frase de participación: se fija una vez y solo se renueva al recargar o crear pregunta
+  const [rankingParticipacion, setRankingParticipacion] = useState<any[] | null>(null);
 
   const animRef = useRef<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -833,10 +1005,6 @@ export function MarketPage() {
   const SPINNER_OFFSET = 55;
   const SPRING_CONFIG = "0.4s cubic-bezier(0.3, 0.7, 0, 1)";
 
-  // NOTA: el scroll real ahora ocurre DENTRO de mainContainerRef (no en el
-  // documento/window). html y body están fijados (position: fixed) vía el
-  // <style> de abajo, así que usamos mainContainerRef.current.scrollTop en
-  // vez de window.scrollY, y .scrollTo() del propio div en vez de window.scrollTo.
   const handleMainTouchStart = (e: React.TouchEvent) => {
     const scrollTop = mainContainerRef.current?.scrollTop ?? 0;
     if (scrollTop <= 10 && !isRefreshing) {
@@ -889,6 +1057,7 @@ export function MarketPage() {
         if (typeof mercado.recargar === 'function') {
           await mercado.recargar();
           setOrdenSnapshot({});
+          setRankingParticipacion(null);
         } else {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -902,15 +1071,20 @@ export function MarketPage() {
     }
   };
 
+  // CONTROL DEL HEADER STICKY AL HACER SCROLL
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    setScrolled(scrollTop > 120);
+  };
+
+  // Fija el snapshot de la frase de participación la primera vez que hay datos
   useEffect(() => {
-    const rankingCalculado = mercado.leerRanking();
-    if (rankingFijo.length === 0 && rankingCalculado.length > 0) {
-      setRankingFijo(rankingCalculado);
+    if (rankingParticipacion === null && rankingFijo.length > 0) {
+      setRankingParticipacion(rankingFijo);
     }
-  }, [mercado.leerRanking, rankingFijo.length]);
+  }, [rankingParticipacion, rankingFijo]);
 
   const asignaturasOrdenadas = [...asignaturas].sort((a, b) => {
-    if (a.cerrada !== b.cerrada) return a.cerrada ? 1 : -1;
     if (a.fechaExamen == null && b.fechaExamen == null) return 0;
     if (a.fechaExamen == null) return 1;
     if (b.fechaExamen == null) return -1;
@@ -932,10 +1106,8 @@ export function MarketPage() {
           nuevoOrden[a.id] = preguntas
             .filter((p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada)
             .sort((p1, p2) => {
-              // 1º) Mayor probabilidad primero (redondeada, como se ve en pantalla).
               const difProb = Math.round(probabilidad(p2)) - Math.round(probabilidad(p1));
               if (difProb !== 0) return difProb;
-              // 2º) Si empatan, primero la que tenga más volumen de apuestas.
               const vol1 = (p1.poolSi || 0) + (p1.poolNo || 0);
               const vol2 = (p2.poolSi || 0) + (p2.poolNo || 0);
               return vol2 - vol1;
@@ -949,6 +1121,10 @@ export function MarketPage() {
   }, [asignaturasOrdenadas, preguntas]);
 
   const [alturaContenedor, setAlturaContenedor] = useState<number | 'auto'>('auto');
+  // La altura del contenedor solo se anima al cambiar de asignatura; cuando cambia por los
+  // puntos o el botón de retirar sigue a la altura real sin retraso (esos ya se animan por dentro)
+  const [animarAltura, setAnimarAltura] = useState(false);
+  const timerAlturaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -1000,6 +1176,10 @@ export function MarketPage() {
     haptic();
     setAsigActiva(id); 
 
+    setAnimarAltura(true);
+    if (timerAlturaRef.current) clearTimeout(timerAlturaRef.current);
+    timerAlturaRef.current = setTimeout(() => setAnimarAltura(false), 400);
+
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -1042,14 +1222,10 @@ export function MarketPage() {
     }
   };
 
-  // -----------------------------------------------------
-  // COMPARTIR APP: usa el menú nativo de compartir (Web Share API)
-  // y si el navegador no lo soporta, copia el enlace al portapapeles.
-  // -----------------------------------------------------
   const compartirApp = async () => {
     haptic();
     const url = window.location.hostname === "localhost"
-      ? "https://casndra.vercel.app" // <-- pon aquí tu URL real de producción
+      ? "https://casndra.vercel.app"
       : window.location.origin;
     const datosCompartir = {
       title: "Casandra",
@@ -1065,21 +1241,15 @@ export function MarketPage() {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
       }
-    } catch (err) {
-      // El usuario canceló el menú de compartir, o no hay soporte: no hacemos nada.
-    }
+    } catch (err) {}
   };
-// -----------------------------------------------------
-  // COPIAR PREDICCIÓN: arma un texto para WhatsApp con las preguntas
-  // abiertas del examen seleccionado y sus probabilidades.
-  // -----------------------------------------------------
+
   const copiarPrediccion = async () => {
     haptic();
 
     const asig = asignaturas.find((a) => a.id === asigId);
     if (!asig) return;
 
-    // Mismas preguntas y mismo orden que se ven en pantalla, sin las que nadie ha apostado.
     const idsOrden = ordenSnapshot[asigId] || [];
     const lista = idsOrden
       .map((id) => preguntas.find((p) => p.id === id))
@@ -1095,7 +1265,6 @@ export function MarketPage() {
     }
 
     const construirTexto = async (): Promise<string> => {
-      // Cabecera: nombre del examen + cuenta atrás precisa (si tiene fecha futura)
       let cabecera = `*${asig.nombre.toUpperCase()}*`;
       if (asig.fechaExamen && asig.fechaExamen > Date.now()) {
         const totalMin = Math.floor((asig.fechaExamen - Date.now()) / 60000);
@@ -1109,7 +1278,6 @@ export function MarketPage() {
         cabecera += ` · faltan ${partes.join(" ")}`;
       }
 
-      // Una barra de 10 cuadros por pregunta: verde si ≥50 %, rojo si no.
       const bloques = lista.map((p) => {
         const prob = probabilidad(p);
         const llenos = Math.max(0, Math.min(10, Math.round(prob / 10)));
@@ -1117,7 +1285,6 @@ export function MarketPage() {
         return `${barra} *${prob}%*\n${p.titulo}`;
       });
 
-      // Opiniones agregadas usando la función unificada
       let estadistica = "";
       const rankingActual = mercado.leerRanking();
       const stats = calcularEstadisticas(rankingActual);
@@ -1206,6 +1373,7 @@ export function MarketPage() {
   return (
     <div
       ref={mainContainerRef}
+      onScroll={handleScroll}
       onTouchStart={handleMainTouchStart}
       onTouchMove={handleMainTouchMove}
       onTouchEnd={handleMainTouchEnd}
@@ -1222,11 +1390,6 @@ export function MarketPage() {
         * { scrollbar-width: none; -ms-overflow-style: none; }
         *::-webkit-scrollbar { display: none; }
 
-        /* Evita que el DOCUMENTO (html/body) pueda hacer scroll o rebote.
-           El scroll real vive dentro de este contenedor (mainContainerRef).
-           Esto es lo que quita el difuminado "liquid glass" que iOS aplica
-           arriba cuando detecta rebote elástico a nivel de página en una
-           webapp instalada (standalone). */
         html, body {
           position: fixed;
           inset: 0;
@@ -1237,20 +1400,49 @@ export function MarketPage() {
         }
       `}</style>
 
-      {/* HEADER TOP-BAR */}
-      <header className="relative z-30 bg-lienzo" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* HEADER TOP-BAR STICKY */}
+      <header 
+        className={`sticky top-0 z-40 bg-lienzo/90 backdrop-blur-md transition-shadow duration-200 ${scrolled ? "border-b border-borde/50 shadow-sm" : ""}`} 
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div className="mx-auto flex h-14 w-full max-w-[520px] items-center justify-between px-5">
-          <span style={fuenteApple} className="text-[15px] font-bold tracking-tight">Probabilidad fiable?</span>
-          <div className="flex items-center gap-2">
-            {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
-            {esModerador && <Link to={"/mod" as never} className={`${mono} mr-2 text-ink font-bold`}>MOD</Link>}
-            <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
-              <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
-            </Link>
-            <Link to="/profile" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
-              <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
-            </Link>
-          </div>
+          {scrolled ? (
+            <div key="header-scrolled" className="flex w-full items-center justify-center gap-1.5 animate-in fade-in duration-200">
+              <span style={fuenteApple} className="text-[18px] font-medium text-ink">
+                Has apostado y te quedan
+              </span>
+              <span className="inline-block min-w-[2ch] text-right font-mono text-[18px] font-semibold text-ink tabular-nums">
+                {Math.round(mercado.saldo || 0)}
+              </span>
+              <span style={fuenteApple} className="text-[18px] font-medium text-ink">
+                tokens
+              </span>
+              <Moneda className="!h-[18px] !w-[18px] shrink-0" />
+              
+            <Link to="/ranking" className="ml-1.5 pl-2.5 border-l border-borde flex items-center gap-1.5 touch-manipulation text-ink active:opacity-60">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-80">
+                              <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/>
+                            </svg>
+                            <span className="font-mono text-[19px] font-bold">
+                              #{rankingFijo.findIndex(r => r.usuario === mercado.miNombre) !== -1 ? rankingFijo.findIndex(r => r.usuario === mercado.miNombre) + 1 : "-"}
+                            </span>
+                          </Link>
+            </div>
+          ) : (
+            <div key="header-top" className="flex w-full items-center justify-between animate-in fade-in duration-200">
+              <span style={fuenteApple} className="text-[17px] font-bold tracking-tight">Probabilidad fiable?</span>
+              <div className="flex items-center gap-2">
+                {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
+                {esModerador && <Link to={"/mod" as never} className={`${mono} mr-2 text-ink font-bold`}>MOD</Link>}
+                <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
+                  <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
+                </Link>
+                <Link to="/profile" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
+                  <Settings className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -1291,27 +1483,10 @@ export function MarketPage() {
             transition: isPulling ? 'none' : `transform ${SPRING_CONFIG}`
           }}
         >
-          {/* HEADER PRINCIPAL (SALDO Y CLASIFICACIÓN) */}
+          {/* HEADER PRINCIPAL (INFORMACIÓN DE PARTICIPANTES) */}
           <div className="mx-auto w-full max-w-[520px]">
             {!mercado.pausado && (
-              <div className="mt-8 mb-4 flex flex-col items-center justify-center w-full">
-                <div className="relative z-10 flex w-full items-center justify-center">
-                  <div className="flex flex-1 justify-end pr-1.5">
-                    <SaldoAnimado valor={mercado.saldo || 0} />
-                  </div>
-                  <div className="flex flex-1 justify-start pl-1.5">
-                    <button
-                      style={{ width: "47px", height: "47px" }}
-                      className="flex shrink-0 items-center justify-center rounded-full touch-manipulation transition-transform hover:scale-110 active:scale-90 focus:outline-none"
-                    >
-                      <Moneda className="!h-full !w-full" />
-                    </button>
-                  </div>
-                </div>
-                
-                <BotonRankingDinamico rankingFijo={rankingFijo} miNombre={mercado.miNombre} />
-                
-              </div>
+              <ParticipacionInfo rankingFijo={rankingParticipacion || []} />
             )}
 
             <Asignaturas 
@@ -1327,8 +1502,11 @@ export function MarketPage() {
           <div 
             ref={scrollContainerRef}
             onWheel={detenerAnimacion}
-            style={{ height: alturaContenedor === 'auto' ? 'auto' : `${alturaContenedor}px` }}
-            className="flex items-start w-full overflow-x-hidden overflow-y-hidden snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-[height] duration-300 ease-out"
+            style={{
+              height: alturaContenedor === 'auto' ? 'auto' : `${alturaContenedor}px`,
+              transition: animarAltura ? "height 300ms ease-out" : "none",
+            }}
+            className="flex items-start w-full overflow-x-hidden overflow-y-hidden snap-x snap-mandatory overscroll-x-contain mx-auto max-w-[520px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
             {asignaturasOrdenadas.map((asig) => {
               const idsOrden = ordenSnapshot[asig.id] || [];
@@ -1412,6 +1590,12 @@ export function MarketPage() {
                             </p>
                           </div>
                         </ToggleInfo>
+                        
+                        <MiniRanking 
+                          rankingFijo={rankingFijo} 
+                          miNombre={mercado.miNombre} 
+                          actividadActual={mercado.leerActividadUsuarios?.() || mercado.leerApuestas()} 
+                        />
                       </article>
                     </div>
                   )}
@@ -1433,10 +1617,9 @@ export function MarketPage() {
             if (typeof mercado.recargar === 'function') {
               await mercado.recargar();
             }
-            
+
             setOrdenSnapshot({});
-            // Sin scroll al cerrar el modal: la pregunta se añade, y la
-            // vista se queda exactamente donde estaba.
+            setRankingParticipacion(null);
           }}
         />
       )}
