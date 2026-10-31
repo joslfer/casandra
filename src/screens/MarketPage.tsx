@@ -1,6 +1,6 @@
 /**
-- CAPA DE DATOS CONECTADA A SUPABASE
-- ----------------------------------
+ * CAPA DE DATOS CONECTADA A SUPABASE
+ * ----------------------------------
  */
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -874,35 +874,85 @@ function Asignaturas({
   preguntas,
   saldo,
 }) {
-  return (
-    <div className="flex flex-wrap justify-center gap-2 pb-6 pt-2 px-5">
-      {asignaturas.map((a) => {
-        const sinApostar = preguntas.filter(
-          (p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada && (p.misSi || 0) + (p.misNo || 0) === 0
-        ).length;
+  const [abierto, setAbierto] = useState(false);
+  const activa = asignaturas.find((a) => a.id === asigId) || asignaturas[0];
 
-        return (
-          <button
-            key={a.id}
-            onClick={(e) => {
-              reboteTag(e.currentTarget);
-              setAsigActiva(a.id);
-            }}
-            style={fuenteApple}
-            className={`relative touch-manipulation whitespace-nowrap rounded-full border flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color,border-color,transform] duration-200 ease-out active:scale-95 ${
-              a.id === asigId ? "border-ink bg-ink text-white" : "border-borde bg-white text-ink hover:border-ink/30"
+  if (!activa) return null;
+
+  return (
+    <div className="relative flex w-full flex-col items-center justify-center px-5 pb-8 pt-6 z-30">
+      <button
+        onClick={() => asignaturas.length > 1 && setAbierto(!abierto)}
+        style={fuenteApple}
+        className={`group flex touch-manipulation items-center justify-center gap-3 transition-transform max-w-full ${
+          asignaturas.length > 1 ? "active:scale-[0.98]" : "cursor-default"
+        }`}
+      >
+        {/* TÍTULO GIGANTE TIPO PORTADA CON DEGRADADO */}
+        <div className="flex items-center justify-center gap-2 min-w-0 max-w-full">
+          <h1 
+            className={`bg-gradient-to-br from-ink via-ink/80 to-sutil/50 bg-clip-text text-transparent font-extrabold tracking-tighter leading-[1.1] pb-1 break-words text-left sm:text-center ${
+              activa.nombre.length <= 12 ? "text-[46px]" : activa.nombre.length <= 22 ? "text-[34px]" : "text-[26px]"
             }`}
           >
-            <span>{a.nombre}</span>
-            {a.cerrada && <Lock className="h-3 w-3 opacity-60" />}
-            {sinApostar > 0 && saldo > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-lienzo">
-                {sinApostar}
-              </span>
-            )}
-          </button>
-        );
-      })}
+            {activa.nombre}
+          </h1>
+          {activa.cerrada && <Lock className="h-7 w-7 text-sutil/40 shrink-0 -mt-1" />}
+        </div>
+
+        {/* TOGGLE A LA DERECHA */}
+        {asignaturas.length > 1 && (
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/5 text-ink transition-colors group-hover:bg-black/10 mt-1">
+            <svg 
+              className={`h-4 w-4 transition-transform duration-200 ${abierto ? "rotate-180" : ""}`} 
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        )}
+      </button>
+
+      {/* MENÚ DESPLEGABLE ELEGANTE */}
+      {abierto && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
+
+          <div className="absolute top-[90px] z-50 flex max-h-[300px] w-[260px] flex-col overflow-y-auto rounded-2xl border border-borde bg-white/95 p-1.5 shadow-xl shadow-black/[0.08] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
+            {asignaturas.map((a) => {
+              const esActiva = a.id === asigId;
+              const sinApostar = preguntas.filter(
+                (p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada && (p.misSi || 0) + (p.misNo || 0) === 0
+              ).length;
+
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => {
+                    setAsigActiva(a.id);
+                    setAbierto(false);
+                  }}
+                  style={fuenteApple}
+                  className={`flex w-full touch-manipulation items-center justify-between rounded-xl px-3 py-3 text-left transition-colors ${
+                    esActiva ? "bg-black/5 font-semibold text-ink" : "font-medium text-sutil hover:bg-black/[0.03] hover:text-ink"
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[15px]">{a.nombre}</span>
+                    {a.cerrada && <Lock className="h-3 w-3 shrink-0 opacity-50" />}
+                  </div>
+
+                  {sinApostar > 0 && saldo > 0 && (
+                    <span className="ml-3 flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-ink px-1.5 text-[11px] font-bold text-white">
+                      {sinApostar}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1012,8 +1062,7 @@ export function MarketPage() {
   const preguntas = mercado.leerPreguntas({ estado: "todas" }) || [];
   const asignaturas = mercado.leerAsignaturas() || [];
 
-  const rankingFijo = mercado.leerRanking();
-
+  const rankingFijo = (mercado.leerRanking() || []).filter((r: any) => !r.pausado);
   // Snapshot de la frase de participación: se fija una vez y solo se renueva al recargar o crear pregunta
   const [rankingParticipacion, setRankingParticipacion] = useState<any[] | null>(null);
 
@@ -1316,7 +1365,7 @@ export function MarketPage() {
       });
 
       let estadistica = "";
-      const rankingActual = mercado.leerRanking();
+      const rankingActual = (mercado.leerRanking() || []).filter((r: any) => !r.pausado);
       const stats = calcularEstadisticas(rankingActual);
 
       if (stats.opinionesAgregadas > 0) {
@@ -1462,8 +1511,16 @@ export function MarketPage() {
             <div key="header-top" className="flex w-full items-center justify-between animate-in fade-in duration-200">
               <span style={fuenteApple} className="text-[17px] font-bold tracking-tight">Probabilidad fiable?</span>
               <div className="flex items-center gap-2">
-                {usuario.esAdmin && <Link to={"/admin" as never} className={`${mono} mr-2`}>ADMN</Link>}
-                {esModerador && <Link to={"/mod" as never} className={`${mono} mr-2 text-ink font-bold`}>MOD</Link>}
+                {usuario.esAdmin && (
+                  <Link to={"/admin" as never} style={fuenteApple} className="mr-1 flex touch-manipulation items-center rounded-md bg-ink px-2.5 py-1 text-[12px] font-semibold text-white transition-transform active:scale-95">
+                    Admin
+                  </Link>
+                )}
+                {esModerador && (
+                  <Link to={"/mod" as never} style={fuenteApple} className="mr-1 flex touch-manipulation items-center rounded-md border border-borde bg-white px-2.5 py-1 text-[12px] font-semibold text-ink transition-transform active:scale-95 active:bg-black/5">
+                    Mod
+                  </Link>
+                )}
                 <Link to="/resueltas" className="flex touch-manipulation items-center justify-center p-2 text-ink opacity-100">
                   <ClipboardList className="h-[20px] w-[20px] shrink-0" strokeWidth={2} />
                 </Link>

@@ -1,6 +1,6 @@
 /**
-- CAPA DE DATOS CONECTADA A SUPABASE
-- ----------------------------------
+ * CAPA DE DATOS CONECTADA A SUPABASE
+ * ----------------------------------
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -502,7 +502,7 @@ export function useMercado(usuario: Usuario | null) {
   const leerActividadUsuarios = useCallback((): ActividadUsuario[] => {
     const resultado: ActividadUsuario[] = [];
     for (const a of alumnos) {
-      if (a.claseId !== miClaseId) continue;
+      if (a.claseId !== miClaseId || a.pausado) continue; // <-- Ignoramos a los pausados
       const cuando = ultimaActividad[a.id];
       if (!cuando) continue;
       resultado.push({
@@ -515,13 +515,13 @@ export function useMercado(usuario: Usuario | null) {
   }, [alumnos, ultimaActividad, miClaseId]);
 
   const leerWAU = useCallback((): number => {
-    const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId).map(a => a.id));
+    const alumnosClase = new Set(alumnos.filter(a => a.claseId === miClaseId && !a.pausado).map(a => a.id));
     return activosSemana.filter((id) => alumnosClase.has(id)).length;
   }, [activosSemana, alumnos, miClaseId]);
 
   const leerRanking = useCallback(() => {
     return [...alumnos]
-      .filter(a => a.claseId === miClaseId)
+      .filter(a => a.claseId === miClaseId && !a.pausado) // <-- Filtramos a los pausados aquí
       .map((a) => {
         const apostado = Math.round(apostadoAbierto[a.id] || 0);
         const tokens = Math.round(a.saldo + (apostadoAbierto[a.id] || 0));
