@@ -915,6 +915,7 @@ function FilaPregunta({
   );
 }
 
+
 function Asignaturas({
   asignaturas,
   asigId,
@@ -928,35 +929,44 @@ function Asignaturas({
   if (!activa) return null;
 
   return (
-    <div className="relative flex w-full flex-col items-center justify-center px-5 pb-2 pt-6 z-30">      <button
+    <div className="relative flex w-full flex-col items-center justify-center px-5 pb-2 pt-6 z-30">
+      <button
         onClick={() => asignaturas.length > 1 && setAbierto(!abierto)}
         style={fuenteApple}
         className={`group flex touch-manipulation items-center justify-center gap-3 transition-transform max-w-full ${
           asignaturas.length > 1 ? "active:scale-[0.98]" : "cursor-default"
         }`}
       >
-        {/* TÍTULO GIGANTE TIPO PORTADA CON DEGRADADO */}
+        {/* TÍTULO GIGANTE TIPO PORTADA */}
         <div className="flex items-center justify-center gap-2 min-w-0 max-w-full">
-          <h1 
-            className={`bg-gradient-to-br from-ink via-ink/80 to-sutil/50 bg-clip-text text-transparent font-extrabold tracking-tighter leading-[1.05] pb-1 break-words text-center ${
-              activa.nombre.length <= 12 
-                ? "text-[clamp(46px,12vw,72px)]" 
-                : activa.nombre.length <= 22 
-                  ? "text-[clamp(34px,8vw,52px)]" 
+          <h1
+            className={`text-ink font-semibold leading-[0.95] pb-1 break-words text-center ${
+              activa.nombre.length <= 12
+                ? "text-[clamp(46px,12vw,72px)]"
+                : activa.nombre.length <= 22
+                  ? "text-[clamp(34px,8vw,52px)]"
                   : "text-[clamp(26px,6vw,38px)]"
             }`}
           >
             {activa.nombre}
           </h1>
-          {activa.cerrada && <Lock className="h-7 w-7 text-sutil/40 shrink-0 -mt-1" />}
+
+          {activa.cerrada && (
+            <Lock className="h-7 w-7 text-sutil/40 shrink-0 -mt-1" />
+          )}
         </div>
 
         {/* TOGGLE A LA DERECHA */}
         {asignaturas.length > 1 && (
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/5 text-ink transition-colors group-hover:bg-black/10 mt-1">
-            <svg 
-              className={`h-4 w-4 transition-transform duration-200 ${abierto ? "rotate-180" : ""}`} 
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+            <svg
+              className={`h-4 w-4 transition-transform duration-200 ${abierto ? "rotate-180" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
               <path d="m6 9 6 6 6-6" />
             </svg>
@@ -967,13 +977,21 @@ function Asignaturas({
       {/* MENÚ DESPLEGABLE ELEGANTE */}
       {abierto && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setAbierto(false)}
+          />
 
           <div className="absolute top-[90px] z-50 flex max-h-[300px] w-[260px] flex-col overflow-y-auto rounded-2xl border border-borde bg-white/95 p-1.5 shadow-xl shadow-black/[0.08] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
             {asignaturas.map((a) => {
               const esActiva = a.id === asigId;
+
               const sinApostar = preguntas.filter(
-                (p) => p.asignaturaId === a.id && p.resultado === null && !p.archivada && (p.misSi || 0) + (p.misNo || 0) === 0
+                (p) =>
+                  p.asignaturaId === a.id &&
+                  p.resultado === null &&
+                  !p.archivada &&
+                  (p.misSi || 0) + (p.misNo || 0) === 0
               ).length;
 
               return (
@@ -985,12 +1003,18 @@ function Asignaturas({
                   }}
                   style={fuenteApple}
                   className={`flex w-full touch-manipulation items-center justify-between rounded-xl px-3 py-3 text-left transition-colors ${
-                    esActiva ? "bg-black/5 font-semibold text-ink" : "font-medium text-sutil hover:bg-black/[0.03] hover:text-ink"
+                    esActiva
+                      ? "bg-black/5 font-semibold text-ink"
+                      : "font-medium text-sutil hover:bg-black/[0.03] hover:text-ink"
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-[15px]">{a.nombre}</span>
-                    {a.cerrada && <Lock className="h-3 w-3 shrink-0 opacity-50" />}
+                    <span className="truncate text-[15px]">
+                      {a.nombre}
+                    </span>
+                    {a.cerrada && (
+                      <Lock className="h-3 w-3 shrink-0 opacity-50" />
+                    )}
                   </div>
 
                   {sinApostar > 0 && saldo > 0 && (
@@ -1007,6 +1031,7 @@ function Asignaturas({
     </div>
   );
 }
+
 
 function PantallaNuevaPregunta({
   asignaturas,
