@@ -85,9 +85,14 @@ export function ResueltasScreen() {
       .sort(ordenarPorFecha),
   }));
 
-  const gruposPorAsignatura = [...gruposActivos, ...gruposHuerfanos].filter(
-    (g) => g.preguntas.length > 0
-  );
+  const gruposPorAsignatura = [...gruposActivos, ...gruposHuerfanos]
+    .filter((g) => g.preguntas.length > 0)
+    .sort((a, b) => {
+      // Como las preguntas ya están ordenadas, la de la posición 0 es la más reciente de ese examen
+      const masRecienteA = a.preguntas[0]?.creadaEn || 0;
+      const masRecienteB = b.preguntas[0]?.creadaEn || 0;
+      return masRecienteB - masRecienteA; 
+    });
 
   return (
     <div className="min-h-screen bg-lienzo pb-10 touch-pan-y overscroll-x-none" style={fuenteApple}>
