@@ -1515,8 +1515,8 @@ export function MarketPage() {
       ], { duration: 280, easing: "ease-in-out" });
       return;
     }
-    mercado.apostar(id, lado);
     playApuesta();
+    mercado.apostar(id, lado);
   };
 
   const retirarPregunta = (id: string) => {
