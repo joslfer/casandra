@@ -5,7 +5,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useHaptic } from "@/hooks/useHaptic";
 import { useSound } from "@/hooks/useSound";
 import { useSesion } from "@/hooks/useSesion";
 import { Settings, ClipboardList, Lock, Copy } from "lucide-react";
@@ -1129,7 +1128,6 @@ function ToggleInfo({ titulo, children }: { titulo: string; children: React.Reac
 export function MarketPage() {
   const { usuario, cargando, entrarConGoogle } = useSesion();
   const mercado = useMercado(usuario);
-  const haptic = useHaptic();
   const playApuesta = useSound("/token_sound.m4a");
   const playRetirar = useSound("/retirar_sound_2.m4a");
 
@@ -1207,7 +1205,6 @@ export function MarketPage() {
     setIsPulling(false);
 
     if (pullDistance >= REFRESH_THRESHOLD && !isRefreshing) {
-      haptic();
       setIsRefreshing(true);
       setPullDistance(SPINNER_OFFSET); 
 
@@ -1331,7 +1328,6 @@ export function MarketPage() {
   };
 
   const scrollToAsig = (id: string) => {
-    haptic();
     setAsigActiva(id); 
 
     setAnimarAltura(true);
@@ -1381,7 +1377,6 @@ export function MarketPage() {
   };
 
   const compartirApp = async () => {
-    haptic();
     const url = window.location.hostname === "localhost"
       ? "https://casndra.vercel.app"
       : window.location.origin;
@@ -1403,8 +1398,6 @@ export function MarketPage() {
   };
 
   const copiarPrediccion = async () => {
-    haptic();
-
     const asig = asignaturas.find((a) => a.id === asigId);
     if (!asig) return;
 
@@ -1508,7 +1501,6 @@ export function MarketPage() {
   const hayAsignaturasAbiertas = asignaturas.some((a) => !a.cerrada);
 
   const intentarApostar = (id: string, lado: Lado) => {
-    haptic(); 
     if ((mercado.saldo || 0) < 1) {
       document.body.animate([
         { transform: "translateX(0)" }, { transform: "translateX(-7px)" },
@@ -1520,11 +1512,10 @@ export function MarketPage() {
     mercado.apostar(id, lado);
   };
 
-    const retirarPregunta = (id: string) => {
-      haptic();
-      playRetirar();
-      mercado.retirar(id);
-    };
+  const retirarPregunta = (id: string) => {
+    playRetirar();
+    mercado.retirar(id);
+  };
   const pullProgress = Math.min(pullDistance / (REFRESH_THRESHOLD * 0.7), 1);
 
   const esModerador = !!(mercado.perfil as any)?.mod || !!usuario.esAdmin;
@@ -1538,12 +1529,6 @@ export function MarketPage() {
       onTouchEnd={handleMainTouchEnd}
       className="h-[100dvh] w-full overflow-x-hidden overflow-y-auto overscroll-y-none bg-lienzo select-none relative"
       style={{ ...fuenteApple, WebkitOverflowScrolling: "touch", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
-      onClickCapture={(event) => {
-        const target = event.target as Element;
-        if (target.id === "haptic-checkbox" || target.id === "haptic-label") return;
-        if (target.closest('input[type="text"], input:not([type]), textarea')) return;
-        if (target.closest("a, input, select, button")) haptic();
-      }}
     >
       <style>{`
         * { scrollbar-width: none; -ms-overflow-style: none; }
@@ -1791,9 +1776,6 @@ export function MarketPage() {
           }}
         />
       )}
-
-      <input type="checkbox" id="haptic-checkbox" ref={(el) => { if (el) el.setAttribute("switch", ""); }} style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} tabIndex={-1} aria-hidden="true" />
-      <label htmlFor="haptic-checkbox" id="haptic-label" style={{ position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none", width: "1px", height: "1px" }} aria-hidden="true"></label>
     </div>
   );
 }
