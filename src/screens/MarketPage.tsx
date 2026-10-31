@@ -880,8 +880,7 @@ function Asignaturas({
   if (!activa) return null;
 
   return (
-    <div className="relative flex w-full flex-col items-center justify-center px-5 pb-8 pt-6 z-30">
-      <button
+    <div className="relative flex w-full flex-col items-center justify-center px-5 pb-2 pt-6 z-30">      <button
         onClick={() => asignaturas.length > 1 && setAbierto(!abierto)}
         style={fuenteApple}
         className={`group flex touch-manipulation items-center justify-center gap-3 transition-transform max-w-full ${
@@ -891,8 +890,12 @@ function Asignaturas({
         {/* TÍTULO GIGANTE TIPO PORTADA CON DEGRADADO */}
         <div className="flex items-center justify-center gap-2 min-w-0 max-w-full">
           <h1 
-            className={`bg-gradient-to-br from-ink via-ink/80 to-sutil/50 bg-clip-text text-transparent font-extrabold tracking-tighter leading-[1.1] pb-1 break-words text-left sm:text-center ${
-              activa.nombre.length <= 12 ? "text-[46px]" : activa.nombre.length <= 22 ? "text-[34px]" : "text-[26px]"
+            className={`bg-gradient-to-br from-ink via-ink/80 to-sutil/50 bg-clip-text text-transparent font-extrabold tracking-tighter leading-[1.05] pb-1 break-words text-center ${
+              activa.nombre.length <= 12 
+                ? "text-[clamp(46px,12vw,72px)]" 
+                : activa.nombre.length <= 22 
+                  ? "text-[clamp(34px,8vw,52px)]" 
+                  : "text-[clamp(26px,6vw,38px)]"
             }`}
           >
             {activa.nombre}
