@@ -54,7 +54,7 @@ function PaginaRanking() {
   const mercado = useMercado(usuario);
   const [rankingFijo, setRankingFijo] = useState<any[]>([]);
 
-  const rankingActual = mercado.leerRanking();
+  const rankingActual = (mercado.leerRanking() || []).filter((r: any) => !r.pausado);
 
   // NOTA: Para que esto sea "entrar a la app" y no solo apostar, el backend y
   // tu hook `useMercado` deben estar trackeando la última conexión.
@@ -90,7 +90,9 @@ function PaginaRanking() {
   const LIMITE_10_DIAS = 10 * 24 * 60 * 60 * 1000;
   const ahora = Date.now();
 
-  const listaCombinada = rankingFijo.slice(0, LIMITE_RANKING).map((r) => {
+  // Filtramos los pausados JUSTO ANTES de mapear y cortar, por si 'rankingFijo' se coló sucio
+  const rankingFiltrado = rankingFijo.filter((r) => !r.pausado);
+  const listaCombinada = rankingFiltrado.slice(0, LIMITE_RANKING).map((r) => {
     const ultimaActividad = actividadActual.find((a: any) => a.usuario === r.usuario);
     let textoActividad = null;
 
@@ -108,7 +110,8 @@ function PaginaRanking() {
     };
   });
 
-  const stats = calcularEstadisticas(rankingActual);
+  // Garantizamos que a las estadísticas solo lleguen usuarios activos
+  const stats = calcularEstadisticas(rankingActual.filter((r: any) => !r.pausado));
   const wau = mercado.leerWAU();
 
   const bloqueEstadisticas = (
