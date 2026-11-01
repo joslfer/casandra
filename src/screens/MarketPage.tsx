@@ -473,7 +473,8 @@ function EscalaPuntos({ si, no, misSi, misNo }: { si: number; no: number; misSi:
     >
       <div ref={interiorRef} className="flex min-h-[16px] w-full items-center">
         {!hayPuntos ? (
-          <p className="font-mono text-[11px] leading-none text-sutil">esperando apuestas</p>
+          // h-4 (16px) = misma altura que la primera fila de puntos (min-h-[16px] del contenedor)
+          <p className="flex h-4 items-center font-mono text-[11px] leading-none text-sutil">esperando apuestas</p>
         ) : (
           <div className="flex w-full gap-4 items-start" aria-hidden="true">
             <div className="flex flex-1 flex-wrap content-start items-start justify-start gap-1">
@@ -629,7 +630,7 @@ function NumeroRodante({ valor, className = "" }) {
       >
         <span
           ref={interiorRef}
-          className="absolute inset-0 flex items-center justify-center will-change-transform"
+          className="absolute inset-0 flex items-center justify-center"
         >
           {numero}
         </span>
@@ -837,9 +838,11 @@ function FilaPregunta({
       <div className="flex items-start justify-between gap-4">
         <h2 className="min-w-0 flex-1 break-words text-[19px] font-medium leading-snug text-ink">{pregunta.titulo}</h2>
         
-        <div className="flex flex-col items-end gap-1.5">
+        {/* Columna del porcentaje con ancho fijo (4ch de la fuente mono de 30px, cabe "100%"):
+            así "--%" o "5%" ocupan lo mismo que "100%" y el título nunca se reajusta. */}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span
-            className={`flex h-[1.15em] shrink-0 items-center font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
+            className={`flex h-[1.15em] min-w-[4ch] shrink-0 items-center justify-end font-mono text-[30px] leading-none tabular-nums transition-colors duration-500 ${!tieneApuestas ? "text-sutil" : positivo ? "text-verde" : "text-rojo"}`}
           >
             {mostrarProb ? (
               <>
@@ -1193,12 +1196,13 @@ export function MarketPage() {
 
     const scrollTop = mainContainerRef.current?.scrollTop ?? 0;
 
-    if (diffY > 0 && scrollTop <= 10) {
-      const distance = diffY * (1 - Math.min(diffY / 600, 0.75));
-      setPullDistance(distance);
-    } else if (diffY < 0) {
+    // Zona muerta de 12 px: un toque normal (con 1-3 px de deriva) no mueve el layout
+    if (diffY > 12 && scrollTop <= 10) {
+      const efectivo = diffY - 12;
+      setPullDistance(efectivo * (1 - Math.min(efectivo / 600, 0.75)));
+    } else if (diffY <= 0) {
       setPullDistance(0);
-      setIsPulling(false);
+      if (diffY < 0) setIsPulling(false);
     }
   };
 
@@ -1514,10 +1518,19 @@ export function MarketPage() {
 
   const intentarApostar = (id: string, lado: Lado) => {
     if ((mercado.saldo || 0) < 1) {
-      document.body.animate([
-        { transform: "translateX(0)" }, { transform: "translateX(-7px)" },
-        { transform: "translateX(6px)" }, { transform: "translateX(-4px)" }, { transform: "translateX(0)" }
-      ], { duration: 280, easing: "ease-in-out" });
+      // Se sacuden solo los botones de apuesta: animar un transform en el body
+      // (que además es position: fixed) desajusta el hit-testing de los toques en iOS.
+      if (!reducirMovimiento()) {
+        document.querySelectorAll<HTMLElement>("[data-apuesta]").forEach((b) =>
+          b.animate(
+            [
+              { transform: "translateX(0)" }, { transform: "translateX(-7px)" },
+              { transform: "translateX(6px)" }, { transform: "translateX(-4px)" }, { transform: "translateX(0)" },
+            ],
+            { duration: 280, easing: "ease-in-out" }
+          )
+        );
+      }
       return;
     }
     playApuesta();
